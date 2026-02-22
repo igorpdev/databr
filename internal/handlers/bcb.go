@@ -81,6 +81,26 @@ func (h *BCBHandler) GetCambio(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetPIX handles GET /v1/bcb/pix/estatisticas.
+func (h *BCBHandler) GetPIX(w http.ResponseWriter, r *http.Request) {
+	records, err := h.store.FindLatest(r.Context(), "bcb_pix")
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, "PIX data not yet available")
+		return
+	}
+	rec := records[0]
+	respond(w, r, domain.APIResponse{
+		Source:    rec.Source,
+		UpdatedAt: rec.FetchedAt,
+		CostUSDC:  "0.001",
+		Data:      rec.Data,
+	})
+}
+
 // jsonError writes a JSON error response.
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")

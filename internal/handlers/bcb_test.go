@@ -115,6 +115,28 @@ func TestBCBHandler_GetCambio_NotFound(t *testing.T) {
 	}
 }
 
+func TestBCBHandler_GetPIX_OK(t *testing.T) {
+	store := &stubBCBStore{
+		records: []domain.SourceRecord{{
+			Source:    "bcb_pix",
+			RecordKey: "202501",
+			Data:      map[string]any{"ano_mes": "202501", "qtd_transacoes": float64(5000000000)},
+			FetchedAt: time.Now(),
+		}},
+	}
+	h := handlers.NewBCBHandler(store)
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/pix/estatisticas", h.GetPIX)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/pix/estatisticas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
 	store := &stubBCBStore{
 		records: []domain.SourceRecord{{
