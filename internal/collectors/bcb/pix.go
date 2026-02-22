@@ -27,7 +27,7 @@ func NewPIXCollector(baseURL string) *PIXCollector {
 	}
 	return &PIXCollector{
 		baseURL:    strings.TrimRight(baseURL, "/"),
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
@@ -37,7 +37,9 @@ func (c *PIXCollector) Schedule() string { return "@monthly" }
 func (c *PIXCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	var url string
 	if strings.Contains(c.baseURL, "olinda.bcb.gov.br") {
-		url = fmt.Sprintf("%s/EstatisticasTransacoesPix?$format=json&$top=12", c.baseURL)
+		// EstatisticasTransacoesPix is an OData Function that requires Database parameter.
+		// Empty string ('') is the accepted value for the production database.
+		url = fmt.Sprintf("%s/EstatisticasTransacoesPix(Database=@Database)?@Database=''&$format=json&$top=12", c.baseURL)
 	} else {
 		// test server: use baseURL directly
 		url = c.baseURL
@@ -67,7 +69,14 @@ func (c *PIXCollector) Collect(ctx context.Context) ([]domain.SourceRecord, erro
 
 	records := make([]domain.SourceRecord, 0, len(raw.Value))
 	for _, entry := range raw.Value {
-		anoMes, _ := entry["AnoMes"].(string)
+		// AnoMes is Edm.Int32 — JSON decoder unmarshals numbers as float64 in map[string]any.
+		var anoMes string
+		switch v := entry["AnoMes"].(type) {
+		case float64:
+			anoMes = fmt.Sprintf("%.0f", v)
+		case string:
+			anoMes = v
+		}
 		if anoMes == "" {
 			continue
 		}
@@ -76,8 +85,8 @@ func (c *PIXCollector) Collect(ctx context.Context) ([]domain.SourceRecord, erro
 			RecordKey: anoMes,
 			Data: map[string]any{
 				"ano_mes":          anoMes,
-				"qtd_transacoes":   entry["QtdTransacoes"],
-				"valor_transacoes": entry["ValorTransacoes"],
+				"qtd_transacoes":   entry["QUANTIDADE"],
+				"valor_transacoes": entry["VALOR"],
 			},
 			FetchedAt: time.Now().UTC(),
 		})

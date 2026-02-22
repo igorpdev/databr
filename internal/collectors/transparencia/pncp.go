@@ -11,7 +11,9 @@ import (
 	"github.com/databr/api/internal/domain"
 )
 
-const pncpBase = "https://pncp.gov.br/api/pncp/v1"
+// API migrated: old /api/pncp/v1 → /api/consulta/v1
+// New requirements: date format yyyyMMdd, tamanhoPagina >= 10, codigoModalidadeContratacao required.
+const pncpBase = "https://pncp.gov.br/api/consulta/v1"
 
 // PNCPCollector fetches public procurement data from PNCP (Portal Nacional de Contratações Públicas).
 // Note: /contratos endpoint has a routing bug on the server — use /contratacoes instead.
@@ -34,7 +36,14 @@ func NewPNCPCollector(baseURL string) *PNCPCollector {
 func (c *PNCPCollector) Source() string   { return "pncp_licitacoes" }
 func (c *PNCPCollector) Schedule() string { return "@daily" }
 
-// Collect fetches today's published contratacoes from PNCP.
+// pncpResponse wraps the paginated response from /api/consulta/v1.
+type pncpResponse struct {
+	Data            []map[string]any `json:"data"`
+	TotalRegistros  int              `json:"totalRegistros"`
+}
+
+// Collect fetches recent published contratacoes from PNCP (Pregão Eletrônico, modalidade 6).
+// API requirements (as of 2026-02): dates in yyyyMMdd, tamanhoPagina >= 10, codigoModalidadeContratacao required.
 func (c *PNCPCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	now := time.Now()
 	yesterday := now.AddDate(0, 0, -1)
@@ -42,10 +51,10 @@ func (c *PNCPCollector) Collect(ctx context.Context) ([]domain.SourceRecord, err
 	var url string
 	if strings.Contains(c.baseURL, "pncp.gov.br") {
 		url = fmt.Sprintf(
-			"%s/contratacoes/publicacao?dataInicial=%s&dataFinal=%s&pagina=1&tamanhoPagina=100",
+			"%s/contratacoes/publicacao?dataInicial=%s&dataFinal=%s&pagina=1&tamanhoPagina=50&codigoModalidadeContratacao=6",
 			c.baseURL,
-			yesterday.Format("2006-01-02"),
-			now.Format("2006-01-02"),
+			yesterday.Format("20060102"),
+			now.Format("20060102"),
 		)
 	} else {
 		url = c.baseURL
@@ -67,29 +76,42 @@ func (c *PNCPCollector) Collect(ctx context.Context) ([]domain.SourceRecord, err
 		return nil, fmt.Errorf("pncp: upstream returned %d", resp.StatusCode)
 	}
 
-	var raw []map[string]any
+	var raw pncpResponse
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("pncp: decode: %w", err)
 	}
 
-	records := make([]domain.SourceRecord, 0, len(raw))
-	for _, entry := range raw {
-		numControle, _ := entry["numeroControlePNCP"].(string)
-		if numControle == "" {
+	records := make([]domain.SourceRecord, 0, len(raw.Data))
+	for _, entry := range raw.Data {
+		// numeroCompra + anoCompra + sequencialCompra form a unique key
+		numCompra, _ := entry["numeroCompra"].(string)
+		if numCompra == "" {
 			continue
 		}
-		objeto, _ := entry["objeto"].(string)
-		valor, _ := entry["valorTotalEstimado"].(float64)
-		dataPubl, _ := entry["dataPublicacaoGlobal"].(string)
+		orgao := ""
+		if o, ok := entry["orgaoEntidade"].(map[string]any); ok {
+			orgao, _ = o["razaoSocial"].(string)
+		}
+		objeto, _ := entry["objetoCompra"].(string)
+		dataAtu, _ := entry["dataAtualizacao"].(string)
+
+		// Build unique key from orgao CNPJ + year + sequential
+		cnpjOrgao := ""
+		if o, ok := entry["orgaoEntidade"].(map[string]any); ok {
+			cnpjOrgao, _ = o["cnpj"].(string)
+		}
+		ano, _ := entry["anoCompra"].(float64)
+		seq, _ := entry["sequencialCompra"].(float64)
+		recordKey := fmt.Sprintf("%s_%d_%d", cnpjOrgao, int(ano), int(seq))
 
 		records = append(records, domain.SourceRecord{
 			Source:    "pncp_licitacoes",
-			RecordKey: numControle,
+			RecordKey: recordKey,
 			Data: map[string]any{
-				"numero_controle": numControle,
+				"numero_compra":   numCompra,
+				"orgao":           orgao,
 				"objeto":          objeto,
-				"valor_estimado":  valor,
-				"data_publicacao": dataPubl,
+				"data_atualizacao": dataAtu,
 			},
 			RawData:   entry,
 			FetchedAt: time.Now().UTC(),

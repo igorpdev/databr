@@ -10,15 +10,23 @@ import (
 	"github.com/databr/api/internal/collectors/transparencia"
 )
 
-var fakePNCPResponse = []map[string]any{
-	{
-		"cnpj":                 "00000000000001",
-		"razaoSocial":          "MINISTÉRIO DA FAZENDA",
-		"codigoUnidade":        "170001",
-		"numeroControlePNCP":   "2026000001",
-		"dataPublicacaoGlobal": "2026-02-01",
-		"objeto":               "Aquisição de material de escritório",
-		"valorTotalEstimado":   50000.0,
+// fakePNCPResponse mirrors the new /api/consulta/v1 paginated response format.
+var fakePNCPResponse = map[string]any{
+	"totalRegistros": 1,
+	"totalPaginas":   1,
+	"numeroPagina":   1,
+	"data": []map[string]any{
+		{
+			"numeroCompra":      "PE1/2026",
+			"anoCompra":         2026.0,
+			"sequencialCompra":  1.0,
+			"objetoCompra":      "Aquisição de material de escritório",
+			"dataAtualizacao":   "2026-02-01T00:00:00",
+			"orgaoEntidade": map[string]any{
+				"cnpj":       "00000000000001",
+				"razaoSocial": "MINISTÉRIO DA FAZENDA",
+			},
+		},
 	},
 }
 
@@ -65,7 +73,7 @@ func TestPNCPCollector_Collect(t *testing.T) {
 	if r.Source != "pncp_licitacoes" {
 		t.Errorf("Source = %q, want pncp_licitacoes", r.Source)
 	}
-	for _, field := range []string{"numero_controle", "objeto", "valor_estimado"} {
+	for _, field := range []string{"numero_compra", "objeto", "orgao"} {
 		if _, ok := r.Data[field]; !ok {
 			t.Errorf("Data missing field %q", field)
 		}

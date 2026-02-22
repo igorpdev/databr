@@ -34,9 +34,21 @@ func NewPTAXCollector(baseURL string) *PTAXCollector {
 func (c *PTAXCollector) Source() string   { return "bcb_ptax" }
 func (c *PTAXCollector) Schedule() string { return "@daily" }
 
-// Collect fetches USD PTAX for today (or last business day).
+// Collect fetches USD PTAX for the most recent available trading day.
+// PTAX returns empty on weekends and holidays, so we walk back up to 7 days.
 func (c *PTAXCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
-	return c.FetchByCurrency(ctx, "USD", time.Now().Format("2006-01-02"))
+	for i := 0; i < 7; i++ {
+		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		records, err := c.FetchByCurrency(ctx, "USD", date)
+		if err != nil {
+			return nil, err
+		}
+		if len(records) > 0 {
+			return records, nil
+		}
+	}
+	// All 7 days were holidays/weekends — return empty (not an error)
+	return []domain.SourceRecord{}, nil
 }
 
 // FetchByCurrency fetches the PTAX rate for the given currency (e.g. "USD", "EUR")

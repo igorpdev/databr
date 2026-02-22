@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,15 +21,47 @@ func NewSourceRecordRepository(db *pgxpool.Pool) *SourceRecordRepository {
 	return &SourceRecordRepository{db: db}
 }
 
-// Upsert inserts or updates a batch of source records.
-// ON CONFLICT (source, record_key) updates data and fetched_at.
+const upsertSQL = `
+	INSERT INTO source_records (source, record_key, data, raw_data, fetched_at, valid_until)
+	VALUES ($1, $2, $3, $4, $5, $6)
+	ON CONFLICT (source, record_key) DO UPDATE SET
+		data        = EXCLUDED.data,
+		raw_data    = EXCLUDED.raw_data,
+		fetched_at  = EXCLUDED.fetched_at,
+		valid_until = EXCLUDED.valid_until
+`
+
+// upsertBatchSize is the number of records sent per pgx.SendBatch round-trip.
+// Larger = fewer round-trips; smaller = less memory per batch.
+const upsertBatchSize = 1000
+
+// Upsert inserts or updates records using pgx.SendBatch to minimise round-trips.
+// Records are processed in chunks of upsertBatchSize so memory stays bounded.
 func (r *SourceRecordRepository) Upsert(ctx context.Context, records []domain.SourceRecord) error {
+	if len(records) == 0 {
+		return nil
+	}
+
+	for i := 0; i < len(records); i += upsertBatchSize {
+		end := i + upsertBatchSize
+		if end > len(records) {
+			end = len(records)
+		}
+		if err := r.upsertChunk(ctx, records[i:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *SourceRecordRepository) upsertChunk(ctx context.Context, records []domain.SourceRecord) error {
+	batch := &pgx.Batch{}
+
 	for _, rec := range records {
 		dataJSON, err := json.Marshal(rec.Data)
 		if err != nil {
 			return fmt.Errorf("repositories: marshal data for %s/%s: %w", rec.Source, rec.RecordKey, err)
 		}
-
 		var rawJSON []byte
 		if rec.RawData != nil {
 			rawJSON, err = json.Marshal(rec.RawData)
@@ -36,22 +69,18 @@ func (r *SourceRecordRepository) Upsert(ctx context.Context, records []domain.So
 				return fmt.Errorf("repositories: marshal raw_data for %s/%s: %w", rec.Source, rec.RecordKey, err)
 			}
 		}
+		batch.Queue(upsertSQL, rec.Source, rec.RecordKey, dataJSON, rawJSON, rec.FetchedAt, rec.ValidUntil)
+	}
 
-		_, err = r.db.Exec(ctx, `
-			INSERT INTO source_records (source, record_key, data, raw_data, fetched_at, valid_until)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (source, record_key)
-			DO UPDATE SET
-				data       = EXCLUDED.data,
-				raw_data   = EXCLUDED.raw_data,
-				fetched_at = EXCLUDED.fetched_at,
-				valid_until = EXCLUDED.valid_until
-		`, rec.Source, rec.RecordKey, dataJSON, rawJSON, rec.FetchedAt, rec.ValidUntil)
-		if err != nil {
-			return fmt.Errorf("repositories: upsert %s/%s: %w", rec.Source, rec.RecordKey, err)
+	br := r.db.SendBatch(ctx, batch)
+	defer br.Close()
+
+	for range records {
+		if _, err := br.Exec(); err != nil {
+			return fmt.Errorf("repositories: batch upsert: %w", err)
 		}
 	}
-	return nil
+	return br.Close()
 }
 
 // FindLatest returns the 100 most-recent records for the given source, ordered by fetched_at DESC.

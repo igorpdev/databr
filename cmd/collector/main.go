@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +26,21 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file, using environment variables")
 	}
+
+	// Health endpoint — Railway requires /health to mark the deployment as active.
+	go func() {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		log.Printf("[INFO] health server on :%s", port)
+		if err := http.ListenAndServe(":"+port, nil); err != nil {
+			log.Printf("[WARN] health server: %v", err)
+		}
+	}()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -56,6 +72,13 @@ func main() {
 		tse.NewCandidatosCollector(""),
 	}
 
+	// Run all collectors immediately on startup to populate the DB before cron fires.
+	log.Println("[INFO] running initial collection for all sources...")
+	for _, col := range collectors {
+		runCollector(ctx, col, repo)
+	}
+	log.Println("[INFO] initial collection complete")
+
 	c := cron.New()
 	for _, col := range collectors {
 		col := col // capture for closure
@@ -69,7 +92,7 @@ func main() {
 	}
 
 	c.Start()
-	log.Println("collector scheduler started — waiting for schedules")
+	log.Println("[INFO] collector scheduler started — waiting for schedules")
 
 	<-ctx.Done()
 	log.Println("shutting down collector...")
