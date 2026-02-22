@@ -72,12 +72,19 @@ func main() {
 		tse.NewCandidatosCollector(""),
 	}
 
-	// Run all collectors immediately on startup to populate the DB before cron fires.
-	log.Println("[INFO] running initial collection for all sources...")
-	for _, col := range collectors {
-		runCollector(ctx, col, repo)
-	}
-	log.Println("[INFO] initial collection complete")
+	// Run lightweight collectors immediately on startup to populate the DB.
+	// Skip @yearly collectors — they take too long and run on schedule.
+	log.Println("[INFO] running initial collection (skipping @yearly sources)...")
+	go func() {
+		for _, col := range collectors {
+			if col.Schedule() == "@yearly" {
+				log.Printf("[INFO] skipping %s on startup (schedule: @yearly)", col.Source())
+				continue
+			}
+			runCollector(ctx, col, repo)
+		}
+		log.Println("[INFO] initial collection complete")
+	}()
 
 	c := cron.New()
 	for _, col := range collectors {
