@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/databr/api/internal/domain"
@@ -35,20 +36,31 @@ const upsertSQL = `
 // Larger = fewer round-trips; smaller = less memory per batch.
 const upsertBatchSize = 1000
 
+// upsertLogEvery logs progress every N records during large upserts.
+const upsertLogEvery = 10_000
+
 // Upsert inserts or updates records using pgx.SendBatch to minimise round-trips.
 // Records are processed in chunks of upsertBatchSize so memory stays bounded.
+// Progress is logged every 10k records so long-running upserts are observable.
 func (r *SourceRecordRepository) Upsert(ctx context.Context, records []domain.SourceRecord) error {
 	if len(records) == 0 {
 		return nil
 	}
 
-	for i := 0; i < len(records); i += upsertBatchSize {
+	total := len(records)
+	source := records[0].Source
+	log.Printf("[INFO] upsert %s: starting %d records", source, total)
+
+	for i := 0; i < total; i += upsertBatchSize {
 		end := i + upsertBatchSize
-		if end > len(records) {
-			end = len(records)
+		if end > total {
+			end = total
 		}
 		if err := r.upsertChunk(ctx, records[i:end]); err != nil {
 			return err
+		}
+		if end%upsertLogEvery == 0 || end == total {
+			log.Printf("[INFO] upsert %s: %d/%d records done", source, end, total)
 		}
 	}
 	return nil

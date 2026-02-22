@@ -129,9 +129,10 @@ func runCollector(ctx context.Context, col domain.Collector, repo *repositories.
 		log.Printf("[INFO] %s: no records returned (weekend/holiday?)", col.Source())
 		return
 	}
+	log.Printf("[INFO] %s: collected %d records, starting upsert...", col.Source(), len(records))
 	if err := repo.Upsert(ctx, records); err != nil {
 		log.Printf("[ERROR] %s upsert: %v", col.Source(), err)
 		return
 	}
-	log.Printf("[INFO] %s: upserted %d records", col.Source(), len(records))
+	log.Printf("[INFO] %s: done — upserted %d records", col.Source(), len(records))
 }
