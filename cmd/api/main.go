@@ -189,11 +189,13 @@ func serverPort() string {
 	return "8080"
 }
 
-// networkName converts an EIP-155 chain ID string to the short name used by x402-go.
+// networkName converts an EIP-155 chain ID string or short name to the x402-go network name.
+// Accepts both "base" / "base-sepolia" directly and EIP-155 IDs like "eip155:8453".
 // Defaults to base-sepolia (testnet) when no network is configured.
 func networkName(eipNetwork string) string {
 	switch {
-	case strings.Contains(eipNetwork, "8453") && !strings.Contains(eipNetwork, "84532"):
+	case eipNetwork == "base",
+		strings.Contains(eipNetwork, "8453") && !strings.Contains(eipNetwork, "84532"):
 		return "base"
 	default:
 		return "base-sepolia"
