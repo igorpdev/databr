@@ -109,6 +109,7 @@ func main() {
 	r.Route("/v1", func(r chi.Router) {
 		// $0.001 — company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.001"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
 			r.Get("/tesouro/rreo", tesouroHand.GetRREO)
@@ -131,6 +132,7 @@ func main() {
 
 		// $0.002 — B3 stock quotes
 		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.002"))
 			if mercHandler != nil {
 				r.Get("/mercado/acoes/{ticker}", mercHandler.GetAcoes)
@@ -139,6 +141,7 @@ func main() {
 
 		// $0.003 — compliance via empresa sub-route, DOU search
 		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
 			r.Get("/dou/busca", douHandler.GetBusca)
@@ -146,6 +149,7 @@ func main() {
 
 		// $0.005 — full compliance check, CVM fund data
 		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
 			if mercHandler != nil {
@@ -155,6 +159,7 @@ func main() {
 
 		// $0.010 — judicial process search (DataJud CNJ)
 		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
 		})
