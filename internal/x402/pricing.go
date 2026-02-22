@@ -1,0 +1,106 @@
+// Package x402 provides payment middleware and pricing for the DataBR API.
+// It wraps the mark3labs/x402-go library with per-route dynamic pricing.
+package x402
+
+import (
+	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
+)
+
+// priceTable maps Chi route patterns to their USDC prices (as decimal strings).
+var priceTable = map[string]string{
+	"/v1/empresas/{cnpj}":             "0.001",
+	"/v1/empresas/{cnpj}/socios":      "0.001",
+	"/v1/empresas/{cnpj}/historico":   "0.002",
+	"/v1/empresas/{cnpj}/compliance":  "0.003",
+	"/v1/empresas/busca":              "0.001",
+	"/v1/mercado/acoes/{ticker}":      "0.002",
+	"/v1/mercado/fundos/{cnpj}":       "0.005",
+	"/v1/mercado/fatos-relevantes":    "0.002",
+	"/v1/mercado/fatos-relevantes/{id}": "0.002",
+	"/v1/mercado/insider/{ticker}":    "0.002",
+	"/v1/bcb/cambio/{moeda}":          "0.001",
+	"/v1/bcb/selic":                   "0.001",
+	"/v1/bcb/pix/estatisticas":        "0.001",
+	"/v1/bcb/credito":                 "0.001",
+	"/v1/bcb/reservas":                "0.001",
+	"/v1/compliance/{cnpj}":           "0.005",
+	"/v1/compliance/ceis/{cnpj}":      "0.003",
+	"/v1/compliance/cnep/{cnpj}":      "0.003",
+	"/v1/compliance/cepim/{cnpj}":     "0.003",
+	"/v1/compliance/licitacoes/{cnpj}": "0.003",
+	"/v1/economia/ipca":               "0.001",
+	"/v1/economia/pib":                "0.001",
+	"/v1/economia/emprego/caged":      "0.001",
+	"/v1/economia/emprego/rais/{ano}": "0.001",
+	"/v1/economia/indicadores":        "0.001",
+	"/v1/judicial/processos/{doc}":    "0.010",
+	"/v1/judicial/processos/{numero}": "0.010",
+	"/v1/dou/busca":                   "0.003",
+	"/v1/diarios/busca":               "0.003",
+	"/v1/ambiente/embargos/{cpf_cnpj}": "0.003",
+	"/v1/ambiente/car/{cpf_cnpj}":     "0.003",
+	"/v1/ambiente/desmatamento":       "0.002",
+	"/v1/transporte/veiculo/{placa}":  "0.002",
+	"/v1/transporte/aeronave/{prefixo}": "0.002",
+	"/v1/transporte/acidentes":        "0.001",
+}
+
+const contextSurcharge = "0.001" // ?format=context adds this to base price
+
+// PriceFor returns the USDC price string for a given route pattern.
+// Returns ("", false) if the route is not in the price table.
+func PriceFor(routePattern string) (string, bool) {
+	price, ok := priceTable[routePattern]
+	return price, ok
+}
+
+// AddContextPrice adds the context surcharge (+$0.001) to a base price string.
+// E.g. "0.001" → "0.002".
+func AddContextPrice(basePrice string) string {
+	base, err := strconv.ParseFloat(basePrice, 64)
+	if err != nil {
+		return basePrice
+	}
+	surcharge, _ := strconv.ParseFloat(contextSurcharge, 64)
+	total := base + surcharge
+	return fmt.Sprintf("%.3f", total)
+}
+
+// USDCToAtomicUnits converts a decimal USDC amount string to its 6-decimal atomic unit string.
+// E.g. "0.001" → "1000" (USDC has 6 decimals).
+func USDCToAtomicUnits(usdc string) string {
+	f, err := strconv.ParseFloat(usdc, 64)
+	if err != nil {
+		return "1000" // fallback: 0.001 USDC
+	}
+	// USDC has 6 decimals: multiply by 1_000_000
+	atomic := new(big.Float).Mul(big.NewFloat(f), big.NewFloat(1_000_000))
+	result, _ := atomic.Int(nil)
+	return result.String()
+}
+
+// allRoutePatterns returns all known route patterns (for documentation/MCP).
+func AllRoutePatterns() []string {
+	patterns := make([]string, 0, len(priceTable))
+	for p := range priceTable {
+		patterns = append(patterns, p)
+	}
+	return patterns
+}
+
+// DefaultPrice returns a sensible default price if a route is not in the table.
+const DefaultPrice = "0.001"
+
+// IsPublicPath returns true for paths that must bypass x402 (health, metrics).
+func IsPublicPath(path string) bool {
+	public := []string{"/health", "/metrics", "/favicon.ico"}
+	for _, p := range public {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
