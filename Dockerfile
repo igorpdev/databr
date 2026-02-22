@@ -20,4 +20,7 @@ COPY --from=builder /databr-api .
 
 EXPOSE 8080
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO /dev/null http://localhost:8080/health || exit 1
+
 CMD ["/app/databr-api"]

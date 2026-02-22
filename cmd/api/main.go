@@ -17,6 +17,7 @@ import (
 	"github.com/databr/api/internal/mcp"
 	"github.com/databr/api/internal/repositories"
 	x402pkg "github.com/databr/api/internal/x402"
+	migpkg "github.com/databr/api/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
@@ -35,6 +36,9 @@ func main() {
 	if pool, err := repositories.NewPool(ctx); err != nil {
 		log.Printf("DB unavailable (%v) — store-backed endpoints disabled", err)
 	} else {
+		if err := repositories.RunMigrations(ctx, pool, migpkg.FS); err != nil {
+			log.Printf("WARNING: migrations failed: %v", err)
+		}
 		store = repositories.NewSourceRecordRepository(pool)
 		defer pool.Close()
 	}
