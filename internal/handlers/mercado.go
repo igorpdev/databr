@@ -31,7 +31,7 @@ func (h *MercadoHandler) GetAcoes(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "No quote found for ticker "+ticker)
 		return
 	}
-	respond(w, domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.002",
@@ -53,7 +53,7 @@ func (h *MercadoHandler) GetFundos(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "Fundo não encontrado: "+normalized)
 		return
 	}
-	respond(w, domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.005",

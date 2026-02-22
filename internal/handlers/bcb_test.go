@@ -114,3 +114,37 @@ func TestBCBHandler_GetCambio_NotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
+
+func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
+	store := &stubBCBStore{
+		records: []domain.SourceRecord{{
+			Source:    "bcb_selic",
+			RecordKey: "20/02/2026",
+			Data:      map[string]any{"data": "20/02/2026", "valor": "0.055131"},
+			FetchedAt: time.Now(),
+		}},
+	}
+	h := handlers.NewBCBHandler(store)
+	r := newBCBRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic?format=context", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Context == "" {
+		t.Error("expected non-empty Context field when ?format=context")
+	}
+	if resp.Data != nil {
+		t.Error("expected nil Data when ?format=context")
+	}
+	if resp.CostUSDC != "0.002" {
+		t.Errorf("expected cost 0.002 (+0.001), got %s", resp.CostUSDC)
+	}
+}

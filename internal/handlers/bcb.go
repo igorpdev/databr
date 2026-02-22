@@ -3,7 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/databr/api/internal/domain"
 	"github.com/go-chi/chi/v5"
@@ -38,7 +41,7 @@ func (h *BCBHandler) GetSelic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rec := records[0]
-	respond(w, domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.001",
@@ -70,7 +73,7 @@ func (h *BCBHandler) GetCambio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respond(w, domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    match.Source,
 		UpdatedAt: match.FetchedAt,
 		CostUSDC:  "0.001",
@@ -85,8 +88,22 @@ func jsonError(w http.ResponseWriter, code int, msg string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-// respond writes a JSON API response.
-func respond(w http.ResponseWriter, resp domain.APIResponse) {
+// respond writes the API response, applying ?format=context if requested.
+func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
+	if r.URL.Query().Get("format") == "context" {
+		b, err := json.Marshal(resp.Data)
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, "failed to serialize context")
+			return
+		}
+		resp.Context = fmt.Sprintf("[%s] %s", resp.Source, string(b))
+		resp.Data = nil
+		// Add $0.001 using integer milliUSDC to avoid float rounding
+		if f, err := strconv.ParseFloat(resp.CostUSDC, 64); err == nil {
+			millis := int64(math.Round(f * 1000))
+			resp.CostUSDC = fmt.Sprintf("%.3f", float64(millis+1)/1000.0)
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }

@@ -38,7 +38,7 @@ func (h *EconomiaHandler) serveLatest(w http.ResponseWriter, r *http.Request, so
 	}
 
 	rec := records[0]
-	respond(w, domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  price,

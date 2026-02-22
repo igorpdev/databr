@@ -45,7 +45,7 @@ func (h *ComplianceHandler) GetCompliance(w http.ResponseWriter, r *http.Request
 	}
 
 	rec := records[0]
-	respond(w, domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.005",

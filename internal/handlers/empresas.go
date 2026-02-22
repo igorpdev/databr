@@ -61,14 +61,11 @@ func (h *EmpresasHandler) GetEmpresa(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rec := records[0]
-	resp := domain.APIResponse{
+	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		Cached:    false,
 		CostUSDC:  "0.001",
 		Data:      rec.Data,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	})
 }
