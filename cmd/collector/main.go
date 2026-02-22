@@ -72,19 +72,28 @@ func main() {
 		tse.NewCandidatosCollector(""),
 	}
 
-	// Run lightweight collectors immediately on startup to populate the DB.
-	// Skip @yearly collectors — they take too long and run on schedule.
-	log.Println("[INFO] running initial collection (skipping @yearly sources)...")
+	// Run all collectors on startup to populate the DB.
+	// Heavy collectors (@yearly) run in a separate goroutine to avoid blocking.
+	log.Println("[INFO] running initial collection for all sources...")
 	go func() {
 		for _, col := range collectors {
 			if col.Schedule() == "@yearly" {
-				log.Printf("[INFO] skipping %s on startup (schedule: @yearly)", col.Source())
 				continue
 			}
 			runCollector(ctx, col, repo)
 		}
-		log.Println("[INFO] initial collection complete")
+		log.Println("[INFO] initial collection complete (fast sources)")
 	}()
+	for _, col := range collectors {
+		if col.Schedule() != "@yearly" {
+			continue
+		}
+		col := col
+		go func() {
+			log.Printf("[INFO] running %s in background (large dataset)...", col.Source())
+			runCollector(ctx, col, repo)
+		}()
+	}
 
 	c := cron.New()
 	for _, col := range collectors {
