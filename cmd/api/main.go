@@ -48,6 +48,8 @@ func main() {
 		WalletAddress:  os.Getenv("WALLET_ADDRESS"),
 		FacilitatorURL: os.Getenv("X402_FACILITATOR_URL"),
 		Network:        networkName(os.Getenv("X402_NETWORK")),
+		CDPKeyID:       os.Getenv("CDP_KEY_ID"),
+		CDPKeySecret:   os.Getenv("CDP_KEY_SECRET"),
 	}
 	if x402Cfg.FacilitatorURL == "" {
 		x402Cfg.FacilitatorURL = "https://x402.org/facilitator"

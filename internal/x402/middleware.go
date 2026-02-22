@@ -1,10 +1,12 @@
 package x402
 
 import (
+	"log"
 	"net/http"
 
 	x402sdk "github.com/mark3labs/x402-go"
 	x402http "github.com/mark3labs/x402-go/http"
+	cdpcoinbase "github.com/mark3labs/x402-go/signers/coinbase"
 )
 
 // MiddlewareConfig holds configuration for the x402 payment middleware.
@@ -19,6 +21,14 @@ type MiddlewareConfig struct {
 
 	// Network is the blockchain network name: "base-sepolia" or "base".
 	Network string
+
+	// CDPKeyID is the Coinbase Developer Platform API key ID (UUID from the portal).
+	// Required only for the CDP mainnet facilitator.
+	CDPKeyID string
+
+	// CDPKeySecret is the base64-encoded private key from the CDP portal.
+	// Supports Ed25519 (64-byte raw), Ed25519 seed (32-byte), PKCS8, and SEC1/EC formats.
+	CDPKeySecret string
 }
 
 // NewPricedMiddleware creates a Chi-compatible x402 payment middleware
@@ -40,11 +50,32 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 		panic("x402: invalid payment requirement config: " + err.Error())
 	}
 
-	return x402http.NewX402Middleware(&x402http.Config{
+	httpCfg := &x402http.Config{
 		FacilitatorURL:      cfg.FacilitatorURL,
 		PaymentRequirements: []x402sdk.PaymentRequirement{requirement},
 		VerifyOnly:          false,
-	})
+	}
+
+	// Wire CDP JWT authentication for the mainnet facilitator when credentials are present.
+	// The CDP facilitator requires a short-lived Bearer JWT signed with the EC/Ed25519 key;
+	// the AuthorizationProvider is called per-request so tokens are always fresh.
+	if cfg.CDPKeyID != "" && cfg.CDPKeySecret != "" {
+		cdpAuth, err := cdpcoinbase.NewCDPAuth(cfg.CDPKeyID, cfg.CDPKeySecret, "")
+		if err != nil {
+			panic("x402: invalid CDP credentials: " + err.Error())
+		}
+		httpCfg.FacilitatorAuthorizationProvider = func(r *http.Request) string {
+			token, err := cdpAuth.GenerateBearerToken(r.Method, r.URL.Path)
+			if err != nil {
+				log.Printf("x402: CDP JWT generation failed: %v", err)
+				return ""
+			}
+			return "Bearer " + token
+		}
+		log.Printf("x402: CDP mainnet facilitator auth enabled (key=%s…)", cfg.CDPKeyID[:8])
+	}
+
+	return x402http.NewX402Middleware(httpCfg)
 }
 
 // HealthBypassMiddleware wraps another middleware and skips x402 for public paths
