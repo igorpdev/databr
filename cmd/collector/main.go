@@ -47,6 +47,7 @@ func main() {
 		// Phase 2: Financial markets
 		bcb.NewCreditoCollector(""),
 		bcb.NewReservasCollector(""),
+		bcb.NewPIXCollector(""),
 		cvm.NewFundosCollector(""),
 		b3.NewCotacoesCollector(""),
 

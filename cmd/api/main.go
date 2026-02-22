@@ -9,6 +9,9 @@ import (
 	"strings"
 
 	cnpjcol "github.com/databr/api/internal/collectors/cnpj"
+	"github.com/databr/api/internal/collectors/dou"
+	"github.com/databr/api/internal/collectors/juridico"
+	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/handlers"
 	"github.com/databr/api/internal/mcp"
@@ -50,18 +53,30 @@ func main() {
 	cnpjCollector := cnpjcol.NewCollector("")
 	cguCollector := transparencia.NewCGUCollector("", os.Getenv("TRANSPARENCIA_API_KEY"))
 
-	// HTTP handlers
+	// On-demand collectors for new endpoints
+	tesouroCol := tesouro.NewSICONFICollector("")
+	qdCollector := dou.NewQDCollector("")
+	djCollector := juridico.NewDataJudCollector("", os.Getenv("DATAJUD_API_KEY"))
+
+	// HTTP handlers (on-demand, always available)
 	empHandler := handlers.NewEmpresasHandler(cnpjCollector)
 	compHandler := handlers.NewComplianceHandler(cguCollector)
+	tesouroHand := handlers.NewTesouroHandler(tesouroCol)
+	douHandler := handlers.NewDOUHandler(qdCollector)
+	judicialHand := handlers.NewJudicialHandler(djCollector)
+
+	// Store-backed handlers (only available when DB is connected)
 	var (
-		bcbHandler  *handlers.BCBHandler
-		ecoHandler  *handlers.EconomiaHandler
-		mercHandler *handlers.MercadoHandler
+		bcbHandler   *handlers.BCBHandler
+		ecoHandler   *handlers.EconomiaHandler
+		mercHandler  *handlers.MercadoHandler
+		transHandler *handlers.TransparenciaHandler
 	)
 	if store != nil {
 		bcbHandler = handlers.NewBCBHandler(store)
 		ecoHandler = handlers.NewEconomiaHandler(store)
 		mercHandler = handlers.NewMercadoHandler(store)
+		transHandler = handlers.NewTransparenciaHandler(store)
 	}
 
 	// MCP server (proxies to this REST API via SSE transport)
@@ -88,17 +103,25 @@ func main() {
 
 	// /v1 API routes, grouped by x402 price tier
 	r.Route("/v1", func(r chi.Router) {
-		// $0.001 — company data, BCB rates, economic indicators
+		// $0.001 — company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.001"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
+			r.Get("/tesouro/rreo", tesouroHand.GetRREO)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
+				r.Get("/bcb/pix/estatisticas", bcbHandler.GetPIX)
+				r.Get("/bcb/credito", bcbHandler.GetCredito)
+				r.Get("/bcb/reservas", bcbHandler.GetReservas)
 			}
 			if ecoHandler != nil {
 				r.Get("/economia/ipca", ecoHandler.GetIPCA)
 				r.Get("/economia/pib", ecoHandler.GetPIB)
+			}
+			if transHandler != nil {
+				r.Get("/transparencia/licitacoes", transHandler.GetLicitacoes)
+				r.Get("/eleicoes/candidatos", transHandler.GetCandidatos)
 			}
 		})
 
@@ -110,10 +133,11 @@ func main() {
 			}
 		})
 
-		// $0.003 — compliance via empresa sub-route
+		// $0.003 — compliance via empresa sub-route, DOU search
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
+			r.Get("/dou/busca", douHandler.GetBusca)
 		})
 
 		// $0.005 — full compliance check, CVM fund data
@@ -123,6 +147,12 @@ func main() {
 			if mercHandler != nil {
 				r.Get("/mercado/fundos/{cnpj}", mercHandler.GetFundos)
 			}
+		})
+
+		// $0.010 — judicial process search (DataJud CNJ)
+		r.Group(func(r chi.Router) {
+			r.Use(optionalX402(x402Cfg, "0.010"))
+			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
 		})
 	})
 
