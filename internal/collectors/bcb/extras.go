@@ -51,31 +51,23 @@ func (c *CreditoCollector) Collect(ctx context.Context) ([]domain.SourceRecord, 
 	}
 	defer resp.Body.Close()
 
-	// OLINDA returns {"value": [...]}
-	var container struct {
-		Value []map[string]any `json:"value"`
-	}
-	// Try OLINDA format first
-	if err := json.NewDecoder(resp.Body).Decode(&container); err != nil {
+	// SGS returns a raw JSON array [...] (same format as bcb_selic and bcb_reservas)
+	var raw []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("bcb_credito: decode: %w", err)
 	}
 
-	records := make([]domain.SourceRecord, 0, len(container.Value))
-	for _, entry := range container.Value {
-		data, _ := entry["Data"].(string)
-		valor, _ := entry["Valor"].(string)
-		if data == "" {
-			// Try SGS format (lowercase)
-			data, _ = entry["data"].(string)
-			valor, _ = entry["valor"].(string)
-		}
+	records := make([]domain.SourceRecord, 0, len(raw))
+	for _, entry := range raw {
+		data, _ := entry["data"].(string)
+		valor, _ := entry["valor"].(string)
 		if data == "" {
 			continue
 		}
 		records = append(records, domain.SourceRecord{
 			Source:    "bcb_credito",
 			RecordKey: data,
-			Data:      map[string]any{"data": data, "valor_bilhoes_brl": valor},
+			Data:      map[string]any{"data": data, "valor_mi_brl": valor},
 			FetchedAt: time.Now().UTC(),
 		})
 	}

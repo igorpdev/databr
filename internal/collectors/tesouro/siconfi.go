@@ -43,16 +43,31 @@ func (c *SICONFICollector) Collect(ctx context.Context) ([]domain.SourceRecord, 
 	return nil, nil
 }
 
+// ufToIBGE maps Brazilian state abbreviations to their 2-digit IBGE codes.
+// SICONFI requires id_ente (IBGE code), not the UF abbreviation.
+var ufToIBGE = map[string]int{
+	"AC": 12, "AL": 27, "AM": 13, "AP": 16, "BA": 29, "CE": 23,
+	"DF": 53, "ES": 32, "GO": 52, "MA": 21, "MG": 31, "MS": 50,
+	"MT": 51, "PA": 15, "PB": 25, "PE": 26, "PI": 22, "PR": 41,
+	"RJ": 33, "RN": 24, "RO": 11, "RR": 14, "RS": 43, "SC": 42,
+	"SE": 28, "SP": 35, "TO": 17,
+}
+
 // FetchRREO fetches the RREO (Relatório Resumido da Execução Orçamentária)
-// for a given UF, exercise year and period number.
+// for a given UF abbreviation (ex: SP), exercise year and period number.
 // Note: when using the production URL, the double slash (tt//) is intentional ORDS routing.
 func (c *SICONFICollector) FetchRREO(ctx context.Context, uf string, ano, periodo int) ([]domain.SourceRecord, error) {
 	var url string
 	if strings.Contains(c.baseURL, "apidatalake.tesouro.gov.br") {
+		// SICONFI uses id_ente (IBGE 2-digit code), not UF abbreviation
+		idEnte, ok := ufToIBGE[strings.ToUpper(uf)]
+		if !ok {
+			return nil, fmt.Errorf("siconfi: UF desconhecida: %s", uf)
+		}
 		// Double slash after "tt/" is intentional — required by ORDS routing
 		url = fmt.Sprintf(
-			"%s//rreo?an_exercicio=%d&nr_periodo=%d&co_tipo_demonstrativo=RREO&no_uf=%s",
-			c.baseURL, ano, periodo, uf,
+			"%s//rreo?an_exercicio=%d&nr_periodo=%d&co_tipo_demonstrativo=RREO&id_ente=%d",
+			c.baseURL, ano, periodo, idEnte,
 		)
 	} else {
 		// Test server: use baseURL directly
@@ -81,19 +96,22 @@ func (c *SICONFICollector) FetchRREO(ctx context.Context, uf string, ano, period
 		return nil, fmt.Errorf("siconfi: decode: %w", err)
 	}
 
-	records := make([]domain.SourceRecord, 0, len(raw.Items))
-	for _, item := range raw.Items {
-		ente, _ := item["ente"].(string)
-		if ente == "" {
-			continue
-		}
-		key := fmt.Sprintf("%s_%d_%d", uf, ano, periodo)
-		records = append(records, domain.SourceRecord{
-			Source:    "tesouro_siconfi",
-			RecordKey: key,
-			Data:      item,
-			FetchedAt: time.Now().UTC(),
-		})
+	if len(raw.Items) == 0 {
+		return nil, nil
 	}
-	return records, nil
+	// Return all rows as a single aggregated record (keyed by UF+ano+periodo)
+	key := fmt.Sprintf("%s_%d_%d", strings.ToUpper(uf), ano, periodo)
+	record := domain.SourceRecord{
+		Source:    "tesouro_siconfi",
+		RecordKey: key,
+		Data: map[string]any{
+			"uf":      strings.ToUpper(uf),
+			"ano":     ano,
+			"periodo": periodo,
+			"linhas":  raw.Items,
+			"total":   len(raw.Items),
+		},
+		FetchedAt: time.Now().UTC(),
+	}
+	return []domain.SourceRecord{record}, nil
 }

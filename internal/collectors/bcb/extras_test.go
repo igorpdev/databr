@@ -2,30 +2,17 @@ package bcb_test
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/databr/api/internal/collectors/bcb"
 )
 
-var fakeOLINDAResponse = map[string]any{
-	"value": []map[string]any{
-		{"Data": "2026-01", "Valor": "5800.5"},
-	},
-}
-
-func newOLINDAGenServer(t *testing.T, resp any) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
-	}))
+var fakeCreditoResponse = []map[string]any{
+	{"data": "01/12/2025", "valor": "4090464.00"},
 }
 
 func TestCreditoCollector_Source(t *testing.T) {
-	srv := newOLINDAGenServer(t, fakeOLINDAResponse)
+	srv := newSGSServer(t, fakeCreditoResponse)
 	defer srv.Close()
 	c := bcb.NewCreditoCollector(srv.URL)
 	if c.Source() != "bcb_credito" {
@@ -34,7 +21,7 @@ func TestCreditoCollector_Source(t *testing.T) {
 }
 
 func TestCreditoCollector_Collect(t *testing.T) {
-	srv := newOLINDAGenServer(t, fakeOLINDAResponse)
+	srv := newSGSServer(t, fakeCreditoResponse)
 	defer srv.Close()
 
 	c := bcb.NewCreditoCollector(srv.URL)

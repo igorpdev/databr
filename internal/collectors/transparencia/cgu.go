@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -100,16 +101,27 @@ func (c *CGUCollector) fetchList(ctx context.Context, path, cnpjNum string) ([]a
 		return nil, fmt.Errorf("cgu_compliance: %s returned %d", path, resp.StatusCode)
 	}
 
-	// CGU returns {"data": [...]} or just [...]
-	var raw map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	// CGU returns a raw JSON array [...] directly
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
 
-	if data, ok := raw["data"]; ok {
-		if list, ok := data.([]any); ok {
-			return list, nil
+	// Try array first (actual CGU response format)
+	var list []any
+	if err := json.Unmarshal(body, &list); err == nil {
+		return list, nil
+	}
+
+	// Fallback: try {"data": [...]} envelope
+	var wrapped map[string]any
+	if err := json.Unmarshal(body, &wrapped); err == nil {
+		if data, ok := wrapped["data"]; ok {
+			if l, ok := data.([]any); ok {
+				return l, nil
+			}
 		}
 	}
+
 	return []any{}, nil
 }

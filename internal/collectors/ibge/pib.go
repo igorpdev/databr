@@ -22,6 +22,9 @@ type PIBCollector struct {
 
 // NewPIBCollector creates a PIB collector.
 func NewPIBCollector(baseURL string) *PIBCollector {
+	if baseURL == "" {
+		baseURL = sidraBase
+	}
 	return &PIBCollector{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		ipca:    NewIPCACollector(baseURL),

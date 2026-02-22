@@ -1,0 +1,9 @@
+.env
+*.env
+.worktrees/
+.git/
+databr-api
+/tmp/
+docs/
+tests/
+cmd/seed/

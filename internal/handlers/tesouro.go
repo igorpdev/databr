@@ -56,14 +56,11 @@ func (h *TesouroHandler) GetRREO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items := make([]map[string]any, len(records))
-	for i, rec := range records {
-		items[i] = rec.Data
-	}
+	rec := records[0]
 	respond(w, r, domain.APIResponse{
 		Source:    "tesouro_siconfi",
-		UpdatedAt: records[0].FetchedAt,
+		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.001",
-		Data:      map[string]any{"uf": uf, "ano": ano, "periodo": periodo, "registros": items},
+		Data:      rec.Data,
 	})
 }

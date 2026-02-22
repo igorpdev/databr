@@ -43,7 +43,7 @@ func (c *SelicCollector) Collect(ctx context.Context) ([]domain.SourceRecord, er
 	// When using a custom test base URL, append the series path; otherwise use full URL.
 	var url string
 	if strings.Contains(c.baseURL, "api.bcb.gov.br") {
-		url = fmt.Sprintf("%s.%s/dados/ultimos/30?formato=json", c.baseURL, sgsSelic)
+		url = fmt.Sprintf("%s.%s/dados/ultimos/20?formato=json", c.baseURL, sgsSelic)
 	} else {
 		// Test server: just append a path that the test server handles
 		url = fmt.Sprintf("%s/dados/ultimos/30", c.baseURL)
