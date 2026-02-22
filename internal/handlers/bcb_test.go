@@ -137,6 +137,46 @@ func TestBCBHandler_GetPIX_OK(t *testing.T) {
 	}
 }
 
+func TestBCBHandler_GetCredito_OK(t *testing.T) {
+	store := &stubBCBStore{
+		records: []domain.SourceRecord{{
+			Source:    "bcb_credito",
+			RecordKey: "01/01/2026",
+			Data:      map[string]any{"data": "01/01/2026", "valor_bilhoes_brl": "6100.5"},
+			FetchedAt: time.Now(),
+		}},
+	}
+	h := handlers.NewBCBHandler(store)
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/credito", h.GetCredito)
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/credito", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestBCBHandler_GetReservas_OK(t *testing.T) {
+	store := &stubBCBStore{
+		records: []domain.SourceRecord{{
+			Source:    "bcb_reservas",
+			RecordKey: "01/01/2026",
+			Data:      map[string]any{"data": "01/01/2026", "valor_bilhoes_usd": "350.2"},
+			FetchedAt: time.Now(),
+		}},
+	}
+	h := handlers.NewBCBHandler(store)
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/reservas", h.GetReservas)
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/reservas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
 func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
 	store := &stubBCBStore{
 		records: []domain.SourceRecord{{
