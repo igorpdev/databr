@@ -17,6 +17,7 @@ import (
 	"github.com/databr/api/internal/collectors/energia"
 	"github.com/databr/api/internal/collectors/ibge"
 	"github.com/databr/api/internal/collectors/saude"
+	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/collectors/tse"
 	"github.com/databr/api/internal/domain"
@@ -70,8 +71,9 @@ func main() {
 		cvm.NewFundosCollector(""),
 		b3.NewCotacoesCollector(""),
 
-		// Phase 3: Transparency & elections
+		// Phase 3: Transparency, treasury & elections
 		transparencia.NewPNCPCollector(""),
+		tesouro.NewSICONFICollector(""),
 		tse.NewCandidatosCollector(""),
 
 		// Phase 4: Expectativas, energy, health, environmental
