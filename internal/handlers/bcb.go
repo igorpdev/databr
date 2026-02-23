@@ -16,6 +16,10 @@ import (
 type SourceStore interface {
 	FindLatest(ctx context.Context, source string) ([]domain.SourceRecord, error)
 	FindOne(ctx context.Context, source, key string) (*domain.SourceRecord, error)
+	// FindLatestFiltered returns records for the given source where the JSONB
+	// data field at jsonbKey contains jsonbValue (case-insensitive substring).
+	// Useful for large datasets like ANEEL where in-memory filtering is impractical.
+	FindLatestFiltered(ctx context.Context, source, jsonbKey, jsonbValue string) ([]domain.SourceRecord, error)
 }
 
 // BCBHandler handles requests for /v1/bcb/*.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +30,21 @@ func (s *stubAmbientalStore) FindOne(ctx context.Context, source, key string) (*
 		}
 	}
 	return nil, nil
+}
+
+func (s *stubAmbientalStore) FindLatestFiltered(ctx context.Context, source, jsonbKey, jsonbValue string) ([]domain.SourceRecord, error) {
+	var out []domain.SourceRecord
+	needle := strings.ToUpper(jsonbValue)
+	for _, r := range s.records {
+		if r.Source != source {
+			continue
+		}
+		v, _ := r.Data[jsonbKey].(string)
+		if strings.Contains(strings.ToUpper(v), needle) {
+			out = append(out, r)
+		}
+	}
+	return out, s.err
 }
 
 func TestAmbientalHandler_GetDesmatamento_OK(t *testing.T) {

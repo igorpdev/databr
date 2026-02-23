@@ -129,6 +129,44 @@ func (r *SourceRecordRepository) FindLatest(ctx context.Context, source string) 
 	return records, rows.Err()
 }
 
+// FindLatestFiltered returns records for the given source where the JSONB data
+// field at jsonbKey contains jsonbValue (case-insensitive substring match).
+// Returns up to 1 000 records, ordered by fetched_at DESC.
+// This is intended for large datasets like ANEEL where in-memory filtering
+// on the 100-row FindLatest result would miss most records.
+func (r *SourceRecordRepository) FindLatestFiltered(ctx context.Context, source, jsonbKey, jsonbValue string) ([]domain.SourceRecord, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT source, record_key, data, raw_data, fetched_at, valid_until
+		FROM source_records
+		WHERE source = $1 AND LOWER(data->>$2) LIKE LOWER($3)
+		ORDER BY fetched_at DESC
+		LIMIT 1000
+	`, source, jsonbKey, "%"+jsonbValue+"%")
+	if err != nil {
+		return nil, fmt.Errorf("repositories: FindLatestFiltered %s[%s]: %w", source, jsonbKey, err)
+	}
+	defer rows.Close()
+
+	var records []domain.SourceRecord
+	for rows.Next() {
+		var rec domain.SourceRecord
+		var dataJSON, rawJSON []byte
+		var fetchedAt time.Time
+		var validUntil *time.Time
+
+		if err := rows.Scan(&rec.Source, &rec.RecordKey, &dataJSON, &rawJSON, &fetchedAt, &validUntil); err != nil {
+			return nil, fmt.Errorf("repositories: FindLatestFiltered scan: %w", err)
+		}
+		rec.FetchedAt = fetchedAt
+		rec.ValidUntil = validUntil
+		if err := json.Unmarshal(dataJSON, &rec.Data); err != nil {
+			continue
+		}
+		records = append(records, rec)
+	}
+	return records, rows.Err()
+}
+
 // FindOne retrieves a single source record by (source, record_key).
 // Returns (nil, nil) if not found.
 func (r *SourceRecordRepository) FindOne(ctx context.Context, source, key string) (*domain.SourceRecord, error) {

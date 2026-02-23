@@ -26,7 +26,6 @@ func tarifaRecords() []domain.SourceRecord {
 			Data: map[string]any{
 				"distribuidora":        "CPFL JAGUARI",
 				"cnpj":                 "53859112000169",
-				"uf":                   "SP",
 				"dat_inicio_vigencia":  "2025-02-01",
 				"dat_fim_vigencia":     "2026-01-31",
 				"base_tarifaria":       "Tarifa de Aplicacao",
@@ -46,7 +45,6 @@ func tarifaRecords() []domain.SourceRecord {
 			Data: map[string]any{
 				"distribuidora":        "ENEL SP",
 				"cnpj":                 "61695227000193",
-				"uf":                   "SP",
 				"dat_inicio_vigencia":  "2025-01-01",
 				"dat_fim_vigencia":     "2025-12-31",
 				"base_tarifaria":       "Tarifa de Aplicacao",
@@ -152,35 +150,6 @@ func TestEnergiaHandler_GetTarifas_FilterByDistribuidora_NotFound(t *testing.T) 
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 when filter matches nothing, got %d", rec.Code)
-	}
-}
-
-func TestEnergiaHandler_GetTarifas_FilterByUF(t *testing.T) {
-	store := &stubBCBStore{records: tarifaRecords()}
-	h := handlers.NewEnergiaHandler(store)
-	r := newEnergiaRouter(h)
-
-	// Both fake records have uf=SP, so both should be returned.
-	req := httptest.NewRequest(http.MethodGet, "/v1/energia/tarifas?uf=SP", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 for uf=SP, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestEnergiaHandler_GetTarifas_FilterByUF_NotFound(t *testing.T) {
-	store := &stubBCBStore{records: tarifaRecords()}
-	h := handlers.NewEnergiaHandler(store)
-	r := newEnergiaRouter(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/energia/tarifas?uf=AM", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for unknown uf, got %d", rec.Code)
 	}
 }
 
