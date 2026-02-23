@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"embed"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -315,7 +316,7 @@ func main() {
 				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "+
 				"font-src 'self' https://fonts.gstatic.com; "+
 				"img-src 'self' data: https:; connect-src 'self'")
-		http.ServeFileFS(w, r, docfs.Static, "landing.html")
+		serveEmbedded(w, docfs.Static, "landing.html", "text/html; charset=utf-8")
 	})
 
 	// API Documentation (Scalar UI)
@@ -326,11 +327,10 @@ func main() {
 				"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
 				"font-src 'self' https://cdn.jsdelivr.net; "+
 				"img-src 'self' data: https:; connect-src 'self'")
-		http.ServeFileFS(w, r, docfs.Static, "scalar.html")
+		serveEmbedded(w, docfs.Static, "scalar.html", "text/html; charset=utf-8")
 	})
 	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
-		http.ServeFileFS(w, r, docfs.Static, "openapi.yaml")
+		serveEmbedded(w, docfs.Static, "openapi.yaml", "text/yaml; charset=utf-8")
 	})
 
 	// /v1 API routes, grouped by x402 price tier
@@ -683,4 +683,15 @@ func maskWallet(addr string) string {
 		return "(not set)"
 	}
 	return addr[:6] + "…" + addr[len(addr)-4:]
+}
+
+// serveEmbedded reads a file from an embed.FS and writes it to the response.
+func serveEmbedded(w http.ResponseWriter, fsys embed.FS, name, contentType string) {
+	data, err := fsys.ReadFile(name)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Write(data)
 }
