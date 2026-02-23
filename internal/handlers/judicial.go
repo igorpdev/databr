@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -53,7 +54,7 @@ func (h *JudicialHandler) GetProcessos(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "datajud_cnj",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.010",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"processos": items, "total": len(items), "documento": doc},
 	})
 }

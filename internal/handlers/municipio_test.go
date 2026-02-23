@@ -11,6 +11,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -92,6 +93,7 @@ func TestMunicipio_OK_AllData(t *testing.T) {
 	router := newMunicipioRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/municipios/3550308/perfil", nil)
+	req = x402pkg.InjectPrice(req, "0.007")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -106,8 +108,8 @@ func TestMunicipio_OK_AllData(t *testing.T) {
 	if resp.Source != "municipio_perfil" {
 		t.Errorf("Source = %q, want municipio_perfil", resp.Source)
 	}
-	if resp.CostUSDC != "0.030" {
-		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("CostUSDC = %q, want 0.007", resp.CostUSDC)
 	}
 	if resp.Data["codigo"] != "3550308" {
 		t.Errorf("codigo = %v, want 3550308", resp.Data["codigo"])

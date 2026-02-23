@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -134,6 +135,7 @@ func TestMercadoHandler_GetCotasByCNPJ_OK(t *testing.T) {
 	r := newMercadoRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fundos/11111111000111/cotas", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -148,8 +150,8 @@ func TestMercadoHandler_GetCotasByCNPJ_OK(t *testing.T) {
 	if resp.Source != "cvm_cotas" {
 		t.Errorf("Source = %q, want cvm_cotas", resp.Source)
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("expected non-nil Data field")
@@ -242,6 +244,7 @@ func TestMercadoHandler_GetFatosRelevantes_OK(t *testing.T) {
 	r := newMercadoRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fatos-relevantes", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -256,8 +259,8 @@ func TestMercadoHandler_GetFatosRelevantes_OK(t *testing.T) {
 	if resp.Source != "cvm_fatos" {
 		t.Errorf("Source = %q, want cvm_fatos", resp.Source)
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("expected non-nil Data field")
@@ -349,8 +352,8 @@ func TestMercadoHandler_GetFatosById_OK(t *testing.T) {
 	if resp.Source != "cvm_fatos" {
 		t.Errorf("Source = %q, want cvm_fatos", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("expected non-nil Data field")

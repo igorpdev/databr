@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -63,7 +64,7 @@ func (h *OrcamentoHandler) GetDespesas(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "siafi_despesas",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"despesas": dados},
 	})
 }
@@ -92,7 +93,7 @@ func (h *OrcamentoHandler) GetFuncionalProgramatica(w http.ResponseWriter, r *ht
 	respond(w, r, domain.APIResponse{
 		Source:    "siafi_funcional_programatica",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"classificacao": dados},
 	})
 }
@@ -126,7 +127,7 @@ func (h *OrcamentoHandler) GetDocumentos(w http.ResponseWriter, r *http.Request)
 	respond(w, r, domain.APIResponse{
 		Source:    "siafi_documentos",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"documentos": dados},
 	})
 }
@@ -153,7 +154,7 @@ func (h *OrcamentoHandler) GetDocumento(w http.ResponseWriter, r *http.Request) 
 	respond(w, r, domain.APIResponse{
 		Source:    "siafi_documento",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"documento": dados},
 	})
 }
@@ -182,7 +183,7 @@ func (h *OrcamentoHandler) GetFavorecidos(w http.ResponseWriter, r *http.Request
 	respond(w, r, domain.APIResponse{
 		Source:    "siafi_favorecidos",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"favorecidos": dados},
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // TransparenciaHandler handles /v1/transparencia/* and /v1/eleicoes/* endpoints.
@@ -35,7 +36,7 @@ func (h *TransparenciaHandler) GetLicitacoes(w http.ResponseWriter, r *http.Requ
 	respond(w, r, domain.APIResponse{
 		Source:    "pncp_licitacoes",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"licitacoes": items, "total": len(items)},
 	})
 }
@@ -71,7 +72,7 @@ func (h *TransparenciaHandler) GetCandidatos(w http.ResponseWriter, r *http.Requ
 	respond(w, r, domain.APIResponse{
 		Source:    "tse_candidatos",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"candidatos": items, "total": len(items)},
 	})
 }

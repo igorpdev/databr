@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // TestCarteiraRisco_OK_TwoDifferentCNPJs verifies the handler returns a valid
@@ -43,6 +44,7 @@ func TestCarteiraRisco_OK_TwoDifferentCNPJs(t *testing.T) {
 	body := `{"cnpjs":["11222333000181","11444777000161"]}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/carteira/risco", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = x402pkg.InjectPrice(req, "0.150")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -58,8 +60,8 @@ func TestCarteiraRisco_OK_TwoDifferentCNPJs(t *testing.T) {
 	if resp.Source != "carteira_risco" {
 		t.Errorf("Source = %q, want carteira_risco", resp.Source)
 	}
-	if resp.CostUSDC != "0.100" {
-		t.Errorf("CostUSDC = %q, want 0.100", resp.CostUSDC)
+	if resp.CostUSDC != "0.150" {
+		t.Errorf("CostUSDC = %q, want 0.150", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

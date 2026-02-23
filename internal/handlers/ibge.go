@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -70,7 +71,7 @@ func (h *IbgeHandler) GetMunicipio(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_localidades",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     raw,
 	})
 }
@@ -98,7 +99,7 @@ func (h *IbgeHandler) GetEstados(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_localidades",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"estados": list,
 			"total":   len(list),
@@ -129,7 +130,7 @@ func (h *IbgeHandler) GetRegioes(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_localidades",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"regioes": list, "total": len(list)},
 	})
 }
@@ -169,7 +170,7 @@ func (h *IbgeHandler) GetMunicipiosPorUF(w http.ResponseWriter, r *http.Request)
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_localidades",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"municipios": list, "total": len(list), "uf": uf},
 	})
 }
@@ -211,7 +212,7 @@ func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
 		}
 		respond(w, r, domain.APIResponse{
 			Source:   "ibge_cnae",
-			CostUSDC: "0.001",
+			CostUSDC: x402pkg.PriceFromRequest(r),
 			Data:     arr[0],
 		})
 		return
@@ -225,7 +226,7 @@ func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_cnae",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     single,
 	})
 }
@@ -273,7 +274,7 @@ func (h *IbgeHandler) GetPNAD(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_pnad",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "PNAD Contínua - Taxa de desocupação (%)"},
 	})
 }
@@ -295,7 +296,7 @@ func (h *IbgeHandler) GetINPC(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_inpc",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "INPC - Variação mensal (%)"},
 	})
 }
@@ -317,7 +318,7 @@ func (h *IbgeHandler) GetPIM(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_pim",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "PIM-PF - Índice base fixa sem ajuste sazonal (Dez 2022=100)"},
 	})
 }
@@ -339,7 +340,7 @@ func (h *IbgeHandler) GetPopulacao(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_populacao",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "Estimativa de população por estado"},
 	})
 }
@@ -361,7 +362,7 @@ func (h *IbgeHandler) GetIPCA15(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_ipca15",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "IPCA-15 - Variação mensal (%)"},
 	})
 }
@@ -384,7 +385,7 @@ func (h *IbgeHandler) GetPMC(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_pmc",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"pmc":       items,
 			"total":     len(items),
@@ -411,7 +412,7 @@ func (h *IbgeHandler) GetPMS(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_pms",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"pms":       items,
 			"total":     len(items),

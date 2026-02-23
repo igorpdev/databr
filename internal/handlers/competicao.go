@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -61,7 +62,7 @@ func (h *CompeticaoHandler) GetCompeticao(w http.ResponseWriter, r *http.Request
 		respond(w, r, domain.APIResponse{
 			Source:    "competicao_setorial",
 			UpdatedAt: time.Now().UTC(),
-			CostUSDC:  "0.020",
+			CostUSDC:  x402pkg.PriceFromRequest(r),
 			Data: map[string]any{
 				"setor":             cnaeInfo,
 				"empresas_listadas": map[string]any{"total": 0, "empresas": []map[string]any{}},
@@ -168,7 +169,7 @@ func (h *CompeticaoHandler) GetCompeticao(w http.ResponseWriter, r *http.Request
 	respond(w, r, domain.APIResponse{
 		Source:    "competicao_setorial",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.020",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"setor": cnaeInfo,
 			"empresas_listadas": map[string]any{

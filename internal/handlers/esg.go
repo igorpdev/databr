@@ -8,6 +8,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -227,7 +228,7 @@ func (h *ESGHandler) GetESG(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "esg_report",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.020",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"empresa": map[string]any{
 				"cnpj":         normalized,

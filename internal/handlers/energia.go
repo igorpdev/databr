@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // EnergiaHandler handles requests for /v1/energia/*.
@@ -64,7 +65,7 @@ func (h *EnergiaHandler) GetTarifas(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "aneel_tarifas",
 		UpdatedAt: updatedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"total":   len(records),
 			"records": items,

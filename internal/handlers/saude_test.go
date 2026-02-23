@@ -57,8 +57,8 @@ func TestSaudeHandler_GetMedicamento_OK(t *testing.T) {
 	if resp.Source != "anvisa_medicamentos" {
 		t.Errorf("Source = %q, want %q", resp.Source, "anvisa_medicamentos")
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want %q", resp.CostUSDC, "0.001")
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want %q", resp.CostUSDC, "0.003")
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -127,7 +127,7 @@ func TestSaudeHandler_GetMedicamento_FormatContext(t *testing.T) {
 	if resp.Data != nil {
 		t.Error("expected nil Data when ?format=context")
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("expected cost 0.002 (+0.001), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("expected cost 0.005 (+0.002), got %s", resp.CostUSDC)
 	}
 }

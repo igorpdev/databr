@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -127,7 +128,7 @@ func (h *RegulacaoSetorHandler) GetRegulacaoSetor(w http.ResponseWriter, r *http
 		respond(w, r, domain.APIResponse{
 			Source:    "regulacao_setorial",
 			UpdatedAt: time.Now().UTC(),
-			CostUSDC:  "0.015",
+			CostUSDC:  x402pkg.PriceFromRequest(r),
 			Data: map[string]any{
 				"cnae":                   cnaeInfo,
 				"reguladores_principais": reguladoresData,
@@ -186,7 +187,7 @@ func (h *RegulacaoSetorHandler) GetRegulacaoSetor(w http.ResponseWriter, r *http
 	respond(w, r, domain.APIResponse{
 		Source:    "regulacao_setorial",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.015",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"cnae":                   cnaeInfo,
 			"reguladores_principais": reguladoresData,

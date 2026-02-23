@@ -318,10 +318,10 @@ func main() {
 
 	// /v1 API routes, grouped by x402 price tier
 	r.Route("/v1", func(r chi.Router) {
-		// $0.001 — company data, BCB rates, economic indicators, tesouro
+		// $0.003 — basic lookups: company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(optionalX402(x402Cfg, "0.001"))
+			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
 			r.Get("/empresas/{cnpj}/socios", empHandler.GetSocios)
 			r.Get("/empresas/{cnpj}/simples", empHandler.GetSimples)
@@ -426,10 +426,10 @@ func main() {
 			}
 		})
 
-		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data, budget documents
+		// $0.005 — standard: B3 stock quotes, CVM fatos relevantes, INPE deforestation data, budget documents
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
-			r.Use(optionalX402(x402Cfg, "0.002"))
+			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Get("/orcamento/documentos", orcamentoHandler.GetDocumentos)
 			r.Get("/orcamento/favorecidos", orcamentoHandler.GetFavorecidos)
 			if mercHandler != nil {
@@ -449,10 +449,10 @@ func main() {
 			}
 		})
 
-		// $0.003 — compliance via empresa sub-route, DOU/diários search, premium cross-references
+		// $0.007 — enhanced: compliance via empresa, DOU/diários search, cross-references
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
-			r.Use(optionalX402(x402Cfg, "0.003"))
+			r.Use(optionalX402(x402Cfg, "0.007"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
 			r.Get("/dou/busca", douHandler.GetBusca)
 			r.Get("/diarios/busca", douHandler.GetDiarios)
@@ -470,10 +470,10 @@ func main() {
 			}
 		})
 
-		// $0.005 — full compliance check, CVM fund data, fund analysis, credit score
+		// $0.010 — premium: full compliance, CVM fund data, fund analysis, credit score
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
-			r.Use(optionalX402(x402Cfg, "0.005"))
+			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
 			if mercHandler != nil {
 				r.Get("/mercado/fundos/{cnpj}", mercHandler.GetFundos)
@@ -486,10 +486,10 @@ func main() {
 			}
 		})
 
-		// $0.010 — judicial process search, economic panorama, labor market
+		// $0.015 — advanced: judicial process search, economic panorama, labor market
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(optionalX402(x402Cfg, "0.010"))
+			r.Use(optionalX402(x402Cfg, "0.015"))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
 			if panoramaHandler != nil {
 				r.Get("/economia/panorama", panoramaHandler.GetPanorama)
@@ -499,10 +499,10 @@ func main() {
 			}
 		})
 
-		// $0.015 — perfil completo, sector regulation
+		// $0.020 — composite: perfil completo, sector regulation
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(optionalX402(x402Cfg, "0.015"))
+			r.Use(optionalX402(x402Cfg, "0.020"))
 			if perfilCompletoHandler != nil {
 				r.Get("/empresas/{cnpj}/perfil-completo", perfilCompletoHandler.GetPerfilCompleto)
 			}
@@ -511,10 +511,10 @@ func main() {
 			}
 		})
 
-		// $0.020 — competition analysis, ESG scoring, litigation risk
+		// $0.030 — deep analysis: competition, ESG scoring, litigation risk
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(optionalX402(x402Cfg, "0.020"))
+			r.Use(optionalX402(x402Cfg, "0.030"))
 			if competicaoHandler != nil {
 				r.Get("/mercado/{cnae}/competicao", competicaoHandler.GetCompeticao)
 			}
@@ -526,27 +526,27 @@ func main() {
 			}
 		})
 
-		// $0.030 — influence network
+		// $0.050 — network/influence analysis
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(optionalX402(x402Cfg, "0.030"))
+			r.Use(optionalX402(x402Cfg, "0.050"))
 			if redeInfluenciaHandler != nil {
 				r.Get("/rede/{cnpj}/influencia", redeInfluenciaHandler.GetRedeInfluencia)
 			}
 		})
 
-		// $0.050 — due diligence
+		// $0.075 — due diligence
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(optionalX402(x402Cfg, "0.050"))
+			r.Use(optionalX402(x402Cfg, "0.075"))
 			if dueDiligenceHandler != nil {
 				r.Get("/empresas/{cnpj}/duediligence", dueDiligenceHandler.GetDueDiligence)
 			}
 		})
 
-		// $0.100 — portfolio risk (batch, POST — no cache)
+		// $0.150 — portfolio risk (batch, POST — no cache)
 		r.Group(func(r chi.Router) {
-			r.Use(optionalX402(x402Cfg, "0.100"))
+			r.Use(optionalX402(x402Cfg, "0.150"))
 			if carteiraRiscoHandler != nil {
 				r.Post("/carteira/risco", carteiraRiscoHandler.PostCarteiraRisco)
 			}
@@ -555,7 +555,7 @@ func main() {
 
 	// MCP server (SSE transport) — protected by x402
 	r.Group(func(r chi.Router) {
-		r.Use(optionalX402(x402Cfg, "0.001"))
+		r.Use(optionalX402(x402Cfg, "0.003"))
 		r.Mount("/mcp", sseServer)
 	})
 
@@ -629,7 +629,8 @@ func optionalX402(cfg x402pkg.MiddlewareConfig, priceUSDC string) func(http.Hand
 			os.Exit(1)
 		}
 		slog.Warn("WALLET_ADDRESS not set, x402 payment disabled (dev mode)")
-		return func(next http.Handler) http.Handler { return next }
+		// Still inject price into context so handlers can read it via PriceFromRequest.
+		return x402pkg.PriceInjectorMiddleware(priceUSDC)
 	}
 	return x402pkg.NewPricedMiddleware(cfg, priceUSDC)
 }

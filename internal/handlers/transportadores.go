@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -49,7 +50,7 @@ func (h *TransportadoresHandler) GetTransportador(w http.ResponseWriter, r *http
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -100,7 +101,7 @@ func (h *TransportadoresHandler) GetTransportadoresByCNPJ(w http.ResponseWriter,
 	respond(w, r, domain.APIResponse{
 		Source:    "antt_rntrc",
 		UpdatedAt: updatedAt,
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"total":   len(records),
 			"records": items,

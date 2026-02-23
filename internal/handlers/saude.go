@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -35,7 +36,7 @@ func (h *SaudeHandler) GetMedicamento(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }

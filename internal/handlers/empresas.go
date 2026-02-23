@@ -8,6 +8,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -61,7 +62,7 @@ func (h *EmpresasHandler) GetEmpresa(w http.ResponseWriter, r *http.Request) {
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
 		Cached:    false,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -110,7 +111,7 @@ func (h *EmpresasHandler) GetSimples(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "cnpj_simples",
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"cnpj":                        normalized,
 			"opcao_pelo_simples":          optSimples,
@@ -161,7 +162,7 @@ func (h *EmpresasHandler) GetSocios(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"cnpj": normalized, "qsa": qsa},
 	})
 }

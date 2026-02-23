@@ -79,8 +79,8 @@ func TestEnderecoHandler_ValidCEP_Returns200(t *testing.T) {
 	if resp.Source != "viacep" {
 		t.Errorf("Source = %q, want viacep", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

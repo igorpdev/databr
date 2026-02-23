@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // TitulosHandler handles GET /v1/tesouro/titulos using a store-backed approach.
@@ -39,7 +40,7 @@ func (h *TitulosHandler) GetTitulos(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tesouro_titulos",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"titulos": titulos},
 	})
 }

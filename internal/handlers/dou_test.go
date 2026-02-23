@@ -11,6 +11,7 @@ import (
 	"github.com/databr/api/internal/collectors/dou"
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -84,6 +85,7 @@ func TestDOUHandler_GetDiarios_OK(t *testing.T) {
 	r.Get("/v1/diarios/busca", h.GetDiarios)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/diarios/busca?q=licitacao&municipio_ibge=3550308&desde=2026-01-01", nil)
+	req = x402pkg.InjectPrice(req, "0.007")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -98,8 +100,8 @@ func TestDOUHandler_GetDiarios_OK(t *testing.T) {
 	if resp.Source != "querido_diario" {
 		t.Errorf("Source = %q, want querido_diario", resp.Source)
 	}
-	if resp.CostUSDC != "0.003" {
-		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("CostUSDC = %q, want 0.007", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

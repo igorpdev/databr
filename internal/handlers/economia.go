@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // EconomiaHandler handles requests for /v1/economia/*.
@@ -18,21 +19,21 @@ func NewEconomiaHandler(store SourceStore) *EconomiaHandler {
 
 // GetIPCA handles GET /v1/economia/ipca.
 func (h *EconomiaHandler) GetIPCA(w http.ResponseWriter, r *http.Request) {
-	h.serveLatest(w, r, "ibge_ipca", "0.001")
+	h.serveLatest(w, r, "ibge_ipca")
 }
 
 // GetPIB handles GET /v1/economia/pib.
 func (h *EconomiaHandler) GetPIB(w http.ResponseWriter, r *http.Request) {
-	h.serveLatest(w, r, "ibge_pib", "0.001")
+	h.serveLatest(w, r, "ibge_pib")
 }
 
 // GetFocus handles GET /v1/economia/focus.
 // Retorna expectativas de mercado do Relatório Focus do BCB (expectativas anuais).
 func (h *EconomiaHandler) GetFocus(w http.ResponseWriter, r *http.Request) {
-	h.serveLatest(w, r, "bcb_focus", "0.001")
+	h.serveLatest(w, r, "bcb_focus")
 }
 
-func (h *EconomiaHandler) serveLatest(w http.ResponseWriter, r *http.Request, source, price string) {
+func (h *EconomiaHandler) serveLatest(w http.ResponseWriter, r *http.Request, source string) {
 	records, err := h.store.FindLatest(r.Context(), source)
 	if err != nil {
 		gatewayError(w, "economia", err)
@@ -47,7 +48,7 @@ func (h *EconomiaHandler) serveLatest(w http.ResponseWriter, r *http.Request, so
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  price,
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }

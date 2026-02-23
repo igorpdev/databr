@@ -113,8 +113,8 @@ func TestBCBHandler_GetSelic_OK(t *testing.T) {
 	if resp.Source != "bcb_selic" {
 		t.Errorf("Source = %q, want bcb_selic", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 
@@ -272,8 +272,8 @@ func TestBCBHandler_GetTaxasCredito_OK(t *testing.T) {
 	if resp.Source != "bcb_taxas_credito" {
 		t.Errorf("Source = %q, want bcb_taxas_credito", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	taxas, ok := resp.Data["taxas"].([]any)
 	if !ok {
@@ -328,8 +328,8 @@ func TestGetIndicadores_ByName(t *testing.T) {
 	if resp.Source != "bcb_sgs" {
 		t.Errorf("Source = %q, want bcb_sgs", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -616,7 +616,7 @@ func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
 	if resp.Data != nil {
 		t.Error("expected nil Data when ?format=context")
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("expected cost 0.002 (+0.001), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("expected cost 0.005 (+0.002), got %s", resp.CostUSDC)
 	}
 }

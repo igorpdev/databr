@@ -7,6 +7,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -74,7 +75,7 @@ func (h *RedeInfluenciaHandler) GetRedeInfluencia(w http.ResponseWriter, r *http
 		respond(w, r, domain.APIResponse{
 			Source:    "rede_influencia",
 			UpdatedAt: time.Now().UTC(),
-			CostUSDC:  "0.030",
+			CostUSDC:  x402pkg.PriceFromRequest(r),
 			Data: map[string]any{
 				"empresa_central": map[string]any{
 					"cnpj":         normalized,
@@ -178,7 +179,7 @@ func (h *RedeInfluenciaHandler) GetRedeInfluencia(w http.ResponseWriter, r *http
 	respond(w, r, domain.APIResponse{
 		Source:    "rede_influencia",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.030",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"empresa_central": map[string]any{
 				"cnpj":         normalized,

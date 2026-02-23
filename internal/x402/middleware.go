@@ -20,6 +20,36 @@ import (
 	fachttp "github.com/coinbase/x402/go/http"
 )
 
+// priceContextKey is the context key for the USDC price injected by x402 middleware.
+type priceCtxKey struct{}
+
+// PriceFromRequest returns the USDC price string set by the x402 middleware.
+// Handlers use this instead of hardcoding prices, so pricing is centralized in main.go.
+// Returns DefaultPrice if no middleware is present (e.g. in unit tests without middleware).
+func PriceFromRequest(r *http.Request) string {
+	if v, ok := r.Context().Value(priceCtxKey{}).(string); ok {
+		return v
+	}
+	return DefaultPrice
+}
+
+// InjectPrice returns a copy of r with the given USDC price in its context.
+// Used in tests to simulate x402 middleware without the full payment flow.
+func InjectPrice(r *http.Request, price string) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), priceCtxKey{}, price))
+}
+
+// PriceInjectorMiddleware returns a middleware that injects the USDC price into the
+// request context without requiring payment. Used in dev mode when x402 is disabled.
+func PriceInjectorMiddleware(priceUSDC string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), priceCtxKey{}, priceUSDC)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // USDC contract addresses per CAIP-2 network identifier.
 var usdcAssets = map[string]string{
 	"eip155:8453":  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Base mainnet
@@ -89,6 +119,10 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Inject price into context so handlers can read it via PriceFromRequest.
+			ctx := context.WithValue(r.Context(), priceCtxKey{}, priceUSDC)
+			r = r.WithContext(ctx)
+
 			payloadBytes := extractPaymentHeader(r)
 			if payloadBytes == nil {
 				write402Response(w, r, baseReq)

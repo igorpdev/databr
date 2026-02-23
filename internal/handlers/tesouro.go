@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // RREOFetcher fetches RREO data from Tesouro SICONFI on-demand.
@@ -76,7 +77,7 @@ func (h *TesouroHandler) GetRREO(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tesouro_siconfi",
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -133,7 +134,7 @@ func (h *TesouroHandler) GetEntes(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "siconfi_entes",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"entes": items, "total": len(items), "pagina": pagina},
 	})
 }
@@ -174,7 +175,7 @@ func (h *TesouroHandler) GetRGF(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "siconfi_rgf",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"rgf": items, "total": len(items), "uf": uf, "ano": ano},
 	})
 }
@@ -203,7 +204,7 @@ func (h *TesouroHandler) GetDCA(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "siconfi_dca",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"dca": items, "total": len(items), "ano": ano, "esfera": esfera},
 	})
 }

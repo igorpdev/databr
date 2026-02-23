@@ -11,6 +11,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // stubAmbientalStore satisfies SourceStore interface.
@@ -67,6 +68,7 @@ func TestAmbientalHandler_GetDesmatamento_OK(t *testing.T) {
 
 	h := handlers.NewAmbientalHandler(store)
 	req := httptest.NewRequest(http.MethodGet, "/v1/ambiental/desmatamento", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	h.GetDesmatamento(rec, req)
 
@@ -81,8 +83,8 @@ func TestAmbientalHandler_GetDesmatamento_OK(t *testing.T) {
 	if resp.Source != "inpe_deter" {
 		t.Errorf("Source = %q, want inpe_deter", resp.Source)
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("expected non-nil Data")
@@ -120,6 +122,7 @@ func TestAmbientalHandler_GetProdes_OK(t *testing.T) {
 
 	h := handlers.NewAmbientalHandler(store)
 	req := httptest.NewRequest(http.MethodGet, "/v1/ambiental/prodes", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	h.GetProdes(rec, req)
 
@@ -134,8 +137,8 @@ func TestAmbientalHandler_GetProdes_OK(t *testing.T) {
 	if resp.Source != "inpe_prodes" {
 		t.Errorf("Source = %q, want inpe_prodes", resp.Source)
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("expected non-nil Data")
@@ -172,6 +175,7 @@ func TestAmbientalHandler_GetDesmatamento_FormatContext(t *testing.T) {
 
 	h := handlers.NewAmbientalHandler(store)
 	req := httptest.NewRequest(http.MethodGet, "/v1/ambiental/desmatamento?format=context", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	h.GetDesmatamento(rec, req)
 
@@ -189,7 +193,7 @@ func TestAmbientalHandler_GetDesmatamento_FormatContext(t *testing.T) {
 	if resp.Data != nil {
 		t.Error("expected nil Data when ?format=context")
 	}
-	if resp.CostUSDC != "0.003" {
-		t.Errorf("expected cost 0.003 (+0.001), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("expected cost 0.007 (+0.002), got %s", resp.CostUSDC)
 	}
 }

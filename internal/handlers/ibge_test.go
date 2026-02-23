@@ -75,8 +75,8 @@ func TestGetMunicipio_OK(t *testing.T) {
 	if resp.Source != "ibge_localidades" {
 		t.Errorf("Source = %q, want ibge_localidades", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -197,8 +197,8 @@ func TestGetCNAE_OK(t *testing.T) {
 	if resp.Source != "ibge_cnae" {
 		t.Errorf("Source = %q, want ibge_cnae", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -339,8 +339,8 @@ func TestGetPMC_OK(t *testing.T) {
 	if resp.Source != "ibge_pmc" {
 		t.Errorf("Source = %q, want ibge_pmc", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -398,8 +398,8 @@ func TestGetPMS_OK(t *testing.T) {
 	if resp.Source != "ibge_pms" {
 		t.Errorf("Source = %q, want ibge_pms", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -75,7 +76,7 @@ func (h *BCBHandler) GetSelic(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -107,7 +108,7 @@ func (h *BCBHandler) GetCambio(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    match.Source,
 		UpdatedAt: match.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      match.Data,
 	})
 }
@@ -127,7 +128,7 @@ func (h *BCBHandler) GetPIX(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -147,7 +148,7 @@ func (h *BCBHandler) GetCredito(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -167,7 +168,7 @@ func (h *BCBHandler) GetReservas(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -193,7 +194,7 @@ func (h *BCBHandler) GetTaxasCredito(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "bcb_taxas_credito",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"taxas": taxas},
 	})
 }
@@ -258,7 +259,7 @@ func (h *BCBHandler) GetIndicadores(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "bcb_sgs",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"serie":  nomeSerie,
 			"codigo": code,
@@ -312,7 +313,7 @@ func (h *BCBHandler) GetCapitais(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "bcb_rde",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"registros": envelope.Value,
 			"total":     len(envelope.Value),
@@ -380,7 +381,7 @@ func (h *BCBHandler) GetSML(w http.ResponseWriter, r *http.Request) {
 		}
 		respond(w, r, domain.APIResponse{
 			Source:   "bcb_sml",
-			CostUSDC: "0.001",
+			CostUSDC: x402pkg.PriceFromRequest(r),
 			Data:     map[string]any{"pais": pais, "cotacoes": dados, "total": len(dados)},
 		})
 		return
@@ -398,7 +399,7 @@ func (h *BCBHandler) GetSML(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "bcb_sml",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"paises": resultados},
 	})
 }
@@ -466,7 +467,7 @@ func (h *BCBHandler) GetIFData(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "bcb_ifdata",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"instituicoes": envelope.Value,
 			"total":        len(envelope.Value),
@@ -531,7 +532,7 @@ func (h *BCBHandler) GetBaseMonetaria(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "bcb_base_monetaria",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"m0":          m0,
 			"m2":          m2,

@@ -52,8 +52,8 @@ func TestEconomiaHandler_GetIPCA_OK(t *testing.T) {
 	if resp.Source != "ibge_ipca" {
 		t.Errorf("Source = %q, want ibge_ipca", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestEconomiaHandler_GetFocus_OK(t *testing.T) {
 	if resp.Source != "bcb_focus" {
 		t.Errorf("Source = %q, want bcb_focus", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 

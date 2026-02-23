@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -73,7 +74,7 @@ func (h *MercadoTrabalhoHandler) GetMercadoTrabalho(w http.ResponseWriter, r *ht
 		respond(w, r, domain.APIResponse{
 			Source:    "mercado_trabalho",
 			UpdatedAt: time.Now().UTC(),
-			CostUSDC:  "0.010",
+			CostUSDC:  x402pkg.PriceFromRequest(r),
 			Data: map[string]any{
 				"estado": map[string]any{
 					"uf":   uf,
@@ -207,7 +208,7 @@ func (h *MercadoTrabalhoHandler) GetMercadoTrabalho(w http.ResponseWriter, r *ht
 	respond(w, r, domain.APIResponse{
 		Source:    "mercado_trabalho",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.010",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"estado": map[string]any{
 				"uf":   uf,

@@ -11,17 +11,17 @@ func TestPricing_KnownRoute(t *testing.T) {
 		route    string
 		wantUSDC string
 	}{
-		{"/v1/empresas/{cnpj}", "0.001"},
-		{"/v1/empresas/{cnpj}/compliance", "0.003"},
-		{"/v1/mercado/acoes/{ticker}", "0.002"},
-		{"/v1/mercado/fundos/{cnpj}", "0.005"},
-		{"/v1/bcb/cambio/{moeda}", "0.001"},
-		{"/v1/bcb/selic", "0.001"},
-		{"/v1/compliance/{cnpj}", "0.005"},
-		{"/v1/economia/ipca", "0.001"},
-		{"/v1/economia/pib", "0.001"},
-		{"/v1/judicial/processos/{doc}", "0.010"},
-		{"/v1/dou/busca", "0.003"},
+		{"/v1/empresas/{cnpj}", "0.003"},
+		{"/v1/empresas/{cnpj}/compliance", "0.007"},
+		{"/v1/mercado/acoes/{ticker}", "0.005"},
+		{"/v1/mercado/fundos/{cnpj}", "0.010"},
+		{"/v1/bcb/cambio/{moeda}", "0.003"},
+		{"/v1/bcb/selic", "0.003"},
+		{"/v1/compliance/{cnpj}", "0.010"},
+		{"/v1/economia/ipca", "0.003"},
+		{"/v1/economia/pib", "0.003"},
+		{"/v1/judicial/processos/{doc}", "0.015"},
+		{"/v1/dou/busca", "0.007"},
 	}
 
 	for _, tt := range tests {
@@ -53,7 +53,7 @@ func TestPricing_ContextAdditional(t *testing.T) {
 	if withCtx == got {
 		t.Error("AddContextPrice should return a higher price than base")
 	}
-	if withCtx != "0.002" {
-		t.Errorf("AddContextPrice(0.001) = %q, want 0.002", withCtx)
+	if withCtx != "0.005" {
+		t.Errorf("AddContextPrice(0.003) = %q, want 0.005", withCtx)
 	}
 }

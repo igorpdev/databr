@@ -8,6 +8,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -158,7 +159,7 @@ func (h *LitigioRiscoHandler) GetLitigioRisco(w http.ResponseWriter, r *http.Req
 	respond(w, r, domain.APIResponse{
 		Source:    "litigio_risco",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.020",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"empresa": empresa,
 			"processos_resumo": map[string]any{

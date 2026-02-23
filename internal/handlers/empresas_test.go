@@ -68,8 +68,8 @@ func TestEmpresasHandler_GetEmpresa_OK(t *testing.T) {
 	if resp.Source != "cnpj" {
 		t.Errorf("Source = %q, want %q", resp.Source, "cnpj")
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("Data must not be nil")
@@ -176,8 +176,8 @@ func TestGetSocios_OK(t *testing.T) {
 	if resp.Source != "cnpj" {
 		t.Errorf("Source = %q, want cnpj", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -288,8 +288,8 @@ func TestGetSimples_OK(t *testing.T) {
 	if resp.Source != "cnpj_simples" {
 		t.Errorf("Source = %q, want cnpj_simples", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

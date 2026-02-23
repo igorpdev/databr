@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"golang.org/x/text/encoding/charmap"
 )
 
@@ -190,7 +191,7 @@ func (h *TSEExtrasHandler) GetBens(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tse_bens",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"bens": rows, "total": len(rows), "ano": ano},
 	})
 }
@@ -222,7 +223,7 @@ func (h *TSEExtrasHandler) GetDoacoes(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tse_doacoes",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"doacoes": rows, "total": len(rows), "ano": ano},
 	})
 }
@@ -254,7 +255,7 @@ func (h *TSEExtrasHandler) GetResultados(w http.ResponseWriter, r *http.Request)
 	respond(w, r, domain.APIResponse{
 		Source:    "tse_resultados",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"resultados": rows, "total": len(rows), "ano": ano},
 	})
 }
@@ -402,7 +403,7 @@ func (h *TSEExtrasHandler) GetCombustiveis(w http.ResponseWriter, r *http.Reques
 	respond(w, r, domain.APIResponse{
 		Source:    "anp_combustiveis",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"combustiveis": combustiveis,
 			"fonte":        "ipeadata",

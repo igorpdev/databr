@@ -8,6 +8,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 const maxCarteiraCNPJs = 50
@@ -202,7 +203,7 @@ func (h *CarteiraRiscoHandler) PostCarteiraRisco(w http.ResponseWriter, r *http.
 	respond(w, r, domain.APIResponse{
 		Source:    "carteira_risco",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.100",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"total_cnpjs":               len(results),
 			"risco_medio":               avgScore,

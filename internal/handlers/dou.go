@@ -6,6 +6,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/dou"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // QDSearcher is the interface for on-demand Querido Diário search.
@@ -56,7 +57,7 @@ func (h *DOUHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "querido_diario",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.003",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"resultados": items, "total": len(items), "query": q},
 	})
 }
@@ -95,7 +96,7 @@ func (h *DOUHandler) GetDiarios(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "querido_diario",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.003",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"resultados":    items,
 			"total":         len(items),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -142,7 +143,7 @@ func (h *CreditoScoreHandler) GetCreditoScore(w http.ResponseWriter, r *http.Req
 
 	respond(w, r, domain.APIResponse{
 		Source:   "credito_score",
-		CostUSDC: "0.050",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"cnpj":               normalized,
 			"score":              score,

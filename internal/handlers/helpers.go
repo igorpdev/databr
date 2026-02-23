@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"regexp"
-	"strconv"
+	"strconv" // used by parsePagination
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 var reDigits = regexp.MustCompile(`\D`)
@@ -57,10 +57,7 @@ func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
 		}
 		resp.Context = fmt.Sprintf("[%s] %s", resp.Source, string(b))
 		resp.Data = nil
-		if f, err := strconv.ParseFloat(resp.CostUSDC, 64); err == nil {
-			millis := int64(math.Round(f * 1000))
-			resp.CostUSDC = fmt.Sprintf("%.3f", float64(millis+1)/1000.0)
-		}
+		resp.CostUSDC = x402pkg.AddContextPrice(resp.CostUSDC)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -71,7 +68,8 @@ func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
 // serveLatest is a helper for the common pattern: look up the latest record(s)
 // for a source in the store and write the API response. Eliminates repetitive
 // find → check error → check empty → respond boilerplate in store-backed handlers.
-func serveLatest(w http.ResponseWriter, r *http.Request, store SourceStore, source, price string) {
+// Price is read from the request context (set by x402 middleware via PriceFromRequest).
+func serveLatest(w http.ResponseWriter, r *http.Request, store SourceStore, source string) {
 	records, err := store.FindLatest(r.Context(), source)
 	if err != nil {
 		gatewayError(w, source, err)
@@ -85,13 +83,14 @@ func serveLatest(w http.ResponseWriter, r *http.Request, store SourceStore, sour
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  price,
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
 
 // serveLatestAll serves all records for a source as an array.
-func serveLatestAll(w http.ResponseWriter, r *http.Request, store SourceStore, source, dataKey, price string) {
+// Price is read from the request context (set by x402 middleware via PriceFromRequest).
+func serveLatestAll(w http.ResponseWriter, r *http.Request, store SourceStore, source, dataKey string) {
 	records, err := store.FindLatest(r.Context(), source)
 	if err != nil {
 		gatewayError(w, source, err)
@@ -108,7 +107,7 @@ func serveLatestAll(w http.ResponseWriter, r *http.Request, store SourceStore, s
 	respond(w, r, domain.APIResponse{
 		Source:    source,
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  price,
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{dataKey: items, "total": len(items)},
 	})
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -86,8 +87,8 @@ func TestTransportadoresHandler_GetTransportador_OK(t *testing.T) {
 	if resp.Source != "antt_rntrc" {
 		t.Errorf("Source = %q, want antt_rntrc", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -173,8 +174,8 @@ func TestTransportadoresHandler_GetTransportador_FormatContext(t *testing.T) {
 	if resp.Data != nil {
 		t.Error("expected nil Data when ?format=context")
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("expected cost 0.002 (+0.001 for context), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("expected cost 0.005 (+0.002 for context), got %s", resp.CostUSDC)
 	}
 }
 
@@ -187,6 +188,7 @@ func TestTransportadoresHandler_GetTransportadoresByCNPJ_OK(t *testing.T) {
 
 	// Formatted CNPJ — handler must strip non-digits before DB lookup.
 	req := httptest.NewRequest(http.MethodGet, "/v1/transporte/transportadores?cnpj=11.193.322/0001-10", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -201,8 +203,8 @@ func TestTransportadoresHandler_GetTransportadoresByCNPJ_OK(t *testing.T) {
 	if resp.Source != "antt_rntrc" {
 		t.Errorf("Source = %q, want antt_rntrc", resp.Source)
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -290,6 +292,7 @@ func TestTransportadoresHandler_GetTransportadoresByCNPJ_FormatContext(t *testin
 	r := newTransportadoresRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/transporte/transportadores?cnpj=11193322000110&format=context", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -303,7 +306,7 @@ func TestTransportadoresHandler_GetTransportadoresByCNPJ_FormatContext(t *testin
 	if resp.Context == "" {
 		t.Error("expected non-empty Context when ?format=context")
 	}
-	if resp.CostUSDC != "0.003" {
-		t.Errorf("expected cost 0.003 (0.002 + 0.001 for context), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("expected cost 0.007 (0.005 + 0.002 for context), got %s", resp.CostUSDC)
 	}
 }

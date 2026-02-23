@@ -9,6 +9,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -43,6 +44,7 @@ func TestRegulacaoSetor_OK_FinancialSector(t *testing.T) {
 	router := newRegulacaoSetorRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/setor/64/regulacao", nil)
+	req = x402pkg.InjectPrice(req, "0.020")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -57,8 +59,8 @@ func TestRegulacaoSetor_OK_FinancialSector(t *testing.T) {
 	if resp.Source != "regulacao_setorial" {
 		t.Errorf("Source = %q, want regulacao_setorial", resp.Source)
 	}
-	if resp.CostUSDC != "0.015" {
-		t.Errorf("CostUSDC = %q, want 0.015", resp.CostUSDC)
+	if resp.CostUSDC != "0.020" {
+		t.Errorf("CostUSDC = %q, want 0.020", resp.CostUSDC)
 	}
 
 	// Verify nivel_regulacao is "alto" for financial sector (CNAE 64).

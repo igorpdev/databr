@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -126,7 +127,7 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ipea_" + codigo,
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"serie":   codigo,
 			"valores": lastN,
@@ -187,7 +188,7 @@ func (h *IPEAHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ipea_metadados",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"busca":  q,
 			"series": envelope.Value,
@@ -229,7 +230,7 @@ func (h *IPEAHandler) GetTemas(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "ipea_temas",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"temas": envelope.Value,
 			"total": len(envelope.Value),

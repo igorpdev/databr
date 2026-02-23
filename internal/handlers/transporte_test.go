@@ -9,6 +9,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -82,8 +83,8 @@ func TestTransporteHandler_GetAeronave_OK(t *testing.T) {
 	if resp.Source != "anac_rab" {
 		t.Errorf("Source = %q, want anac_rab", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -152,8 +153,8 @@ func TestTransporteHandler_GetAeronave_FormatContext(t *testing.T) {
 	if resp.Data != nil {
 		t.Error("expected nil Data when ?format=context")
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("expected cost 0.002 (+0.001 for context), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("expected cost 0.005 (+0.002 for context), got %s", resp.CostUSDC)
 	}
 }
 
@@ -165,6 +166,7 @@ func TestTransporteHandler_GetAeronaves_OK(t *testing.T) {
 	r := newTransporteRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/transporte/aeronaves", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -179,8 +181,8 @@ func TestTransporteHandler_GetAeronaves_OK(t *testing.T) {
 	if resp.Source != "anac_rab" {
 		t.Errorf("Source = %q, want anac_rab", resp.Source)
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -320,6 +322,7 @@ func TestTransporteHandler_GetAeronaves_FormatContext(t *testing.T) {
 	r := newTransporteRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/transporte/aeronaves?format=context", nil)
+	req = x402pkg.InjectPrice(req, "0.005")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -333,7 +336,7 @@ func TestTransporteHandler_GetAeronaves_FormatContext(t *testing.T) {
 	if resp.Context == "" {
 		t.Error("expected non-empty Context when ?format=context")
 	}
-	if resp.CostUSDC != "0.003" {
-		t.Errorf("expected cost 0.003 (0.002 + 0.001 for context), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("expected cost 0.007 (0.005 + 0.002 for context), got %s", resp.CostUSDC)
 	}
 }

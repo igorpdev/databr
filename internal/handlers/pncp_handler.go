@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // PNCPHandler handles requests for /v1/pncp/*.
@@ -76,7 +77,7 @@ func (h *PNCPHandler) GetOrgaos(w http.ResponseWriter, r *http.Request) {
 
 	respond(w, r, domain.APIResponse{
 		Source:   "pncp_orgaos",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"orgaos": orgaos, "total": len(orgaos), "pagina": pagina},
 	})
 }

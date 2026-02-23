@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -59,6 +60,7 @@ func TestPanorama_OK_AllSources(t *testing.T) {
 	router := newPanoramaRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/economia/panorama", nil)
+	req = x402pkg.InjectPrice(req, "0.015")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -73,8 +75,8 @@ func TestPanorama_OK_AllSources(t *testing.T) {
 	if resp.Source != "panorama_economico" {
 		t.Errorf("Source = %q, want panorama_economico", resp.Source)
 	}
-	if resp.CostUSDC != "0.010" {
-		t.Errorf("CostUSDC = %q, want 0.010", resp.CostUSDC)
+	if resp.CostUSDC != "0.015" {
+		t.Errorf("CostUSDC = %q, want 0.015", resp.CostUSDC)
 	}
 
 	// Verify all 7 sources are present.

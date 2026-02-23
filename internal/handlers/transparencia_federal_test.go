@@ -84,8 +84,8 @@ func TestTransparenciaFederal_GetContratos_OK(t *testing.T) {
 	if resp.Source != "cgu_contratos" {
 		t.Errorf("Source = %q, want cgu_contratos", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 
@@ -185,8 +185,8 @@ func TestTransparenciaFederal_GetServidores_OK(t *testing.T) {
 	if resp.Source != "cgu_servidores" {
 		t.Errorf("Source = %q, want cgu_servidores", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 
@@ -265,8 +265,8 @@ func TestTransparenciaFederal_GetBolsaFamilia_OK(t *testing.T) {
 	if resp.Source != "cgu_beneficios" {
 		t.Errorf("Source = %q, want cgu_beneficios", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 
@@ -374,8 +374,8 @@ func TestTransparenciaFederal_GetCartoes_OK(t *testing.T) {
 	if resp.Source != "cgu_cartoes" {
 		t.Errorf("Source = %q, want cgu_cartoes", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 

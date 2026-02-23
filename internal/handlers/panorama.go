@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // PanoramaHandler aggregates multiple macroeconomic indicators into a single
@@ -70,7 +71,7 @@ func (h *PanoramaHandler) GetPanorama(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "panorama_economico",
 		UpdatedAt: latestUpdate,
-		CostUSDC:  "0.010",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      panorama,
 	})
 }

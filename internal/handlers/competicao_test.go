@@ -11,6 +11,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -52,6 +53,7 @@ func TestCompeticao_OK_WithStoreNil(t *testing.T) {
 	router := newCompeticaoRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/64/competicao", nil)
+	req = x402pkg.InjectPrice(req, "0.030")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -66,8 +68,8 @@ func TestCompeticao_OK_WithStoreNil(t *testing.T) {
 	if resp.Source != "competicao_setorial" {
 		t.Errorf("Source = %q, want competicao_setorial", resp.Source)
 	}
-	if resp.CostUSDC != "0.020" {
-		t.Errorf("CostUSDC = %q, want 0.020", resp.CostUSDC)
+	if resp.CostUSDC != "0.030" {
+		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
 	}
 
 	// Verify setor info is present from IBGE mock.

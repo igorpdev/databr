@@ -72,8 +72,8 @@ func TestGetSerie_OK(t *testing.T) {
 	if resp.Source != "ipea_BM12_TJOVER12" {
 		t.Errorf("Source = %q, want ipea_BM12_TJOVER12", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

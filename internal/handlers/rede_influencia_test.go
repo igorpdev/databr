@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -53,6 +54,7 @@ func TestRedeInfluencia_OK_WithSocios(t *testing.T) {
 	router := newRedeInfluenciaRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/rede/11222333000181/influencia", nil)
+	req = x402pkg.InjectPrice(req, "0.050")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -67,8 +69,8 @@ func TestRedeInfluencia_OK_WithSocios(t *testing.T) {
 	if resp.Source != "rede_influencia" {
 		t.Errorf("Source = %q, want rede_influencia", resp.Source)
 	}
-	if resp.CostUSDC != "0.030" {
-		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
+	if resp.CostUSDC != "0.050" {
+		t.Errorf("CostUSDC = %q, want 0.050", resp.CostUSDC)
 	}
 
 	// Check empresa_central.

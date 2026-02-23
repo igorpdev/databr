@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -71,6 +72,7 @@ func TestRiscoAmbiental_LowRisk(t *testing.T) {
 	router := newRiscoAmbientalRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/ambiental/risco/Belem", nil)
+	req = x402pkg.InjectPrice(req, "0.007")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -85,8 +87,8 @@ func TestRiscoAmbiental_LowRisk(t *testing.T) {
 	if resp.Source != "risco_ambiental" {
 		t.Errorf("Source = %q, want risco_ambiental", resp.Source)
 	}
-	if resp.CostUSDC != "0.030" {
-		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("CostUSDC = %q, want 0.007", resp.CostUSDC)
 	}
 	riskLevel, _ := resp.Data["risk_level"].(string)
 	if riskLevel != "low" {

@@ -81,8 +81,8 @@ func TestEnergiaHandler_GetTarifas_OK(t *testing.T) {
 	if resp.Source != "aneel_tarifas" {
 		t.Errorf("Source = %q, want aneel_tarifas", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	// The data field should contain a list of records.
 	if resp.Data == nil {
@@ -170,7 +170,7 @@ func TestEnergiaHandler_GetTarifas_FormatContext(t *testing.T) {
 	if resp.Context == "" {
 		t.Error("expected non-empty Context when ?format=context")
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("expected cost 0.002 (+0.001 for context), got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("expected cost 0.005 (+0.002 for context), got %s", resp.CostUSDC)
 	}
 }

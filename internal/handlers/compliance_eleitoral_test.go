@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -87,6 +88,7 @@ func TestComplianceEleitoral_Clean(t *testing.T) {
 	router := newComplianceEleitoralRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/eleicoes/compliance/12345678909", nil)
+	req = x402pkg.InjectPrice(req, "0.007")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -101,8 +103,8 @@ func TestComplianceEleitoral_Clean(t *testing.T) {
 	if resp.Source != "compliance_eleitoral" {
 		t.Errorf("Source = %q, want compliance_eleitoral", resp.Source)
 	}
-	if resp.CostUSDC != "0.030" {
-		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("CostUSDC = %q, want 0.007", resp.CostUSDC)
 	}
 	status, _ := resp.Data["status"].(string)
 	if status != "apto" {

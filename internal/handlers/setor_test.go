@@ -11,6 +11,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -88,6 +89,7 @@ func TestSetor_OK_WithCNAE(t *testing.T) {
 	router := newSetorRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/setor", nil)
+	req = x402pkg.InjectPrice(req, "0.007")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -102,8 +104,8 @@ func TestSetor_OK_WithCNAE(t *testing.T) {
 	if resp.Source != "setor_analise" {
 		t.Errorf("Source = %q, want setor_analise", resp.Source)
 	}
-	if resp.CostUSDC != "0.030" {
-		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
+	if resp.CostUSDC != "0.007" {
+		t.Errorf("CostUSDC = %q, want 0.007", resp.CostUSDC)
 	}
 	if resp.Data["cnae_fiscal"] != "6201501" {
 		t.Errorf("cnae_fiscal = %v, want 6201501", resp.Data["cnae_fiscal"])

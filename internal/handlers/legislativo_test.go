@@ -59,8 +59,8 @@ func TestGetDeputados_OK(t *testing.T) {
 	if resp.Source != "camara_deputados" {
 		t.Errorf("Source = %q, want camara_deputados", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -115,8 +115,8 @@ func TestGetDeputado_OK(t *testing.T) {
 	if resp.Source != "camara_deputados" {
 		t.Errorf("Source = %q, want camara_deputados", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -180,8 +180,8 @@ func TestGetProposicoes_OK(t *testing.T) {
 	if resp.Source != "camara_proposicoes" {
 		t.Errorf("Source = %q, want camara_proposicoes", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -209,8 +209,8 @@ func TestGetEventos_OK(t *testing.T) {
 	if resp.Source != "camara_eventos" {
 		t.Errorf("Source = %q, want camara_eventos", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -276,8 +276,8 @@ func TestGetComissoes_OK(t *testing.T) {
 	if resp.Source != "camara_comissoes" {
 		t.Errorf("Source = %q, want camara_comissoes", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
@@ -393,8 +393,8 @@ func TestGetMateriasSenado_OK(t *testing.T) {
 	if resp.Source != "senado_materias" {
 		t.Errorf("Source = %q, want senado_materias", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")

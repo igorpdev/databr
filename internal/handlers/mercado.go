@@ -6,6 +6,7 @@ import (
 
 	"github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -39,7 +40,7 @@ func (h *MercadoHandler) GetAcoes(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -61,7 +62,7 @@ func (h *MercadoHandler) GetFundos(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.005",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -98,7 +99,7 @@ func (h *MercadoHandler) GetCotasByCNPJ(w http.ResponseWriter, r *http.Request) 
 	respond(w, r, domain.APIResponse{
 		Source:    "cvm_cotas",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"cnpj":  normalizedCNPJ,
 			"cotas": cotas,
@@ -151,7 +152,7 @@ func (h *MercadoHandler) GetFatosRelevantes(w http.ResponseWriter, r *http.Reque
 	respond(w, r, domain.APIResponse{
 		Source:    "cvm_fatos",
 		UpdatedAt: records[0].FetchedAt,
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"total":   len(records),
 			"records": items,
@@ -177,7 +178,7 @@ func (h *MercadoHandler) GetFatosById(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -35,6 +36,7 @@ func TestLitigioRisco_OK_NoProcesses(t *testing.T) {
 	router := newLitigioRiscoRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/litigio/11222333000181/risco", nil)
+	req = x402pkg.InjectPrice(req, "0.030")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -49,8 +51,8 @@ func TestLitigioRisco_OK_NoProcesses(t *testing.T) {
 	if resp.Source != "litigio_risco" {
 		t.Errorf("Source = %q, want litigio_risco", resp.Source)
 	}
-	if resp.CostUSDC != "0.020" {
-		t.Errorf("CostUSDC = %q, want 0.020", resp.CostUSDC)
+	if resp.CostUSDC != "0.030" {
+		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
 	}
 
 	// With no processes the risk score should be 0.

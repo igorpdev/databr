@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -88,7 +89,7 @@ func (h *MunicipioHandler) GetMunicipioPerfil(w http.ResponseWriter, r *http.Req
 
 	respond(w, r, domain.APIResponse{
 		Source:   "municipio_perfil",
-		CostUSDC: "0.030",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"codigo":            codigo,
 			"populacao":         populacaoData,

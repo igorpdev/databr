@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -38,7 +39,7 @@ func (h *TransporteHandler) GetAeronave(w http.ResponseWriter, r *http.Request) 
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -99,7 +100,7 @@ func (h *TransporteHandler) GetAeronaves(w http.ResponseWriter, r *http.Request)
 	respond(w, r, domain.APIResponse{
 		Source:    "anac_rab",
 		UpdatedAt: updatedAt,
-		CostUSDC:  "0.002",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"total":   len(records),
 			"records": items,

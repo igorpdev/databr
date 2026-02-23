@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -58,6 +59,7 @@ func TestComplianceHandler_GetCompliance_OK(t *testing.T) {
 	r := newComplianceRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/compliance/12345678000195", nil)
+	req = x402pkg.InjectPrice(req, "0.010")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -72,8 +74,8 @@ func TestComplianceHandler_GetCompliance_OK(t *testing.T) {
 	if resp.Source != "cgu_compliance" {
 		t.Errorf("Source = %q, want cgu_compliance", resp.Source)
 	}
-	if resp.CostUSDC != "0.005" {
-		t.Errorf("CostUSDC = %q, want 0.005", resp.CostUSDC)
+	if resp.CostUSDC != "0.010" {
+		t.Errorf("CostUSDC = %q, want 0.010", resp.CostUSDC)
 	}
 }
 
@@ -149,8 +151,8 @@ func TestComplianceHandler_GetCEIS_OK(t *testing.T) {
 	if resp.Source != "cgu_ceis" {
 		t.Errorf("Source = %q, want cgu_ceis", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 }
 

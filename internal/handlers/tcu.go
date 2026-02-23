@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -59,7 +60,7 @@ func (h *TCUHandler) GetAcordaos(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tcu_acordaos",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"acordaos": dados},
 	})
 }
@@ -89,7 +90,7 @@ func (h *TCUHandler) GetCertidao(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tcu_certidao",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"cnpj": cnpj, "certidao": dados},
 	})
 }
@@ -107,7 +108,7 @@ func (h *TCUHandler) GetInabilitados(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tcu_inabilitados",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"inabilitados": dados},
 	})
 }
@@ -132,7 +133,7 @@ func (h *TCUHandler) GetInabilitadoByCPF(w http.ResponseWriter, r *http.Request)
 	respond(w, r, domain.APIResponse{
 		Source:    "tcu_inabilitados",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"cpf": clean, "inabilitado": dados},
 	})
 }
@@ -150,7 +151,7 @@ func (h *TCUHandler) GetContratos(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, domain.APIResponse{
 		Source:    "tcu_contratos",
 		UpdatedAt: time.Now().UTC(),
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"contratos": dados},
 	})
 }

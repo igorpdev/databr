@@ -70,8 +70,8 @@ func TestANSHandler_GetPlanos_OK(t *testing.T) {
 	if resp["source"] != "ans_operadoras" {
 		t.Errorf("source = %q, want %q", resp["source"], "ans_operadoras")
 	}
-	if resp["cost_usdc"] != "0.001" {
-		t.Errorf("cost_usdc = %q, want 0.001", resp["cost_usdc"])
+	if resp["cost_usdc"] != "0.003" {
+		t.Errorf("cost_usdc = %q, want 0.003", resp["cost_usdc"])
 	}
 
 	data, ok := resp["data"].(map[string]any)

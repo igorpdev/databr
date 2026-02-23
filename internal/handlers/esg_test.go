@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -47,6 +48,7 @@ func TestESG_OK_CleanCompany(t *testing.T) {
 	router := newESGRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/ambiental/empresa/11222333000181/esg", nil)
+	req = x402pkg.InjectPrice(req, "0.030")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -61,8 +63,8 @@ func TestESG_OK_CleanCompany(t *testing.T) {
 	if resp.Source != "esg_report" {
 		t.Errorf("Source = %q, want esg_report", resp.Source)
 	}
-	if resp.CostUSDC != "0.020" {
-		t.Errorf("CostUSDC = %q, want 0.020", resp.CostUSDC)
+	if resp.CostUSDC != "0.030" {
+		t.Errorf("CostUSDC = %q, want 0.030", resp.CostUSDC)
 	}
 
 	// Clean company: E=100, S=100, G=100 => ESG = 100*0.4 + 100*0.3 + 100*0.3 = 100.

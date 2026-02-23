@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -40,6 +41,7 @@ func TestMercadoTrabalho_OK_NoStore(t *testing.T) {
 	router := newMercadoTrabalhoRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mercado-trabalho/SP/analise", nil)
+	req = x402pkg.InjectPrice(req, "0.015")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -54,8 +56,8 @@ func TestMercadoTrabalho_OK_NoStore(t *testing.T) {
 	if resp.Source != "mercado_trabalho" {
 		t.Errorf("Source = %q, want mercado_trabalho", resp.Source)
 	}
-	if resp.CostUSDC != "0.010" {
-		t.Errorf("CostUSDC = %q, want 0.010", resp.CostUSDC)
+	if resp.CostUSDC != "0.015" {
+		t.Errorf("CostUSDC = %q, want 0.015", resp.CostUSDC)
 	}
 
 	// Verify estado section.

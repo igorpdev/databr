@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -82,7 +83,7 @@ func (h *LegislativoHandler) GetDeputados(w http.ResponseWriter, r *http.Request
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_deputados",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"deputados": dados, "total": len(dados)},
 	})
 }
@@ -124,7 +125,7 @@ func (h *LegislativoHandler) GetDeputado(w http.ResponseWriter, r *http.Request)
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_deputados",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     body.Dados,
 	})
 }
@@ -182,7 +183,7 @@ func (h *LegislativoHandler) GetProposicoes(w http.ResponseWriter, r *http.Reque
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_proposicoes",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"proposicoes": dados, "total": len(dados)},
 	})
 }
@@ -240,7 +241,7 @@ func (h *LegislativoHandler) GetVotacoes(w http.ResponseWriter, r *http.Request)
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_votacoes",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"votacoes": dados, "total": len(dados)},
 	})
 }
@@ -286,7 +287,7 @@ func (h *LegislativoHandler) GetPartidos(w http.ResponseWriter, r *http.Request)
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_partidos",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"partidos": dados, "total": len(dados)},
 	})
 }
@@ -335,7 +336,7 @@ func (h *LegislativoHandler) GetSenadores(w http.ResponseWriter, r *http.Request
 
 	respond(w, r, domain.APIResponse{
 		Source:   "senado_senadores",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"senadores": senadores, "total": len(senadores)},
 	})
 }
@@ -394,7 +395,7 @@ func (h *LegislativoHandler) GetEventos(w http.ResponseWriter, r *http.Request) 
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_eventos",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"eventos": dados, "total": len(dados)},
 	})
 }
@@ -446,7 +447,7 @@ func (h *LegislativoHandler) GetComissoes(w http.ResponseWriter, r *http.Request
 
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_comissoes",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"comissoes": dados, "total": len(dados)},
 	})
 }
@@ -489,7 +490,7 @@ func (h *LegislativoHandler) GetFrentes(w http.ResponseWriter, r *http.Request) 
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_frentes",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"frentes": dados, "total": len(dados)},
 	})
 }
@@ -532,7 +533,7 @@ func (h *LegislativoHandler) GetBlocos(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_blocos",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"blocos": dados, "total": len(dados)},
 	})
 }
@@ -591,7 +592,7 @@ func (h *LegislativoHandler) GetDespesas(w http.ResponseWriter, r *http.Request)
 	}
 	respond(w, r, domain.APIResponse{
 		Source:   "camara_despesas",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"despesas": dados, "total": len(dados), "deputado_id": id, "ano": ano},
 	})
 }
@@ -672,7 +673,7 @@ func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Re
 
 	respond(w, r, domain.APIResponse{
 		Source:   "senado_materias",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"materias": list, "total": len(list)},
 	})
 }

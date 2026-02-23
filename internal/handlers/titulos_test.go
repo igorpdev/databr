@@ -65,8 +65,8 @@ func TestTitulosHandler_GetTitulos_OK(t *testing.T) {
 	if resp.Source != "tesouro_titulos" {
 		t.Errorf("Source = %q, want tesouro_titulos", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	if resp.Data == nil {
 		t.Error("expected non-nil Data field")
@@ -121,7 +121,7 @@ func TestTitulosHandler_GetTitulos_FormatContext(t *testing.T) {
 	if resp.Data != nil {
 		t.Error("expected nil Data when ?format=context")
 	}
-	if resp.CostUSDC != "0.002" {
-		t.Errorf("expected cost 0.002, got %s", resp.CostUSDC)
+	if resp.CostUSDC != "0.005" {
+		t.Errorf("expected cost 0.005, got %s", resp.CostUSDC)
 	}
 }

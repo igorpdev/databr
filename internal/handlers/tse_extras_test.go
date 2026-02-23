@@ -99,8 +99,8 @@ func TestTSEExtras_GetBens_OK(t *testing.T) {
 	if resp.Source != "tse_bens" {
 		t.Errorf("Source = %q, want tse_bens", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	bens, ok := resp.Data["bens"].([]any)
 	if !ok || len(bens) == 0 {
@@ -321,8 +321,8 @@ func TestTSEExtras_GetCombustiveis_OK(t *testing.T) {
 	if resp.Source != "anp_combustiveis" {
 		t.Errorf("Source = %q, want anp_combustiveis", resp.Source)
 	}
-	if resp.CostUSDC != "0.001" {
-		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
 	}
 	combustiveis, ok := resp.Data["combustiveis"].([]any)
 	if !ok || len(combustiveis) == 0 {

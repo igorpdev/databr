@@ -10,6 +10,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -36,6 +37,7 @@ func TestJudicialHandler_GetProcessos_OK(t *testing.T) {
 	r.Get("/v1/judicial/processos/{doc}", h.GetProcessos)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/judicial/processos/12345678909", nil)
+	req = x402pkg.InjectPrice(req, "0.015")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -46,8 +48,8 @@ func TestJudicialHandler_GetProcessos_OK(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.CostUSDC != "0.010" {
-		t.Errorf("CostUSDC = %q, want 0.010", resp.CostUSDC)
+	if resp.CostUSDC != "0.015" {
+		t.Errorf("CostUSDC = %q, want 0.015", resp.CostUSDC)
 	}
 }
 

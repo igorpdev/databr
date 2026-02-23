@@ -11,6 +11,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -94,6 +95,7 @@ func TestFundoAnalise_OK(t *testing.T) {
 	router := newFundoAnaliseRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fundos/12345678000195/analise", nil)
+	req = x402pkg.InjectPrice(req, "0.010")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -108,8 +110,8 @@ func TestFundoAnalise_OK(t *testing.T) {
 	if resp.Source != "fundo_analise" {
 		t.Errorf("Source = %q, want fundo_analise", resp.Source)
 	}
-	if resp.CostUSDC != "0.050" {
-		t.Errorf("CostUSDC = %q, want 0.050", resp.CostUSDC)
+	if resp.CostUSDC != "0.010" {
+		t.Errorf("CostUSDC = %q, want 0.010", resp.CostUSDC)
 	}
 
 	// Fund data should be present.

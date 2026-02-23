@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -99,7 +100,7 @@ func (h *ComplianceEleitoralHandler) GetComplianceEleitoral(w http.ResponseWrite
 
 	respond(w, r, domain.APIResponse{
 		Source:   "compliance_eleitoral",
-		CostUSDC: "0.030",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
 			"documento":          digits,
 			"status":             status,

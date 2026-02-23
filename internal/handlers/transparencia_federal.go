@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -92,7 +93,7 @@ func (h *TransparenciaFederalHandler) GetContratos(w http.ResponseWriter, r *htt
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -119,7 +120,7 @@ func (h *TransparenciaFederalHandler) GetServidores(w http.ResponseWriter, r *ht
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -151,7 +152,7 @@ func (h *TransparenciaFederalHandler) GetBolsaFamilia(w http.ResponseWriter, r *
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -189,7 +190,7 @@ func (h *TransparenciaFederalHandler) GetCartoes(w http.ResponseWriter, r *http.
 	respond(w, r, domain.APIResponse{
 		Source:    rec.Source,
 		UpdatedAt: rec.FetchedAt,
-		CostUSDC:  "0.001",
+		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      rec.Data,
 	})
 }
@@ -245,7 +246,7 @@ func (h *TransparenciaFederalHandler) GetCEAF(w http.ResponseWriter, r *http.Req
 
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_ceaf",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"cnpj": cnpj, "ceaf": dados},
 	})
 }
@@ -302,7 +303,7 @@ func (h *TransparenciaFederalHandler) GetEmendas(w http.ResponseWriter, r *http.
 
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_emendas",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"emendas": dados, "total": len(dados), "ano": ano},
 	})
 }
@@ -356,7 +357,7 @@ func (h *TransparenciaFederalHandler) GetObras(w http.ResponseWriter, r *http.Re
 
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_obras",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"obras": dados, "total": len(dados)},
 	})
 }
@@ -420,7 +421,7 @@ func (h *TransparenciaFederalHandler) GetTransferencias(w http.ResponseWriter, r
 
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_transferencias",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"transferencias": dados, "total": len(dados), "orgao": orgao, "municipio_ibge": municipio},
 	})
 }
@@ -480,7 +481,7 @@ func (h *TransparenciaFederalHandler) GetPensionistas(w http.ResponseWriter, r *
 
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_pensionistas",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"pensionistas": dados, "total": len(dados), "orgao": orgao},
 	})
 }
@@ -547,7 +548,7 @@ func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.
 
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_viagens",
-		CostUSDC: "0.001",
+		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"viagens": dados, "total": len(dados), "de": de, "ate": ate},
 	})
 }
