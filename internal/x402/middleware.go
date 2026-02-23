@@ -194,12 +194,18 @@ func buildRequirementsBytes(r *http.Request, base x402types.PaymentRequirements)
 	if r.TLS == nil {
 		scheme = "http"
 	}
-	resourceURL := scheme + "://" + r.Host + r.URL.Path
 
-	meta, ok := matchRouteMeta(r.URL.Path)
-	if !ok {
+	// Use the route pattern (e.g. /v1/mercado/acoes/{ticker}) instead of the
+	// concrete path (/v1/mercado/acoes/VALE3) so the Bazaar indexes one canonical
+	// entry per endpoint rather than one per example URL the crawler visited.
+	routePath := r.URL.Path
+	pattern, meta, ok := matchRoutePattern(r.URL.Path)
+	if ok {
+		routePath = pattern
+	} else {
 		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
 	}
+	resourceURL := scheme + "://" + r.Host + routePath
 
 	method := "GET"
 	if r.Method == http.MethodPost {
@@ -241,12 +247,16 @@ func write402Response(w http.ResponseWriter, r *http.Request, req x402types.Paym
 	if r.TLS == nil {
 		scheme = "http"
 	}
-	resourceURL := scheme + "://" + r.Host + r.URL.Path
 
-	meta, ok := matchRouteMeta(r.URL.Path)
-	if !ok {
+	// Use route pattern for canonical Bazaar resource URL (same logic as buildRequirementsBytes).
+	routePath := r.URL.Path
+	pattern, meta, ok := matchRoutePattern(r.URL.Path)
+	if ok {
+		routePath = pattern
+	} else {
 		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
 	}
+	resourceURL := scheme + "://" + r.Host + routePath
 
 	method := "GET"
 	if r.Method == http.MethodPost {

@@ -164,13 +164,23 @@ func RouteMeta(pattern string) (description, mimeType string) {
 // matchRouteMeta finds the routeMetaEntry for a concrete URL path by matching
 // against parameterized patterns (e.g. /v1/bcb/cambio/USD matches /v1/bcb/cambio/{moeda}).
 func matchRouteMeta(path string) (routeMetaEntry, bool) {
+	_, meta, ok := matchRoutePattern(path)
+	return meta, ok
+}
+
+// matchRoutePattern matches a concrete URL path to a parameterized route pattern.
+// Returns the pattern (e.g. "/v1/mercado/acoes/{ticker}"), its metadata, and whether
+// a match was found. Used to build canonical resource URLs for the Bazaar index so that
+// concrete paths like /v1/mercado/acoes/VALE3 and /v1/mercado/acoes/PETR4 resolve to
+// the same pattern instead of polluting the index with duplicate entries.
+func matchRoutePattern(path string) (pattern string, meta routeMetaEntry, ok bool) {
 	// Fast path: exact match (non-parameterized routes like /v1/bcb/selic).
-	if m, ok := routeMeta[path]; ok {
-		return m, true
+	if m, found := routeMeta[path]; found {
+		return path, m, true
 	}
 	pathParts := strings.Split(path, "/")
-	for pattern, meta := range routeMeta {
-		patParts := strings.Split(pattern, "/")
+	for pat, m := range routeMeta {
+		patParts := strings.Split(pat, "/")
 		if len(patParts) != len(pathParts) {
 			continue
 		}
@@ -185,8 +195,8 @@ func matchRouteMeta(path string) (routeMetaEntry, bool) {
 			}
 		}
 		if match {
-			return meta, true
+			return pat, m, true
 		}
 	}
-	return routeMetaEntry{}, false
+	return "", routeMetaEntry{}, false
 }

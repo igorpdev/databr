@@ -137,6 +137,47 @@ func TestV2Response_UnknownRoute(t *testing.T) {
 	}
 }
 
+// TestV2Response_CanonicalResourceURL verifies that parameterized paths produce
+// canonical pattern-based resource URLs (e.g. {ticker} not VALE3) to prevent
+// the Bazaar from indexing duplicate entries for the same endpoint.
+func TestV2Response_CanonicalResourceURL(t *testing.T) {
+	fac := mockFacilitator(t, true)
+	defer fac.Close()
+
+	r := chi.NewRouter()
+	r.Use(x402.NewPricedMiddleware(x402.MiddlewareConfig{
+		WalletAddress:  "0xWALLET",
+		FacilitatorURL: fac.URL,
+		Network:        "eip155:84532",
+	}, "0.005"))
+	r.Get("/v1/mercado/acoes/{ticker}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Both VALE3 and PETR4 should produce the same canonical resource URL.
+	for _, ticker := range []string{"VALE3", "PETR4", "ITUB4"} {
+		req := httptest.NewRequest(http.MethodGet, "/v1/mercado/acoes/"+ticker, nil)
+		rr := httptest.NewRecorder()
+		r.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusPaymentRequired {
+			t.Fatalf("expected 402 for %s, got %d", ticker, rr.Code)
+		}
+
+		var body map[string]interface{}
+		json.Unmarshal(rr.Body.Bytes(), &body)
+
+		resource := body["resource"].(map[string]interface{})
+		url := resource["url"].(string)
+
+		// Should use pattern {ticker}, not the concrete ticker value.
+		wantSuffix := "/v1/mercado/acoes/{ticker}"
+		if len(url) < len(wantSuffix) || url[len(url)-len(wantSuffix):] != wantSuffix {
+			t.Errorf("ticker=%s: resource.url = %q, want suffix %q", ticker, url, wantSuffix)
+		}
+	}
+}
+
 // TestRouteMeta_Coverage verifies that all pricing table routes have metadata.
 func TestRouteMeta_Coverage(t *testing.T) {
 	for _, pattern := range x402.AllRoutePatterns() {
