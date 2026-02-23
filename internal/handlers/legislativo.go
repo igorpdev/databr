@@ -176,6 +176,151 @@ func (h *LegislativoHandler) GetProposicoes(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// GetVotacoes handles GET /v1/legislativo/votacoes.
+// Optional query params: pagina (default "1"), dataInicio, dataFim, orgao (e.g. "Plenário").
+func (h *LegislativoHandler) GetVotacoes(w http.ResponseWriter, r *http.Request) {
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+	dataInicio := r.URL.Query().Get("dataInicio")
+	dataFim := r.URL.Query().Get("dataFim")
+	orgao := r.URL.Query().Get("orgao")
+
+	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/votacoes?formato=json&itens=50&pagina=%s", pagina)
+	if dataInicio != "" {
+		url += "&dataInicio=" + dataInicio
+	}
+	if dataFim != "" {
+		url += "&dataFim=" + dataFim
+	}
+	if orgao != "" {
+		url += "&siglaOrgao=" + orgao
+	}
+
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar votações da Câmara: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var body struct {
+		Dados []any `json:"dados"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_votacoes",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"votacoes": dados, "total": len(dados)},
+	})
+}
+
+// GetPartidos handles GET /v1/legislativo/partidos.
+// Returns all political parties registered at the Câmara.
+func (h *LegislativoHandler) GetPartidos(w http.ResponseWriter, r *http.Request) {
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+
+	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/partidos?formato=json&itens=100&pagina=%s", pagina)
+
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar partidos da Câmara: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var body struct {
+		Dados []any `json:"dados"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_partidos",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"partidos": dados, "total": len(dados)},
+	})
+}
+
+// GetSenadores handles GET /v1/legislativo/senado/senadores.
+// Returns the current list of senators from the Senado Federal.
+func (h *LegislativoHandler) GetSenadores(w http.ResponseWriter, r *http.Request) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet,
+		"https://legis.senado.leg.br/dadosabertos/senador/lista/atual", nil)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao criar requisição para o Senado: "+err.Error())
+		return
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Senado Federal: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Senado retornou status %d", resp.StatusCode))
+		return
+	}
+
+	// Response: {"ListaParlamentarEmExercicio": {"Parlamentares": {"Parlamentar": [...]}}}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta do Senado: "+err.Error())
+		return
+	}
+
+	var senadores []any
+	if lista, ok := body["ListaParlamentarEmExercicio"].(map[string]any); ok {
+		if parlamentares, ok := lista["Parlamentares"].(map[string]any); ok {
+			if arr, ok := parlamentares["Parlamentar"].([]any); ok {
+				senadores = arr
+			}
+		}
+	}
+	if senadores == nil {
+		senadores = []any{}
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "senado_senadores",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"senadores": senadores, "total": len(senadores)},
+	})
+}
+
 // GetMateriasSenado handles GET /v1/legislativo/senado/materias.
 // Optional query params: ano (default: current year), sigla, pagina (default "1").
 func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Request) {

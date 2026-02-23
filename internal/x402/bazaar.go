@@ -54,12 +54,17 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/transporte/transportadores":         {"Transportadores rodoviários por CNPJ (ANTT RNTRC)", "application/json"},
 	// Phase 7: IBGE localidades + CNAE
 	"/v1/ibge/municipio/{ibge}": {"Dados de município por código IBGE", "application/json"},
+	"/v1/ibge/municipios/{uf}":  {"Lista de municípios por UF (IBGE)", "application/json"},
 	"/v1/ibge/estados":          {"Lista de estados brasileiros (IBGE)", "application/json"},
+	"/v1/ibge/regioes":          {"Lista de regiões do Brasil (IBGE)", "application/json"},
 	"/v1/ibge/cnae/{codigo}":    {"Subclasse CNAE por código (IBGE)", "application/json"},
 	// Phase 7: Legislativo (Câmara + Senado)
 	"/v1/legislativo/deputados":            {"Lista de deputados federais (Câmara)", "application/json"},
 	"/v1/legislativo/deputados/{id}":       {"Deputado federal por ID (Câmara)", "application/json"},
 	"/v1/legislativo/proposicoes":          {"Proposições legislativas da Câmara dos Deputados", "application/json"},
+	"/v1/legislativo/votacoes":             {"Votações do plenário da Câmara dos Deputados", "application/json"},
+	"/v1/legislativo/partidos":             {"Partidos políticos registrados na Câmara", "application/json"},
+	"/v1/legislativo/senado/senadores":     {"Lista de senadores em exercício (Senado Federal)", "application/json"},
 	"/v1/legislativo/senado/materias":      {"Matérias legislativas do Senado Federal", "application/json"},
 	// Phase 7: cartões do governo
 	"/v1/transparencia/cartoes": {"Gastos com cartões corporativos do governo federal (CGU)", "application/json"},

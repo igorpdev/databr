@@ -104,6 +104,74 @@ func (h *IbgeHandler) GetEstados(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetRegioes handles GET /v1/ibge/regioes.
+// Proxies to servicodados.ibge.gov.br/api/v1/localidades/regioes.
+func (h *IbgeHandler) GetRegioes(w http.ResponseWriter, r *http.Request) {
+	resp, err := h.httpClient.Get("https://servicodados.ibge.gov.br/api/v1/localidades/regioes")
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE Localidades: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE Localidades retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var list []any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE Localidades: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_localidades",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"regioes": list, "total": len(list)},
+	})
+}
+
+// GetMunicipiosPorUF handles GET /v1/ibge/municipios/{uf}.
+// Proxies to servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios.
+// {uf} can be the 2-letter sigla (e.g. "SP") or the numeric IBGE state code.
+func (h *IbgeHandler) GetMunicipiosPorUF(w http.ResponseWriter, r *http.Request) {
+	uf := chi.URLParam(r, "uf")
+	if uf == "" {
+		jsonError(w, http.StatusBadRequest, "UF é obrigatória")
+		return
+	}
+
+	url := fmt.Sprintf("https://servicodados.ibge.gov.br/api/v1/localidades/estados/%s/municipios", uf)
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE Localidades: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		jsonError(w, http.StatusNotFound, fmt.Sprintf("UF não encontrada: %s", uf))
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE Localidades retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var list []any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE Localidades: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_localidades",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"municipios": list, "total": len(list), "uf": uf},
+	})
+}
+
 // GetCNAE handles GET /v1/ibge/cnae/{codigo}.
 // Proxies to servicodados.ibge.gov.br/api/v2/cnae/subclasses/{codigo}.
 func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
