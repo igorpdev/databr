@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"regexp"
@@ -30,20 +30,20 @@ func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
-		log.Printf("ERROR: failed to encode error response: %v", err)
+		slog.Error("failed to encode error response", "error", err)
 	}
 }
 
 // gatewayError logs the internal error details server-side and writes a generic
 // error message to the client. Use this instead of exposing err.Error() directly.
 func gatewayError(w http.ResponseWriter, source string, err error) {
-	log.Printf("ERROR: %s: %v", source, err)
+	slog.Error("gateway error", "source", source, "error", err)
 	jsonError(w, http.StatusBadGateway, "upstream service temporarily unavailable")
 }
 
 // internalError logs the error and writes a generic 500 to the client.
 func internalError(w http.ResponseWriter, source string, err error) {
-	log.Printf("ERROR: %s: %v", source, err)
+	slog.Error("internal error", "source", source, "error", err)
 	jsonError(w, http.StatusInternalServerError, "internal error")
 }
 
@@ -64,7 +64,7 @@ func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("ERROR: failed to encode API response: %v", err)
+		slog.Error("failed to encode API response", "error", err)
 	}
 }
 
@@ -160,8 +160,8 @@ func fetchJSON(ctx context.Context, client *http.Client, url string, headers map
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := limitedReadAll(resp.Body)
-		log.Printf("WARN: upstream %s returned HTTP %d: %s", url, resp.StatusCode, string(body))
+		_, _ = limitedReadAll(resp.Body) // drain body
+		slog.Warn("upstream error", "url", url, "status", resp.StatusCode)
 		return resp.StatusCode, fmt.Errorf("upstream returned %d", resp.StatusCode)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
@@ -185,7 +185,7 @@ func limitedReadAll(r io.Reader) ([]byte, error) {
 // logUpstreamError logs the upstream error details server-side and returns a
 // generic error message safe to show to clients.
 func logUpstreamError(source string, statusCode int, body []byte) string {
-	log.Printf("WARN: %s upstream error (HTTP %d): %s", source, statusCode, string(body))
+	slog.Warn("upstream error", "source", source, "status", statusCode)
 	return "upstream service temporarily unavailable"
 }
 

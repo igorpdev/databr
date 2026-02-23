@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -506,8 +506,8 @@ func (h *BCBHandler) GetBaseMonetaria(w http.ResponseWriter, r *http.Request) {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			body, _ := limitedReadAll(resp.Body)
-			log.Printf("WARN: BCB SGS %d upstream error (HTTP %d): %s", code, resp.StatusCode, string(body))
+			_, _ = limitedReadAll(resp.Body) // drain body
+			slog.Warn("BCB SGS upstream error", "series", code, "status", resp.StatusCode)
 			return nil, fmt.Errorf("upstream service temporarily unavailable")
 		}
 		var valores []map[string]any

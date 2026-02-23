@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -36,7 +36,7 @@ type TransparenciaFederalHandler struct {
 func NewTransparenciaFederalHandler(f TransparenciaFetcher) *TransparenciaFederalHandler {
 	apiKey := os.Getenv("TRANSPARENCIA_API_KEY")
 	if apiKey == "" {
-		log.Println("WARN: TRANSPARENCIA_API_KEY not set — transparencia endpoints will fail")
+		slog.Warn("TRANSPARENCIA_API_KEY not set — transparencia endpoints will fail")
 	}
 	return &TransparenciaFederalHandler{
 		fetcher:    f,

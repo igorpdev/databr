@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -28,8 +28,12 @@ func QueryLogMiddleware(next http.Handler) http.Handler {
 		// to avoid logging PII like CNPJs and CPFs.
 		reqID := middleware.GetReqID(r.Context())
 
-		log.Printf("query_log req_id=%s endpoint=%s status=%d duration_ms=%d",
-			reqID, maskPath(routePattern), ww.Status(), duration.Milliseconds())
+		slog.Info("query_log",
+			"req_id", reqID,
+			"endpoint", maskPath(routePattern),
+			"status", ww.Status(),
+			"duration_ms", duration.Milliseconds(),
+		)
 	})
 }
 

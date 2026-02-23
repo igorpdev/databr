@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -108,7 +108,7 @@ func parseZipCSV(zipData []byte, maxRecords int) ([]map[string]any, error) {
 				break
 			}
 			if err != nil {
-				log.Printf("WARN: TSE CSV malformed row in %s: %v", f.Name, err)
+				slog.Warn("TSE CSV malformed row", "file", f.Name, "error", err)
 				continue
 			}
 			m := make(map[string]any, len(headers))
@@ -329,8 +329,8 @@ func (h *TSEExtrasHandler) fetchIPEASeries(r *http.Request, serCodigo string, n 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := limitedReadAll(resp.Body)
-		log.Printf("WARN: IPEADATA upstream error (HTTP %d): %s", resp.StatusCode, string(body))
+		_, _ = limitedReadAll(resp.Body) // drain body
+		slog.Warn("IPEADATA upstream error", "status", resp.StatusCode)
 		return nil, fmt.Errorf("upstream service temporarily unavailable")
 	}
 
@@ -367,7 +367,7 @@ func (h *TSEExtrasHandler) GetCombustiveis(w http.ResponseWriter, r *http.Reques
 		vals, err := h.fetchIPEASeries(r, series.Codigo, n)
 		if err != nil {
 			// Non-fatal: skip failing series, log server-side, return generic message.
-			log.Printf("ERROR: anp_combustiveis: series %s: %v", series.Codigo, err)
+			slog.Error("anp_combustiveis series fetch failed", "series", series.Codigo, "error", err)
 			combustiveis = append(combustiveis, combustivelEntry{
 				Codigo:    series.Codigo,
 				Nome:      series.Nome,

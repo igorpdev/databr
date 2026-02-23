@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -94,8 +94,8 @@ func (h *TesouroHandler) siconfiItems(ctx context.Context, endpoint string) ([]a
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := limitedReadAll(resp.Body)
-		log.Printf("WARN: SICONFI upstream error (HTTP %d): %s", resp.StatusCode, string(body))
+		_, _ = limitedReadAll(resp.Body) // drain body
+		slog.Warn("SICONFI upstream error", "status", resp.StatusCode)
 		return nil, fmt.Errorf("upstream service temporarily unavailable")
 	}
 	var envelope struct {

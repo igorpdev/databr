@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/csv"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -98,7 +98,7 @@ func (h *ANSHandler) GetPlanos(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			log.Printf("WARN: ANS CSV malformed row: %v", err)
+			slog.Warn("ANS CSV malformed row", "error", err)
 			continue
 		}
 
