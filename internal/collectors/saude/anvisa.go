@@ -66,7 +66,7 @@ func NewAnvisaCollector(csvURL string) *AnvisaCollector {
 }
 
 func (c *AnvisaCollector) Source() string   { return "anvisa_medicamentos" }
-func (c *AnvisaCollector) Schedule() string { return "@monthly" }
+func (c *AnvisaCollector) Schedule() string { return "0 12 15 * *" }
 
 // Collect downloads the ANVISA CSV, filters active medicamentos, and returns one
 // SourceRecord per active registration. The file is ISO-8859-1 encoded and uses

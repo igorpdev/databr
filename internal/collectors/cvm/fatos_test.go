@@ -59,8 +59,8 @@ func TestFatosRelevantesCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := cvm.NewFatosRelevantesCollector(srv.URL)
-	if got := c.Schedule(); got != "@monthly" {
-		t.Errorf("Schedule() = %q, want @monthly", got)
+	if got := c.Schedule(); got != "0 12 * * 1" {
+		t.Errorf("Schedule() = %q, want 0 12 * * 1", got)
 	}
 }
 

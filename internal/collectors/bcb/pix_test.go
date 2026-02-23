@@ -37,8 +37,8 @@ func TestPIXCollector_Schedule(t *testing.T) {
 	srv := newPIXServer(t)
 	defer srv.Close()
 	c := bcb.NewPIXCollector(srv.URL)
-	if c.Schedule() != "@monthly" {
-		t.Errorf("Schedule() = %q, want @monthly", c.Schedule())
+	if c.Schedule() != "0 13 18 * *" {
+		t.Errorf("Schedule() = %q, want 0 13 18 * *", c.Schedule())
 	}
 }
 

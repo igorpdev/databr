@@ -50,8 +50,8 @@ func TestANACCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := transporte.NewANACCollector(srv.URL)
-	if got := c.Schedule(); got != "@weekly" {
-		t.Errorf("Schedule() = %q, want %q", got, "@weekly")
+	if got := c.Schedule(); got != "0 11 * * 3" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 11 * * 3")
 	}
 }
 

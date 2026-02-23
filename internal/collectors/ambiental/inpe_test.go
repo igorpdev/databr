@@ -128,8 +128,8 @@ func TestDETERCollector_Schedule(t *testing.T) {
 	srv := newJSONServer(t, fakeDETERResponse)
 	defer srv.Close()
 	c := ambiental.NewDETERCollector(srv.URL)
-	if got := c.Schedule(); got != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", got)
+	if got := c.Schedule(); got != "0 15 * * *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 15 * * *")
 	}
 }
 

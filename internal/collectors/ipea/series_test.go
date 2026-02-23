@@ -50,8 +50,8 @@ func TestSeriesCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := ipea.NewSeriesCollector(srv.URL)
-	if got := c.Schedule(); got != "@daily" {
-		t.Errorf("Schedule() = %q, want %q", got, "@daily")
+	if got := c.Schedule(); got != "0 15 * * 1-5" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 15 * * 1-5")
 	}
 }
 

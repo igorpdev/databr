@@ -36,7 +36,7 @@ func NewSelicCollector(baseURL string) *SelicCollector {
 }
 
 func (c *SelicCollector) Source() string   { return "bcb_selic" }
-func (c *SelicCollector) Schedule() string { return "@daily" }
+func (c *SelicCollector) Schedule() string { return "0 13 * * 1-5" }
 
 // Collect fetches the last 30 Selic values from BCB SGS.
 func (c *SelicCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

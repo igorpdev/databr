@@ -51,7 +51,7 @@ func NewSTJCollector(baseURL string) *STJCollector {
 }
 
 func (c *STJCollector) Source() string   { return "stj_decisoes" }
-func (c *STJCollector) Schedule() string { return "@daily" }
+func (c *STJCollector) Schedule() string { return "0 13 * * 1-5" }
 
 // Collect fetches STJ decisions from the last 30 days.
 func (c *STJCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

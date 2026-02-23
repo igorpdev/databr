@@ -32,7 +32,7 @@ func NewSenadoCollector(baseURL string) *SenadoCollector {
 }
 
 func (c *SenadoCollector) Source() string   { return "senado_senadores" }
-func (c *SenadoCollector) Schedule() string { return "0 7 * * *" }
+func (c *SenadoCollector) Schedule() string { return "0 22 * * 1-5" }
 
 // Collect fetches the list of currently active senators.
 func (c *SenadoCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

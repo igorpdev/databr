@@ -54,8 +54,8 @@ func TestTaxasCreditoCollector_Schedule(t *testing.T) {
 	srv := newTaxasServer(t, fakeTaxasResponse)
 	defer srv.Close()
 	c := bcb.NewTaxasCreditoCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 15 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 15 * * 1-5", c.Schedule())
 	}
 }
 

@@ -68,7 +68,7 @@ func NewFatosRelevantesCollector(baseURL string) *FatosRelevantesCollector {
 }
 
 func (c *FatosRelevantesCollector) Source() string   { return "cvm_fatos" }
-func (c *FatosRelevantesCollector) Schedule() string { return "@monthly" }
+func (c *FatosRelevantesCollector) Schedule() string { return "0 12 * * 1" }
 
 // Collect downloads and parses the current year's IPE ZIP file, returning only
 // "Fato Relevante" records. Falls back to the previous year if the current year

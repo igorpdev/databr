@@ -33,7 +33,7 @@ func NewAcordaosCollectorWithURL(baseURL string) *AcordaosCollector {
 }
 
 func (c *AcordaosCollector) Source() string   { return "tcu_acordaos" }
-func (c *AcordaosCollector) Schedule() string { return "@daily" }
+func (c *AcordaosCollector) Schedule() string { return "0 13 * * 3,4" }
 
 func (c *AcordaosCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	url := c.baseURL + "?inicio=0&quantidade=100"

@@ -51,8 +51,8 @@ func TestPNCPCollector_Schedule(t *testing.T) {
 	srv := newPNCPServer(t, fakePNCPResponse)
 	defer srv.Close()
 	c := transparencia.NewPNCPCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 22 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 22 * * 1-5", c.Schedule())
 	}
 }
 

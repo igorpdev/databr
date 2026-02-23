@@ -32,7 +32,7 @@ func NewTaxasCreditoCollector(baseURL string) *TaxasCreditoCollector {
 }
 
 func (c *TaxasCreditoCollector) Source() string   { return "bcb_taxas_credito" }
-func (c *TaxasCreditoCollector) Schedule() string { return "@daily" }
+func (c *TaxasCreditoCollector) Schedule() string { return "0 15 * * 1-5" }
 
 // Collect fetches the latest 50 credit market interest rate records from BCB OLINDA.
 func (c *TaxasCreditoCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

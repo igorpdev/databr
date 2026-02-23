@@ -44,7 +44,7 @@ func NewCAGEDCollector(baseURL string) *CAGEDCollector {
 }
 
 func (c *CAGEDCollector) Source() string   { return "caged_emprego" }
-func (c *CAGEDCollector) Schedule() string { return "0 3 15 * *" }
+func (c *CAGEDCollector) Schedule() string { return "0 12 1 * *" }
 
 // Collect fetches CAGED data for the previous month.
 func (c *CAGEDCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

@@ -36,7 +36,7 @@ func NewFundosCollector(baseURL string) *FundosCollector {
 }
 
 func (c *FundosCollector) Source() string   { return "cvm_fundos" }
-func (c *FundosCollector) Schedule() string { return "@daily" }
+func (c *FundosCollector) Schedule() string { return "0 12 * * 1-5" }
 
 // Collect downloads and parses the latest monthly CVM fund informe.
 func (c *FundosCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

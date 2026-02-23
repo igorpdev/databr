@@ -33,7 +33,7 @@ func NewComexStatCollector(baseURL string) *ComexStatCollector {
 }
 
 func (c *ComexStatCollector) Source() string   { return "comex_exportacoes" }
-func (c *ComexStatCollector) Schedule() string { return "0 8 1 * *" }
+func (c *ComexStatCollector) Schedule() string { return "0 21 7 * *" }
 
 // Collect fetches export data for the previous month.
 func (c *ComexStatCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

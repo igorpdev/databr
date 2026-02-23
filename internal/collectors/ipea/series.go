@@ -65,7 +65,7 @@ func NewSeriesCollector(baseURL string) *SeriesCollector {
 }
 
 func (c *SeriesCollector) Source() string   { return "ipea_series" }
-func (c *SeriesCollector) Schedule() string { return "@daily" }
+func (c *SeriesCollector) Schedule() string { return "0 15 * * 1-5" }
 
 // Collect fetches the last 12 data points for each pre-defined macro series.
 // If a single series fetch fails, it logs a warning and continues to the next.

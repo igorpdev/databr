@@ -36,7 +36,7 @@ func NewIPCACollector(baseURL string) *IPCACollector {
 }
 
 func (c *IPCACollector) Source() string   { return "ibge_ipca" }
-func (c *IPCACollector) Schedule() string { return "0 8 * * *" }
+func (c *IPCACollector) Schedule() string { return "0 14 * * 1-5" }
 
 // Collect fetches the last 12 months of IPCA data from SIDRA.
 func (c *IPCACollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

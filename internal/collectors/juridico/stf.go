@@ -51,7 +51,7 @@ func NewSTFCollector(baseURL string) *STFCollector {
 }
 
 func (c *STFCollector) Source() string   { return "stf_decisoes" }
-func (c *STFCollector) Schedule() string { return "@daily" }
+func (c *STFCollector) Schedule() string { return "0 13 * * 1-5" }
 
 // Collect fetches STF decisions from the last 30 days.
 func (c *STFCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

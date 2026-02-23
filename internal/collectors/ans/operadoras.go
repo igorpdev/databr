@@ -39,7 +39,7 @@ func NewOperadorasCollector(csvURL string) *OperadorasCollector {
 }
 
 func (c *OperadorasCollector) Source() string   { return "ans_operadoras" }
-func (c *OperadorasCollector) Schedule() string { return "@daily" }
+func (c *OperadorasCollector) Schedule() string { return "0 9 * * 1" }
 
 // normalizeKey converts a CSV header name to a lowercase underscore key.
 // Example: "Registro_ANS" -> "registro_ans", "Razao_Social" -> "razao_social".

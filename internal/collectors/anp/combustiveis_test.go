@@ -78,8 +78,8 @@ func TestCombustiveisCollector_Source(t *testing.T) {
 
 func TestCombustiveisCollector_Schedule(t *testing.T) {
 	c := anp.NewCombustiveisCollector("http://unused")
-	if got := c.Schedule(); got != "@weekly" {
-		t.Errorf("Schedule() = %q, want %q", got, "@weekly")
+	if got := c.Schedule(); got != "0 13 * * 2" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 13 * * 2")
 	}
 }
 

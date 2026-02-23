@@ -58,7 +58,7 @@ func NewDETERCollector(baseURL string) *DETERCollector {
 }
 
 func (c *DETERCollector) Source() string   { return "inpe_deter" }
-func (c *DETERCollector) Schedule() string { return "@daily" }
+func (c *DETERCollector) Schedule() string { return "0 15 * * *" }
 
 // Collect fetches the latest 500 DETER deforestation alerts from Terrabrasilis WFS.
 // RecordKey is the WFS feature ID (e.g. "deter_amz.fid-abc123").

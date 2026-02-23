@@ -32,8 +32,8 @@ func TestPIBCollector_Schedule(t *testing.T) {
 	srv := newSIDRAServer(t, fakePIBResponse)
 	defer srv.Close()
 	c := ibge.NewPIBCollector(srv.URL)
-	if c.Schedule() != "0 8 * * *" {
-		t.Errorf("Schedule() = %q, want 0 8 * * *", c.Schedule())
+	if c.Schedule() != "0 14 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 14 * * 1-5", c.Schedule())
 	}
 }
 

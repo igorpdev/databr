@@ -33,7 +33,7 @@ func NewINEPCollector(baseURL string) *INEPCollector {
 }
 
 func (c *INEPCollector) Source() string   { return "inep_censo_escolar" }
-func (c *INEPCollector) Schedule() string { return "0 8 1 * *" }
+func (c *INEPCollector) Schedule() string { return "0 8 1 2,9 *" }
 
 // Collect fetches education indicator data from INEP.
 // Uses the CKAN datastore_search endpoint to retrieve census data.

@@ -30,7 +30,7 @@ func NewCreditoCollector(baseURL string) *CreditoCollector {
 }
 
 func (c *CreditoCollector) Source() string   { return "bcb_credito" }
-func (c *CreditoCollector) Schedule() string { return "@monthly" }
+func (c *CreditoCollector) Schedule() string { return "0 12 28 * *" }
 
 func (c *CreditoCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	var url string
@@ -93,7 +93,7 @@ func NewReservasCollector(baseURL string) *ReservasCollector {
 }
 
 func (c *ReservasCollector) Source() string   { return "bcb_reservas" }
-func (c *ReservasCollector) Schedule() string { return "@daily" }
+func (c *ReservasCollector) Schedule() string { return "0 13 * * 1-5" }
 
 func (c *ReservasCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	var url string

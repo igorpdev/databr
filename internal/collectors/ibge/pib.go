@@ -32,7 +32,7 @@ func NewPIBCollector(baseURL string) *PIBCollector {
 }
 
 func (c *PIBCollector) Source() string   { return "ibge_pib" }
-func (c *PIBCollector) Schedule() string { return "0 8 * * *" }
+func (c *PIBCollector) Schedule() string { return "0 14 * * 1-5" }
 
 // Collect fetches the last 4 quarters of PIB data.
 func (c *PIBCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

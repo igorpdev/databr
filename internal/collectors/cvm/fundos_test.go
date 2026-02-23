@@ -51,8 +51,8 @@ func TestFundosCollector_Schedule(t *testing.T) {
 	srv := newCVMServer(t, fakeFundosCSV)
 	defer srv.Close()
 	c := cvm.NewFundosCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 12 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 12 * * 1-5", c.Schedule())
 	}
 }
 

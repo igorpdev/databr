@@ -40,8 +40,8 @@ func TestANEELCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := energia.NewANEELCollector(srv.URL)
-	if got := c.Schedule(); got != "0 6 * * 1" {
-		t.Errorf("Schedule() = %q, want %q", got, "0 6 * * 1")
+	if got := c.Schedule(); got != "0 9 * * 1" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 9 * * 1")
 	}
 }
 

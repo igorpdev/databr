@@ -46,7 +46,7 @@ func NewFocusCollector(baseURL string) *FocusCollector {
 }
 
 func (c *FocusCollector) Source() string   { return "bcb_focus" }
-func (c *FocusCollector) Schedule() string { return "@daily" }
+func (c *FocusCollector) Schedule() string { return "0 12 * * 1" }
 
 // Collect fetches the latest annual market expectations from the BCB Relatório Focus.
 // Records are keyed by "INDICADOR_DATAREFERENCIA" (e.g., "IPCA_2026").

@@ -88,7 +88,7 @@ func NewANTTCollector(ckanURL, csvURL string) *ANTTCollector {
 }
 
 func (c *ANTTCollector) Source() string   { return "antt_rntrc" }
-func (c *ANTTCollector) Schedule() string { return "@monthly" }
+func (c *ANTTCollector) Schedule() string { return "0 11 10 * *" }
 
 // Collect discovers the latest RNTRC CSV via the CKAN API, then streams and parses it.
 func (c *ANTTCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

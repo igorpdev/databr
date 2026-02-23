@@ -81,8 +81,8 @@ func TestFocusCollector_Schedule(t *testing.T) {
 	srv := newFocusServer(t, fakeFocusResponse)
 	defer srv.Close()
 	c := bcb.NewFocusCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 12 * * 1" {
+		t.Errorf("Schedule() = %q, want 0 12 * * 1", c.Schedule())
 	}
 }
 

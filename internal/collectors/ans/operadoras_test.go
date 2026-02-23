@@ -40,8 +40,8 @@ func TestOperadorasCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := ans.NewOperadorasCollector(srv.URL)
-	if got := c.Schedule(); got != "@daily" {
-		t.Errorf("Schedule() = %q, want %q", got, "@daily")
+	if got := c.Schedule(); got != "0 9 * * 1" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 9 * * 1")
 	}
 }
 

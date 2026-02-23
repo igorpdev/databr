@@ -41,8 +41,8 @@ func TestCamaraCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := legislativo.NewCamaraCollector(srv.URL)
-	if got := c.Schedule(); got != "0 7 * * *" {
-		t.Errorf("Schedule() = %q, want %q", got, "0 7 * * *")
+	if got := c.Schedule(); got != "0 22 * * 1-5" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 22 * * 1-5")
 	}
 }
 

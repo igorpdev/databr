@@ -70,7 +70,7 @@ func NewANEELCollector(csvURL string) *ANEELCollector {
 }
 
 func (c *ANEELCollector) Source() string   { return "aneel_tarifas" }
-func (c *ANEELCollector) Schedule() string { return "0 6 * * 1" }
+func (c *ANEELCollector) Schedule() string { return "0 9 * * 1" }
 
 // Collect downloads the ANEEL tariff CSV and converts each data row into a
 // domain.SourceRecord. The CSV uses semicolons as delimiters, quoted fields, and

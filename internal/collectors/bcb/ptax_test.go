@@ -45,8 +45,8 @@ func TestPTAXCollector_Schedule(t *testing.T) {
 	srv := newOLINDAServer(t, fakePTAXResponse)
 	defer srv.Close()
 	c := bcb.NewPTAXCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 17 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 17 * * 1-5", c.Schedule())
 	}
 }
 

@@ -34,8 +34,8 @@ func TestTesouroDiretoCollector_Schedule(t *testing.T) {
 	srv := newTitulosServer(t, fakeTitulosCSV)
 	defer srv.Close()
 	c := tesouro.NewTesouroDiretoCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 21 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 21 * * 1-5", c.Schedule())
 	}
 }
 

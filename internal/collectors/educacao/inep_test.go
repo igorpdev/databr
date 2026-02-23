@@ -56,8 +56,8 @@ func TestINEPCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := educacao.NewINEPCollector(srv.URL)
-	if got := c.Schedule(); got != "0 8 1 * *" {
-		t.Errorf("Schedule() = %q, want %q", got, "0 8 1 * *")
+	if got := c.Schedule(); got != "0 8 1 2,9 *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 8 1 2,9 *")
 	}
 }
 

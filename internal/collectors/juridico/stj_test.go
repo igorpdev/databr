@@ -56,8 +56,8 @@ func TestSTJCollector_Source(t *testing.T) {
 
 func TestSTJCollector_Schedule(t *testing.T) {
 	c := juridico.NewSTJCollector("http://localhost")
-	if got := c.Schedule(); got != "@daily" {
-		t.Errorf("Schedule() = %q, want %q", got, "@daily")
+	if got := c.Schedule(); got != "0 13 * * 1-5" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 13 * * 1-5")
 	}
 }
 

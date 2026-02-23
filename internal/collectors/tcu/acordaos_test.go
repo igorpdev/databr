@@ -14,8 +14,8 @@ func TestAcordaosCollector_SourceAndSchedule(t *testing.T) {
 	if c.Source() != "tcu_acordaos" {
 		t.Errorf("Source() = %q, want tcu_acordaos", c.Source())
 	}
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 13 * * 3,4" {
+		t.Errorf("Schedule() = %q, want 0 13 * * 3,4", c.Schedule())
 	}
 }
 

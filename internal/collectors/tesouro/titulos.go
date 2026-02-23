@@ -36,7 +36,7 @@ func NewTesouroDiretoCollector(baseURL string) *TesouroDiretoCollector {
 }
 
 func (c *TesouroDiretoCollector) Source() string   { return "tesouro_titulos" }
-func (c *TesouroDiretoCollector) Schedule() string { return "@daily" }
+func (c *TesouroDiretoCollector) Schedule() string { return "0 21 * * 1-5" }
 
 // Collect fetches the latest Tesouro Direto prices from Tesouro Transparente.
 // The CSV holds the full history; only the most recent Data Base date is returned.

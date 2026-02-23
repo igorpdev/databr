@@ -32,7 +32,7 @@ func NewONSCollector(baseURL string) *ONSCollector {
 }
 
 func (c *ONSCollector) Source() string   { return "ons_geracao" }
-func (c *ONSCollector) Schedule() string { return "0 9 * * *" }
+func (c *ONSCollector) Schedule() string { return "0 15 * * *" }
 
 // Collect fetches electricity generation data from ONS.
 // It queries the CKAN datastore_search endpoint for the generation dataset.

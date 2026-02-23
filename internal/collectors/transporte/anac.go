@@ -60,7 +60,7 @@ func NewANACCollector(csvURL string) *ANACCollector {
 }
 
 func (c *ANACCollector) Source() string   { return "anac_rab" }
-func (c *ANACCollector) Schedule() string { return "@weekly" }
+func (c *ANACCollector) Schedule() string { return "0 11 * * 3" }
 
 // Collect downloads the ANAC RAB CSV and returns one SourceRecord per aircraft.
 // The file is UTF-8 with BOM and uses semicolons as field separators.

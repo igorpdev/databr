@@ -32,7 +32,7 @@ func NewPIXCollector(baseURL string) *PIXCollector {
 }
 
 func (c *PIXCollector) Source() string   { return "bcb_pix" }
-func (c *PIXCollector) Schedule() string { return "@monthly" }
+func (c *PIXCollector) Schedule() string { return "0 13 18 * *" }
 
 func (c *PIXCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	var url string

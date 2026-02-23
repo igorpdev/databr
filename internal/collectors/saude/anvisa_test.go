@@ -48,8 +48,8 @@ func TestAnvisaCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := saude.NewAnvisaCollector(srv.URL)
-	if got := c.Schedule(); got != "@monthly" {
-		t.Errorf("Schedule() = %q, want %q", got, "@monthly")
+	if got := c.Schedule(); got != "0 12 15 * *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 12 15 * *")
 	}
 }
 

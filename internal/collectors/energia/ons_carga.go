@@ -28,7 +28,7 @@ func NewONSCargaCollector(baseURL string) *ONSCargaCollector {
 }
 
 func (c *ONSCargaCollector) Source() string   { return "ons_carga" }
-func (c *ONSCargaCollector) Schedule() string { return "0 9 * * *" }
+func (c *ONSCargaCollector) Schedule() string { return "0 15 * * *" }
 
 func (c *ONSCargaCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	url := fmt.Sprintf("%s/datastore_search?resource_id=carga_energia_2_ho&limit=100", c.baseURL)

@@ -48,8 +48,8 @@ func TestIPCACollector_Schedule(t *testing.T) {
 	defer srv.Close()
 	c := ibge.NewIPCACollector(srv.URL)
 	// IPCA is released monthly
-	if c.Schedule() != "0 8 * * *" {
-		t.Errorf("Schedule() = %q, want daily at 08:00", c.Schedule())
+	if c.Schedule() != "0 14 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 14 * * 1-5", c.Schedule())
 	}
 }
 

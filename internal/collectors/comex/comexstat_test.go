@@ -53,8 +53,8 @@ func TestComexStatCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := comex.NewComexStatCollector(srv.URL)
-	if got := c.Schedule(); got != "0 8 1 * *" {
-		t.Errorf("Schedule() = %q, want %q", got, "0 8 1 * *")
+	if got := c.Schedule(); got != "0 21 7 * *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 21 7 * *")
 	}
 }
 

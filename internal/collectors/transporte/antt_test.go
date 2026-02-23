@@ -80,8 +80,8 @@ func TestANTTCollector_Source(t *testing.T) {
 
 func TestANTTCollector_Schedule(t *testing.T) {
 	c := transporte.NewANTTCollector("", "")
-	if got := c.Schedule(); got != "@monthly" {
-		t.Errorf("Schedule() = %q, want %q", got, "@monthly")
+	if got := c.Schedule(); got != "0 11 10 * *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 11 10 * *")
 	}
 }
 

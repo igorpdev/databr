@@ -56,8 +56,8 @@ func TestONSCollector_Schedule(t *testing.T) {
 	defer srv.Close()
 
 	c := energia.NewONSCollector(srv.URL)
-	if got := c.Schedule(); got != "0 9 * * *" {
-		t.Errorf("Schedule() = %q, want %q", got, "0 9 * * *")
+	if got := c.Schedule(); got != "0 15 * * *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 15 * * *")
 	}
 }
 

@@ -37,8 +37,8 @@ func TestSelicCollector_Schedule(t *testing.T) {
 	srv := newSGSServer(t, fakeSelicResponse)
 	defer srv.Close()
 	c := bcb.NewSelicCollector(srv.URL)
-	if c.Schedule() != "@daily" {
-		t.Errorf("Schedule() = %q, want @daily", c.Schedule())
+	if c.Schedule() != "0 13 * * 1-5" {
+		t.Errorf("Schedule() = %q, want 0 13 * * 1-5", c.Schedule())
 	}
 }
 

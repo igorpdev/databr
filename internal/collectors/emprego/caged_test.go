@@ -52,8 +52,8 @@ func TestCAGEDCollector_Source(t *testing.T) {
 
 func TestCAGEDCollector_Schedule(t *testing.T) {
 	c := emprego.NewCAGEDCollector("http://localhost")
-	if got := c.Schedule(); got != "0 3 15 * *" {
-		t.Errorf("Schedule() = %q, want %q", got, "0 3 15 * *")
+	if got := c.Schedule(); got != "0 12 1 * *" {
+		t.Errorf("Schedule() = %q, want %q", got, "0 12 1 * *")
 	}
 }
 

@@ -28,7 +28,7 @@ func NewComexImportCollector(baseURL string) *ComexImportCollector {
 }
 
 func (c *ComexImportCollector) Source() string   { return "comex_importacoes" }
-func (c *ComexImportCollector) Schedule() string { return "0 8 1 * *" }
+func (c *ComexImportCollector) Schedule() string { return "0 21 7 * *" }
 
 func (c *ComexImportCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	now := time.Now().UTC()

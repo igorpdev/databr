@@ -34,7 +34,7 @@ func NewCamaraCollector(baseURL string) *CamaraCollector {
 }
 
 func (c *CamaraCollector) Source() string   { return "camara_deputados" }
-func (c *CamaraCollector) Schedule() string { return "0 7 * * *" }
+func (c *CamaraCollector) Schedule() string { return "0 22 * * 1-5" }
 
 // Collect fetches the list of deputies from the Câmara dos Deputados.
 func (c *CamaraCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {

@@ -34,7 +34,7 @@ func NewPNCPCollector(baseURL string) *PNCPCollector {
 }
 
 func (c *PNCPCollector) Source() string   { return "pncp_licitacoes" }
-func (c *PNCPCollector) Schedule() string { return "@daily" }
+func (c *PNCPCollector) Schedule() string { return "0 22 * * 1-5" }
 
 // pncpResponse wraps the paginated response from /api/consulta/v1.
 type pncpResponse struct {

@@ -32,7 +32,7 @@ func NewPTAXCollector(baseURL string) *PTAXCollector {
 }
 
 func (c *PTAXCollector) Source() string   { return "bcb_ptax" }
-func (c *PTAXCollector) Schedule() string { return "@daily" }
+func (c *PTAXCollector) Schedule() string { return "0 17 * * 1-5" }
 
 // Collect fetches USD PTAX for the most recent available trading day.
 // PTAX returns empty on weekends and holidays, so we walk back up to 7 days.

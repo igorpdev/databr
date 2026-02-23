@@ -65,7 +65,7 @@ func NewCombustiveisCollector(xlsxURL string) *CombustiveisCollector {
 }
 
 func (c *CombustiveisCollector) Source() string   { return "anp_combustiveis" }
-func (c *CombustiveisCollector) Schedule() string { return "@weekly" }
+func (c *CombustiveisCollector) Schedule() string { return "0 13 * * 2" }
 
 // Collect downloads the ANP XLSX, parses fuel price rows, and returns one
 // SourceRecord per product+date combination. ANP blocks HEAD requests (403),

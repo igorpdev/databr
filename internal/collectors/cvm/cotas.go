@@ -34,7 +34,7 @@ func NewCotasCollector(baseURL string) *CotasCollector {
 }
 
 func (c *CotasCollector) Source() string   { return "cvm_cotas" }
-func (c *CotasCollector) Schedule() string { return "@daily" }
+func (c *CotasCollector) Schedule() string { return "0 12 * * 1-5" }
 
 // Collect downloads and parses CVM inf_diario_fi CSVs for the current and previous months.
 func (c *CotasCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
