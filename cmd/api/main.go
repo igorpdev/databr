@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -183,6 +184,19 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+
+	// Proxy TLS detection: behind Railway/Cloudflare r.TLS is nil because
+	// TLS terminates at the proxy. The x402-go SDK checks r.TLS to decide
+	// the scheme for the resource URL. This middleware sets r.TLS from the
+	// X-Forwarded-Proto header so 402 responses emit https:// URLs.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") == "https" {
+				r.TLS = &tls.ConnectionState{}
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	// Security headers
 	r.Use(func(next http.Handler) http.Handler {
