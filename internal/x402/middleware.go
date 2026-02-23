@@ -50,6 +50,20 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 		panic("x402: invalid payment requirement config: " + err.Error())
 	}
 
+	// Attach OutputSchema so the CDP facilitator indexes this endpoint
+	// in the Bazaar discovery layer. The Description and MimeType on the
+	// PaymentRequirement are per-tier (generic), while the BazaarMiddleware
+	// overrides them per-route in the 402 JSON response for clients.
+	requirement.OutputSchema = &x402sdk.OutputSchema{
+		Input: x402sdk.InputSchema{
+			Type:   "http",
+			Method: "GET",
+		},
+		Output: map[string]x402sdk.FieldDef{
+			"type": {Type: "object"},
+		},
+	}
+
 	httpCfg := &x402http.Config{
 		FacilitatorURL:      cfg.FacilitatorURL,
 		PaymentRequirements: []x402sdk.PaymentRequirement{requirement},
