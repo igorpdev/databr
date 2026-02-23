@@ -26,6 +26,7 @@ func (s *stubCNPJFetcher) FetchByCNPJ(ctx context.Context, cnpj string) ([]domai
 func newRouter(h *handlers.EmpresasHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/v1/empresas/{cnpj}", h.GetEmpresa)
+	r.Get("/v1/empresas/{cnpj}/socios", h.GetSocios)
 	return r
 }
 
@@ -133,5 +134,116 @@ func TestEmpresasHandler_GetEmpresa_ContentType(t *testing.T) {
 	ct := rec.Header().Get("Content-Type")
 	if ct != "application/json" {
 		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+}
+
+func TestGetSocios_OK(t *testing.T) {
+	fetcher := &stubCNPJFetcher{
+		records: []domain.SourceRecord{{
+			Source:    "cnpj",
+			RecordKey: "12345678000195",
+			Data: map[string]any{
+				"cnpj":         "12345678000195",
+				"razao_social": "EMPRESA XPTO LTDA",
+				"qsa": []any{
+					map[string]any{
+						"nome_socio":            "JOAO DA SILVA",
+						"qualificacao_socio":    "Sócio-Administrador",
+						"data_entrada_sociedade": "2020-01-01",
+					},
+				},
+			},
+			FetchedAt: time.Now(),
+		}},
+	}
+
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/socios", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "cnpj" {
+		t.Errorf("Source = %q, want cnpj", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+	if resp.Data == nil {
+		t.Fatal("Data must not be nil")
+	}
+	qsa, ok := resp.Data["qsa"]
+	if !ok {
+		t.Fatal("Data[qsa] must be present")
+	}
+	qsaSlice, ok := qsa.([]any)
+	if !ok || len(qsaSlice) == 0 {
+		t.Fatalf("Data[qsa] must be a non-empty slice, got %T", qsa)
+	}
+}
+
+func TestGetSocios_NoQSA(t *testing.T) {
+	fetcher := &stubCNPJFetcher{
+		records: []domain.SourceRecord{{
+			Source:    "cnpj",
+			RecordKey: "12345678000195",
+			Data:      map[string]any{"cnpj": "12345678000195", "razao_social": "EMPRESA SEM SOCIOS"},
+			FetchedAt: time.Now(),
+		}},
+	}
+
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/socios", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when qsa is absent, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetSocios_EmptyQSA(t *testing.T) {
+	fetcher := &stubCNPJFetcher{
+		records: []domain.SourceRecord{{
+			Source:    "cnpj",
+			RecordKey: "12345678000195",
+			Data:      map[string]any{"cnpj": "12345678000195", "qsa": []any{}},
+			FetchedAt: time.Now(),
+		}},
+	}
+
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/socios", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for empty qsa, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetSocios_InvalidCNPJ(t *testing.T) {
+	h := handlers.NewEmpresasHandler(&stubCNPJFetcher{})
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/123/socios", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid CNPJ, got %d", rec.Code)
 	}
 }

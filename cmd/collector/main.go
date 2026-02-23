@@ -69,6 +69,7 @@ func main() {
 		bcb.NewReservasCollector(""),
 		bcb.NewPIXCollector(""),
 		cvm.NewFundosCollector(""),
+		cvm.NewFatosRelevantesCollector(""),
 		b3.NewCotacoesCollector(""),
 
 		// Phase 3: Transparency, treasury & elections

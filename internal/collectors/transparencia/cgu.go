@@ -77,6 +77,33 @@ func (c *CGUCollector) FetchByCNPJ(ctx context.Context, cnpjNum string) ([]domai
 	return []domain.SourceRecord{record}, nil
 }
 
+// FetchGranularByCNPJ fetches a single compliance list ("ceis", "cnep", or "cepim") for a CNPJ.
+// Returns a single SourceRecord with Data containing the list items and total count.
+func (c *CGUCollector) FetchGranularByCNPJ(ctx context.Context, cnpjNum, list string) ([]domain.SourceRecord, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("cgu_%s: TRANSPARENCIA_API_KEY is not set", list)
+	}
+
+	items, err := c.fetchList(ctx, "/"+list, cnpjNum)
+	if err != nil {
+		return nil, fmt.Errorf("cgu_%s: fetch: %w", list, err)
+	}
+
+	record := domain.SourceRecord{
+		Source:    "cgu_" + list,
+		RecordKey: cnpjNum,
+		Data: map[string]any{
+			"cnpj":  cnpjNum,
+			"list":  list,
+			"items": items,
+			"total": len(items),
+		},
+		FetchedAt: time.Now().UTC(),
+	}
+
+	return []domain.SourceRecord{record}, nil
+}
+
 // fetchList fetches a list endpoint (e.g. /ceis) filtered by CNPJ.
 func (c *CGUCollector) fetchList(ctx context.Context, path, cnpjNum string) ([]any, error) {
 	url := fmt.Sprintf("%s%s?cnpjSancionado=%s&pagina=1", c.baseURL, path, cnpjNum)

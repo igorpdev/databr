@@ -120,7 +120,11 @@ func main() {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.001"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
+			r.Get("/empresas/{cnpj}/socios", empHandler.GetSocios)
 			r.Get("/tesouro/rreo", tesouroHand.GetRREO)
+			r.Get("/compliance/ceis/{cnpj}", compHandler.GetCEIS)
+			r.Get("/compliance/cnep/{cnpj}", compHandler.GetCNEP)
+			r.Get("/compliance/cepim/{cnpj}", compHandler.GetCEPIM)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
@@ -143,14 +147,18 @@ func main() {
 			if energiaHandler != nil {
 				r.Get("/energia/tarifas", energiaHandler.GetTarifas)
 			}
+			if mercHandler != nil {
+				r.Get("/mercado/fatos-relevantes/{protocolo}", mercHandler.GetFatosById)
+			}
 		})
 
-		// $0.002 — B3 stock quotes, INPE deforestation data
+		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.002"))
 			if mercHandler != nil {
 				r.Get("/mercado/acoes/{ticker}", mercHandler.GetAcoes)
+				r.Get("/mercado/fatos-relevantes", mercHandler.GetFatosRelevantes)
 			}
 			if ambientalHandler != nil {
 				r.Get("/ambiental/desmatamento", ambientalHandler.GetDesmatamento)
@@ -158,12 +166,13 @@ func main() {
 			}
 		})
 
-		// $0.003 — compliance via empresa sub-route, DOU search
+		// $0.003 — compliance via empresa sub-route, DOU/diários search
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
 			r.Get("/dou/busca", douHandler.GetBusca)
+			r.Get("/diarios/busca", douHandler.GetDiarios)
 		})
 
 		// $0.005 — full compliance check, CVM fund data
