@@ -193,7 +193,7 @@ const DefaultPrice = "0.003"
 
 // IsPublicPath returns true for paths that must bypass x402 (health, metrics).
 func IsPublicPath(path string) bool {
-	public := []string{"/health", "/metrics", "/favicon.ico"}
+	public := []string{"/health", "/metrics", "/favicon.ico", "/.well-known/"}
 	for _, p := range public {
 		if strings.HasPrefix(path, p) {
 			return true

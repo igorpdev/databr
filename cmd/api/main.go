@@ -247,6 +247,9 @@ func main() {
 	// Query logging middleware
 	r.Use(handlers.QueryLogMiddleware)
 
+	// x402 discovery document — public, no payment required
+	r.Get("/.well-known/x402", x402pkg.WellKnownHandler(x402Cfg))
+
 	// Health check with DB + Redis verification
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		healthCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
