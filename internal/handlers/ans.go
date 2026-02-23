@@ -51,13 +51,13 @@ func (h *ANSHandler) GetPlanos(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, ansOperadorasURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição ANS: "+err.Error())
+		internalError(w, "ans", err)
 		return
 	}
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "ANS indisponível: "+err.Error())
+		gatewayError(w, "ans", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -77,7 +77,7 @@ func (h *ANSHandler) GetPlanos(w http.ResponseWriter, r *http.Request) {
 	// Read header row.
 	headers, err := csvReader.Read()
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao ler cabeçalho CSV ANS: "+err.Error())
+		gatewayError(w, "ans", err)
 		return
 	}
 	// Normalize headers to lowercase.

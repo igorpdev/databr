@@ -35,7 +35,7 @@ func (h *EconomiaHandler) GetFocus(w http.ResponseWriter, r *http.Request) {
 func (h *EconomiaHandler) serveLatest(w http.ResponseWriter, r *http.Request, source, price string) {
 	records, err := h.store.FindLatest(r.Context(), source)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "economia", err)
 		return
 	}
 	if len(records) == 0 {

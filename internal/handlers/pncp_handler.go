@@ -51,27 +51,26 @@ func (h *PNCPHandler) GetOrgaos(w http.ResponseWriter, r *http.Request) {
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição PNCP: "+err.Error())
+		internalError(w, "pncp", err)
 		return
 	}
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "PNCP indisponível: "+err.Error())
+		gatewayError(w, "pncp", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("PNCP retornou %d: %s", resp.StatusCode, string(body)))
+		jsonError(w, http.StatusBadGateway, logUpstreamError("pncp", resp.StatusCode, body))
 		return
 	}
 
 	var orgaos []any
 	if err := json.NewDecoder(resp.Body).Decode(&orgaos); err != nil {
-		// Try object envelope
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta PNCP: "+err.Error())
+		gatewayError(w, "pncp", err)
 		return
 	}
 

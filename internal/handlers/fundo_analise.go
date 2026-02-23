@@ -67,7 +67,7 @@ func (h *FundoAnaliseHandler) GetFundoAnalise(w http.ResponseWriter, r *http.Req
 	wg.Wait()
 
 	if fundoRes.err != nil {
-		jsonError(w, http.StatusBadGateway, "failed to fetch fund data: "+fundoRes.err.Error())
+		gatewayError(w, "fundo_analise", fundoRes.err)
 		return
 	}
 	if fundoRes.record == nil {

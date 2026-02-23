@@ -23,7 +23,7 @@ func NewTitulosHandler(store SourceStore) *TitulosHandler {
 func (h *TitulosHandler) GetTitulos(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "tesouro_titulos")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "titulos", err)
 		return
 	}
 	if len(records) == 0 {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/databr/api/internal/domain"
 )
@@ -17,11 +19,32 @@ var reDigits = regexp.MustCompile(`\D`)
 
 const maxResponseSize = 50 * 1024 * 1024 // 50 MB
 
+// defaultPagination holds the default and max page sizes for paginated endpoints.
+const (
+	defaultPageSize = 50
+	maxPageSize     = 500
+)
+
 // jsonError writes a JSON error response with the given HTTP status code.
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("ERROR: failed to encode error response: %v", err)
+	}
+}
+
+// gatewayError logs the internal error details server-side and writes a generic
+// error message to the client. Use this instead of exposing err.Error() directly.
+func gatewayError(w http.ResponseWriter, source string, err error) {
+	log.Printf("ERROR: %s: %v", source, err)
+	jsonError(w, http.StatusBadGateway, "upstream service temporarily unavailable")
+}
+
+// internalError logs the error and writes a generic 500 to the client.
+func internalError(w http.ResponseWriter, source string, err error) {
+	log.Printf("ERROR: %s: %v", source, err)
+	jsonError(w, http.StatusInternalServerError, "internal error")
 }
 
 // respond writes the API response, applying ?format=context if requested.
@@ -40,7 +63,117 @@ func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("ERROR: failed to encode API response: %v", err)
+	}
+}
+
+// serveLatest is a helper for the common pattern: look up the latest record(s)
+// for a source in the store and write the API response. Eliminates repetitive
+// find → check error → check empty → respond boilerplate in store-backed handlers.
+func serveLatest(w http.ResponseWriter, r *http.Request, store SourceStore, source, price string) {
+	records, err := store.FindLatest(r.Context(), source)
+	if err != nil {
+		gatewayError(w, source, err)
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, source+" data not yet available")
+		return
+	}
+	rec := records[0]
+	respond(w, r, domain.APIResponse{
+		Source:    rec.Source,
+		UpdatedAt: rec.FetchedAt,
+		CostUSDC:  price,
+		Data:      rec.Data,
+	})
+}
+
+// serveLatestAll serves all records for a source as an array.
+func serveLatestAll(w http.ResponseWriter, r *http.Request, store SourceStore, source, dataKey, price string) {
+	records, err := store.FindLatest(r.Context(), source)
+	if err != nil {
+		gatewayError(w, source, err)
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, source+" data not yet available")
+		return
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		items = append(items, rec.Data)
+	}
+	respond(w, r, domain.APIResponse{
+		Source:    source,
+		UpdatedAt: records[0].FetchedAt,
+		CostUSDC:  price,
+		Data:      map[string]any{dataKey: items, "total": len(items)},
+	})
+}
+
+// parsePagination extracts limit and offset from query params with safe defaults.
+func parsePagination(r *http.Request) (limit, offset int) {
+	limit = defaultPageSize
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if limit > maxPageSize {
+		limit = maxPageSize
+	}
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	return limit, offset
+}
+
+// paginateSlice applies limit/offset to a slice. Returns the paginated subset.
+func paginateSlice[T any](items []T, limit, offset int) []T {
+	if offset >= len(items) {
+		return nil
+	}
+	end := offset + limit
+	if end > len(items) {
+		end = len(items)
+	}
+	return items[offset:end]
+}
+
+// fetchJSON is a helper for proxy handlers that fetch JSON from an upstream URL.
+// It handles context, timeout, error logging, and JSON decoding in one place.
+func fetchJSON(ctx context.Context, client *http.Client, url string, headers map[string]string, dest any) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("build request: %w", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("fetch: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := limitedReadAll(resp.Body)
+		log.Printf("WARN: upstream %s returned HTTP %d: %s", url, resp.StatusCode, string(body))
+		return resp.StatusCode, fmt.Errorf("upstream returned %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
+		return resp.StatusCode, fmt.Errorf("decode response: %w", err)
+	}
+	return resp.StatusCode, nil
+}
+
+// RateLimitExceeded writes a 429 Too Many Requests response.
+// Exported so it can be used by the rate limit handler in cmd/api/main.go.
+func RateLimitExceeded(w http.ResponseWriter) {
+	jsonError(w, http.StatusTooManyRequests, "rate limit exceeded, max 100 req/min")
 }
 
 // limitedReadAll reads up to maxResponseSize bytes from r.
@@ -54,6 +187,12 @@ func limitedReadAll(r io.Reader) ([]byte, error) {
 func logUpstreamError(source string, statusCode int, body []byte) string {
 	log.Printf("WARN: %s upstream error (HTTP %d): %s", source, statusCode, string(body))
 	return "upstream service temporarily unavailable"
+}
+
+// newHTTPClient creates an HTTP client with the given timeout.
+// Centralizes client creation to ensure consistent settings.
+func newHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{Timeout: timeout}
 }
 
 // ibgeBaseURL is the base URL for IBGE municipality API. Override in tests.
@@ -70,9 +209,7 @@ func SetIBGEBaseURL(url string) {
 }
 
 // resolveIBGEToName converts an IBGE municipality code (e.g., "1302603") to
-// the municipality name (e.g., "Manaus") via IBGE API. If the input doesn't
-// look like an IBGE code (6-7 digit number) or the API call fails, the
-// original input is returned unchanged.
+// the municipality name (e.g., "Manaus") via IBGE API.
 func resolveIBGEToName(client *http.Client, code string) string {
 	clean := reDigits.ReplaceAllString(code, "")
 	if clean != code || len(code) < 6 {

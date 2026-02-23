@@ -38,7 +38,7 @@ func (h *ComplianceHandler) GetCompliance(w http.ResponseWriter, r *http.Request
 
 	records, err := h.fetcher.FetchByCNPJ(r.Context(), normalized)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "compliance", err)
 		return
 	}
 	if len(records) == 0 {
@@ -67,7 +67,7 @@ func (h *ComplianceHandler) fetchGranular(w http.ResponseWriter, r *http.Request
 
 	records, err := h.fetcher.FetchGranularByCNPJ(r.Context(), normalized, list)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "compliance", err)
 		return
 	}
 	if len(records) == 0 {

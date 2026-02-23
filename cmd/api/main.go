@@ -100,7 +100,7 @@ func main() {
 		transporteHandler      *handlers.TransporteHandler
 		transportadoresHandler *handlers.TransportadoresHandler
 		titulosHandler         *handlers.TitulosHandler
-		// Premium cross-referencing handlers
+		// Premium cross-referencing handlers (Phase 10)
 		dueDiligenceHandler        *handlers.DueDiligenceHandler
 		panoramaHandler            *handlers.PanoramaHandler
 		setorHandler               *handlers.SetorHandler
@@ -109,6 +109,15 @@ func main() {
 		creditoScoreHandler        *handlers.CreditoScoreHandler
 		municipioHandler           *handlers.MunicipioHandler
 		fundoAnaliseHandler        *handlers.FundoAnaliseHandler
+		// Premium composite handlers (Phase 12)
+		perfilCompletoHandler  *handlers.PerfilCompletoHandler
+		carteiraRiscoHandler   *handlers.CarteiraRiscoHandler
+		redeInfluenciaHandler  *handlers.RedeInfluenciaHandler
+		litigioRiscoHandler    *handlers.LitigioRiscoHandler
+		competicaoHandler      *handlers.CompeticaoHandler
+		mercadoTrabalhoHandler *handlers.MercadoTrabalhoHandler
+		regulacaoSetorHandler  *handlers.RegulacaoSetorHandler
+		esgHandler             *handlers.ESGHandler
 	)
 	if store != nil {
 		bcbHandler = handlers.NewBCBHandler(store)
@@ -130,6 +139,15 @@ func main() {
 		creditoScoreHandler = handlers.NewCreditoScoreHandler(cnpjCollector, cguCollector, djCollector, store)
 		municipioHandler = handlers.NewMunicipioHandler(store)
 		fundoAnaliseHandler = handlers.NewFundoAnaliseHandler(store)
+		// Phase 12: Premium composite handlers
+		perfilCompletoHandler = handlers.NewPerfilCompletoHandler(cnpjCollector, cguCollector, djCollector, store)
+		carteiraRiscoHandler = handlers.NewCarteiraRiscoHandler(cnpjCollector, cguCollector, store)
+		redeInfluenciaHandler = handlers.NewRedeInfluenciaHandler(cnpjCollector, store)
+		litigioRiscoHandler = handlers.NewLitigioRiscoHandler(djCollector, cnpjCollector, store)
+		competicaoHandler = handlers.NewCompeticaoHandler(store)
+		mercadoTrabalhoHandler = handlers.NewMercadoTrabalhoHandler(store)
+		regulacaoSetorHandler = handlers.NewRegulacaoSetorHandler(store)
+		esgHandler = handlers.NewESGHandler(cnpjCollector, cguCollector, store)
 	}
 
 	// MCP server (proxies to this REST API via SSE transport)
@@ -156,14 +174,22 @@ func main() {
 			w.Header().Set("X-Frame-Options", "DENY")
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+			w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+			w.Header().Set("X-XSS-Protection", "1; mode=block")
+			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0, private")
 			next.ServeHTTP(w, r)
 		})
 	})
 
-	// CORS
+	// CORS — restrict in production, allow all in dev
+	allowedOrigins := []string{"https://databr.api.br", "https://*.up.railway.app"}
+	if os.Getenv("RAILWAY_ENVIRONMENT") == "" && os.Getenv("FLY_APP_NAME") == "" {
+		allowedOrigins = []string{"*"} // dev mode
+	}
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "OPTIONS"},
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "X-PAYMENT", "X-Request-ID"},
 		ExposedHeaders:   []string{"X-Payment-Required", "Content-Length", "X-Request-ID"},
 		AllowCredentials: false,
@@ -176,16 +202,14 @@ func main() {
 		1*time.Minute,
 		httprate.WithKeyFuncs(httprate.KeyByIP),
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded, max 100 req/min"}`)) //nolint:errcheck
+			handlers.RateLimitExceeded(w)
 		}),
 	))
 
 	// Query logging middleware
 	r.Use(handlers.QueryLogMiddleware)
 
-	// Health check with DB verification
+	// Health check with DB verification (no internal details exposed)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		healthCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
@@ -195,7 +219,8 @@ func main() {
 
 		if pool != nil {
 			if err := pool.Ping(healthCtx); err != nil {
-				status["db"] = "error: " + err.Error()
+				log.Printf("ERROR: health check DB ping failed: %v", err)
+				status["db"] = "error"
 				httpCode = http.StatusServiceUnavailable
 			} else {
 				status["db"] = "ok"
@@ -206,7 +231,9 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(httpCode)
-		json.NewEncoder(w).Encode(status)
+		if err := json.NewEncoder(w).Encode(status); err != nil {
+			log.Printf("ERROR: health check encode: %v", err)
+		}
 	})
 
 	// /v1 API routes, grouped by x402 price tier
@@ -369,13 +396,52 @@ func main() {
 			}
 		})
 
-		// $0.010 — judicial process search, economic panorama
+		// $0.010 — judicial process search, economic panorama, labor market
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
 			if panoramaHandler != nil {
 				r.Get("/economia/panorama", panoramaHandler.GetPanorama)
+			}
+			if mercadoTrabalhoHandler != nil {
+				r.Get("/mercado-trabalho/{uf}/analise", mercadoTrabalhoHandler.GetMercadoTrabalho)
+			}
+		})
+
+		// $0.015 — perfil completo, sector regulation
+		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
+			r.Use(optionalX402(x402Cfg, "0.015"))
+			if perfilCompletoHandler != nil {
+				r.Get("/empresas/{cnpj}/perfil-completo", perfilCompletoHandler.GetPerfilCompleto)
+			}
+			if regulacaoSetorHandler != nil {
+				r.Get("/setor/{cnae}/regulacao", regulacaoSetorHandler.GetRegulacaoSetor)
+			}
+		})
+
+		// $0.020 — competition analysis, ESG scoring, litigation risk
+		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
+			r.Use(optionalX402(x402Cfg, "0.020"))
+			if competicaoHandler != nil {
+				r.Get("/mercado/{cnae}/competicao", competicaoHandler.GetCompeticao)
+			}
+			if esgHandler != nil {
+				r.Get("/ambiental/empresa/{cnpj}/esg", esgHandler.GetESG)
+			}
+			if litigioRiscoHandler != nil {
+				r.Get("/litigio/{cnpj}/risco", litigioRiscoHandler.GetLitigioRisco)
+			}
+		})
+
+		// $0.030 — influence network
+		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
+			r.Use(optionalX402(x402Cfg, "0.030"))
+			if redeInfluenciaHandler != nil {
+				r.Get("/rede/{cnpj}/influencia", redeInfluenciaHandler.GetRedeInfluencia)
 			}
 		})
 
@@ -385,6 +451,15 @@ func main() {
 			r.Use(optionalX402(x402Cfg, "0.050"))
 			if dueDiligenceHandler != nil {
 				r.Get("/empresas/{cnpj}/duediligence", dueDiligenceHandler.GetDueDiligence)
+			}
+		})
+
+		// $0.100 — portfolio risk (batch, POST)
+		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
+			r.Use(optionalX402(x402Cfg, "0.100"))
+			if carteiraRiscoHandler != nil {
+				r.Post("/carteira/risco", carteiraRiscoHandler.PostCarteiraRisco)
 			}
 		})
 	})

@@ -81,7 +81,7 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição IPEAData: "+err.Error())
+		internalError(w, "ipea", err)
 		return
 	}
 	// IPEAData OData v4: must use Accept header — $format=json returns 400.
@@ -89,13 +89,13 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IPEAData: "+err.Error())
+		gatewayError(w, "ipea", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IPEAData retornou status %d", resp.StatusCode))
+		gatewayError(w, "ipea", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 		Value []map[string]any `json:"value"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IPEAData: "+err.Error())
+		gatewayError(w, "ipea", err)
 		return
 	}
 
@@ -156,20 +156,20 @@ func (h *IPEAHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição IPEAData: "+err.Error())
+		internalError(w, "ipea", err)
 		return
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IPEAData: "+err.Error())
+		gatewayError(w, "ipea", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IPEAData retornou status %d", resp.StatusCode))
+		gatewayError(w, "ipea", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -177,7 +177,7 @@ func (h *IPEAHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
 		Value []map[string]any `json:"value"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IPEAData: "+err.Error())
+		gatewayError(w, "ipea", err)
 		return
 	}
 
@@ -198,20 +198,20 @@ func (h *IPEAHandler) GetTemas(w http.ResponseWriter, r *http.Request) {
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet,
 		"http://ipeadata.gov.br/api/odata4/Temas", nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição IPEAData: "+err.Error())
+		internalError(w, "ipea", err)
 		return
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IPEAData: "+err.Error())
+		gatewayError(w, "ipea", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IPEAData retornou status %d", resp.StatusCode))
+		gatewayError(w, "ipea", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -219,7 +219,7 @@ func (h *IPEAHandler) GetTemas(w http.ResponseWriter, r *http.Request) {
 		Value []map[string]any `json:"value"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IPEAData: "+err.Error())
+		gatewayError(w, "ipea", err)
 		return
 	}
 

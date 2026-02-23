@@ -56,13 +56,13 @@ func (h *LegislativoHandler) GetDeputados(w http.ResponseWriter, r *http.Request
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Câmara dos Deputados: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *LegislativoHandler) GetDeputados(w http.ResponseWriter, r *http.Request
 		Links []any `json:"links"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *LegislativoHandler) GetDeputado(w http.ResponseWriter, r *http.Request)
 	apiURL := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/deputados/%s?%s", id, params.Encode())
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Câmara dos Deputados: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -110,7 +110,7 @@ func (h *LegislativoHandler) GetDeputado(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *LegislativoHandler) GetDeputado(w http.ResponseWriter, r *http.Request)
 		Dados map[string]any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -157,13 +157,13 @@ func (h *LegislativoHandler) GetProposicoes(w http.ResponseWriter, r *http.Reque
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar proposições da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *LegislativoHandler) GetProposicoes(w http.ResponseWriter, r *http.Reque
 		Dados []any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -215,13 +215,13 @@ func (h *LegislativoHandler) GetVotacoes(w http.ResponseWriter, r *http.Request)
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar votações da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -229,7 +229,7 @@ func (h *LegislativoHandler) GetVotacoes(w http.ResponseWriter, r *http.Request)
 		Dados []any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -261,13 +261,13 @@ func (h *LegislativoHandler) GetPartidos(w http.ResponseWriter, r *http.Request)
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar partidos da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -275,7 +275,7 @@ func (h *LegislativoHandler) GetPartidos(w http.ResponseWriter, r *http.Request)
 		Dados []any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -297,27 +297,27 @@ func (h *LegislativoHandler) GetSenadores(w http.ResponseWriter, r *http.Request
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet,
 		"https://legis.senado.leg.br/dadosabertos/senador/lista/atual", nil)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao criar requisição para o Senado: "+err.Error())
+		internalError(w, "legislativo", err)
 		return
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Senado Federal: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Senado retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
 	// Response: {"ListaParlamentarEmExercicio": {"Parlamentares": {"Parlamentar": [...]}}}
 	var body map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta do Senado: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -368,13 +368,13 @@ func (h *LegislativoHandler) GetEventos(w http.ResponseWriter, r *http.Request) 
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar eventos da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -383,7 +383,7 @@ func (h *LegislativoHandler) GetEventos(w http.ResponseWriter, r *http.Request) 
 		Links []any `json:"links"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -420,13 +420,13 @@ func (h *LegislativoHandler) GetComissoes(w http.ResponseWriter, r *http.Request
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar comissões da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -435,7 +435,7 @@ func (h *LegislativoHandler) GetComissoes(w http.ResponseWriter, r *http.Request
 		Links []any `json:"links"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 
@@ -468,19 +468,19 @@ func (h *LegislativoHandler) GetFrentes(w http.ResponseWriter, r *http.Request) 
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar frentes parlamentares: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 	var body struct {
 		Dados []any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	dados := body.Dados
@@ -511,19 +511,19 @@ func (h *LegislativoHandler) GetBlocos(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar blocos partidários: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 	var body struct {
 		Dados []any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	dados := body.Dados
@@ -566,7 +566,7 @@ func (h *LegislativoHandler) GetDespesas(w http.ResponseWriter, r *http.Request)
 	)
 	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar despesas do deputado: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -575,14 +575,14 @@ func (h *LegislativoHandler) GetDespesas(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 	var body struct {
 		Dados []any `json:"dados"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	dados := body.Dados
@@ -619,20 +619,20 @@ func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Re
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, apiURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao criar requisição para o Senado: "+err.Error())
+		internalError(w, "legislativo", err)
 		return
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Senado Federal: "+err.Error())
+		gatewayError(w, "legislativo", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Senado retornou status %d", resp.StatusCode))
+		gatewayError(w, "legislativo", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 

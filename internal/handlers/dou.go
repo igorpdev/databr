@@ -41,7 +41,7 @@ func (h *DOUHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.searcher.Search(r.Context(), params)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "dou", err)
 		return
 	}
 	if len(records) == 0 {
@@ -80,7 +80,7 @@ func (h *DOUHandler) GetDiarios(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.searcher.Search(r.Context(), params)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "dou", err)
 		return
 	}
 	if len(records) == 0 {

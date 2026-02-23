@@ -27,7 +27,7 @@ func (h *TransporteHandler) GetAeronave(w http.ResponseWriter, r *http.Request) 
 
 	rec, err := h.store.FindOne(r.Context(), "anac_rab", prefixo)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transporte", err)
 		return
 	}
 	if rec == nil {
@@ -72,7 +72,7 @@ func (h *TransporteHandler) GetAeronaves(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transporte", err)
 		return
 	}
 	if len(records) == 0 {

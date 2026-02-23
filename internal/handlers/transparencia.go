@@ -21,7 +21,7 @@ func NewTransparenciaHandler(store SourceStore) *TransparenciaHandler {
 func (h *TransparenciaHandler) GetLicitacoes(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "pncp_licitacoes")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transparencia", err)
 		return
 	}
 	if len(records) == 0 {
@@ -45,7 +45,7 @@ func (h *TransparenciaHandler) GetLicitacoes(w http.ResponseWriter, r *http.Requ
 func (h *TransparenciaHandler) GetCandidatos(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "tse_candidatos")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transparencia", err)
 		return
 	}
 

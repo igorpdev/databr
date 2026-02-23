@@ -35,20 +35,44 @@ func NewCotacoesCollector(baseURL string) *CotacoesCollector {
 }
 
 func (c *CotacoesCollector) Source() string   { return "b3_cotacoes" }
-func (c *CotacoesCollector) Schedule() string { return "@daily" }
+func (c *CotacoesCollector) Schedule() string { return "0 19 * * 1-5" } // 19h, Mon-Fri (after market close)
 
 // Collect downloads and parses B3 cotações for the last business day.
+// If today's file is not yet available (404), it falls back up to 3 previous
+// business days to handle holidays and late publication.
 func (c *CotacoesCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
-	var url string
-	if strings.Contains(c.baseURL, "bvmf.bmfbovespa.com.br") {
-		// B3 date format: DDMMYYYY (not ISO 8601)
-		lastDay := LastBusinessDay(time.Now())
-		filename := fmt.Sprintf("COTAHIST_D%s.ZIP", lastDay.Format("02012006"))
-		url = fmt.Sprintf("%s/%s", c.baseURL, filename)
-	} else {
-		url = c.baseURL
+	if !strings.Contains(c.baseURL, "bvmf.bmfbovespa.com.br") {
+		// Test mode — use baseURL directly.
+		return c.fetchAndParse(ctx, c.baseURL)
 	}
 
+	// Try today and up to 3 previous business days.
+	day := LastBusinessDay(time.Now())
+	for attempts := 0; attempts < 4; attempts++ {
+		filename := fmt.Sprintf("COTAHIST_D%s.ZIP", day.Format("02012006"))
+		url := fmt.Sprintf("%s/%s", c.baseURL, filename)
+
+		records, err := c.fetchAndParse(ctx, url)
+		if err == nil {
+			return records, nil
+		}
+
+		// If 404, try the previous business day.
+		if strings.Contains(err.Error(), "file not found") {
+			day = day.AddDate(0, 0, -1)
+			day = LastBusinessDay(day)
+			continue
+		}
+
+		// Other errors — don't retry.
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("b3_cotacoes: no file found for last 4 business days")
+}
+
+// fetchAndParse downloads a single B3 ZIP file and parses the BDIN content.
+func (c *CotacoesCollector) fetchAndParse(ctx context.Context, url string) ([]domain.SourceRecord, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("b3_cotacoes: build request: %w", err)
@@ -61,8 +85,7 @@ func (c *CotacoesCollector) Collect(ctx context.Context) ([]domain.SourceRecord,
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		// Weekend or holiday — try previous day
-		return nil, fmt.Errorf("b3_cotacoes: file not found (weekend or holiday)")
+		return nil, fmt.Errorf("b3_cotacoes: file not found")
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("b3_cotacoes: upstream returned %d", resp.StatusCode)

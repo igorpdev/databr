@@ -172,13 +172,13 @@ func (h *TSEExtrasHandler) GetBens(w http.ResponseWriter, r *http.Request) {
 	zipURL := fmt.Sprintf("%s/consulta_bem_candidato/consulta_bem_candidato_%d.zip", h.baseURL, ano)
 	zipData, err := h.downloadZip(r, zipURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("tse_bens: %s", err.Error()))
+		gatewayError(w, "tse_bens", err)
 		return
 	}
 
 	rows, err := parseZipCSV(zipData, n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("tse_bens: parse zip: %s", err.Error()))
+		gatewayError(w, "tse_bens", err)
 		return
 	}
 
@@ -204,13 +204,13 @@ func (h *TSEExtrasHandler) GetDoacoes(w http.ResponseWriter, r *http.Request) {
 	zipURL := fmt.Sprintf("%s/receitas_candidatos/receitas_candidatos_%d.zip", h.baseURL, ano)
 	zipData, err := h.downloadZip(r, zipURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("tse_doacoes: %s", err.Error()))
+		gatewayError(w, "tse_doacoes", err)
 		return
 	}
 
 	rows, err := parseZipCSV(zipData, n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("tse_doacoes: parse zip: %s", err.Error()))
+		gatewayError(w, "tse_doacoes", err)
 		return
 	}
 
@@ -236,13 +236,13 @@ func (h *TSEExtrasHandler) GetResultados(w http.ResponseWriter, r *http.Request)
 	zipURL := fmt.Sprintf("%s/votacao_candidato_munzona/votacao_candidato_munzona_%d.zip", h.baseURL, ano)
 	zipData, err := h.downloadZip(r, zipURL)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("tse_resultados: %s", err.Error()))
+		gatewayError(w, "tse_resultados", err)
 		return
 	}
 
 	rows, err := parseZipCSV(zipData, n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("tse_resultados: parse zip: %s", err.Error()))
+		gatewayError(w, "tse_resultados", err)
 		return
 	}
 
@@ -366,13 +366,14 @@ func (h *TSEExtrasHandler) GetCombustiveis(w http.ResponseWriter, r *http.Reques
 	for _, series := range combustiveisSeries {
 		vals, err := h.fetchIPEASeries(r, series.Codigo, n)
 		if err != nil {
-			// Non-fatal: skip failing series but log in response.
+			// Non-fatal: skip failing series, log server-side, return generic message.
+			log.Printf("ERROR: anp_combustiveis: series %s: %v", series.Codigo, err)
 			combustiveis = append(combustiveis, combustivelEntry{
 				Codigo:    series.Codigo,
 				Nome:      series.Nome,
 				Unidade:   series.Unidade,
 				Descricao: series.Descricao,
-				Valores:   []map[string]any{{"erro": err.Error()}},
+				Valores:   []map[string]any{{"erro": "upstream service temporarily unavailable"}},
 			})
 			continue
 		}

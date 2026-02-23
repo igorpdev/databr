@@ -80,7 +80,7 @@ func (h *TransparenciaFederalHandler) GetContratos(w http.ResponseWriter, r *htt
 
 	records, err := h.fetcher.FetchContratos(r.Context(), orgao, cnpj)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	if len(records) == 0 {
@@ -107,7 +107,7 @@ func (h *TransparenciaFederalHandler) GetServidores(w http.ResponseWriter, r *ht
 
 	records, err := h.fetcher.FetchServidores(r.Context(), orgao)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	if len(records) == 0 {
@@ -139,7 +139,7 @@ func (h *TransparenciaFederalHandler) GetBolsaFamilia(w http.ResponseWriter, r *
 
 	records, err := h.fetcher.FetchBolsaFamilia(r.Context(), municipio, mes)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	if len(records) == 0 {
@@ -177,7 +177,7 @@ func (h *TransparenciaFederalHandler) GetCartoes(w http.ResponseWriter, r *http.
 
 	records, err := h.fetcher.FetchCartoes(r.Context(), orgao, de, ate)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	if len(records) == 0 {
@@ -211,14 +211,14 @@ func (h *TransparenciaFederalHandler) GetCEAF(w http.ResponseWriter, r *http.Req
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		internalError(w, "transparencia_federal", err)
 		return
 	}
 	req.Header.Set("chave-api-dados", h.apiKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -239,7 +239,7 @@ func (h *TransparenciaFederalHandler) GetCEAF(w http.ResponseWriter, r *http.Req
 
 	var dados any
 	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 
@@ -272,14 +272,14 @@ func (h *TransparenciaFederalHandler) GetEmendas(w http.ResponseWriter, r *http.
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		internalError(w, "transparencia_federal", err)
 		return
 	}
 	req.Header.Set("chave-api-dados", h.apiKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -296,7 +296,7 @@ func (h *TransparenciaFederalHandler) GetEmendas(w http.ResponseWriter, r *http.
 
 	var dados []any
 	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 
@@ -326,14 +326,14 @@ func (h *TransparenciaFederalHandler) GetObras(w http.ResponseWriter, r *http.Re
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		internalError(w, "transparencia_federal", err)
 		return
 	}
 	req.Header.Set("chave-api-dados", h.apiKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -350,7 +350,7 @@ func (h *TransparenciaFederalHandler) GetObras(w http.ResponseWriter, r *http.Re
 
 	var dados []any
 	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 
@@ -390,14 +390,14 @@ func (h *TransparenciaFederalHandler) GetTransferencias(w http.ResponseWriter, r
 	}
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		internalError(w, "transparencia_federal", err)
 		return
 	}
 	req.Header.Set("chave-api-dados", h.apiKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -414,7 +414,7 @@ func (h *TransparenciaFederalHandler) GetTransferencias(w http.ResponseWriter, r
 
 	var dados []any
 	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 
@@ -450,14 +450,14 @@ func (h *TransparenciaFederalHandler) GetPensionistas(w http.ResponseWriter, r *
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		internalError(w, "transparencia_federal", err)
 		return
 	}
 	req.Header.Set("chave-api-dados", h.apiKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -474,7 +474,7 @@ func (h *TransparenciaFederalHandler) GetPensionistas(w http.ResponseWriter, r *
 
 	var dados []any
 	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 
@@ -517,14 +517,14 @@ func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		internalError(w, "transparencia_federal", err)
 		return
 	}
 	req.Header.Set("chave-api-dados", h.apiKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -541,7 +541,7 @@ func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.
 
 	var dados []any
 	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		gatewayError(w, "transparencia_federal", err)
 		return
 	}
 

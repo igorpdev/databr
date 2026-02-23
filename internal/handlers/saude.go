@@ -24,7 +24,7 @@ func (h *SaudeHandler) GetMedicamento(w http.ResponseWriter, r *http.Request) {
 
 	rec, err := h.store.FindOne(r.Context(), "anvisa_medicamentos", registro)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "saude", err)
 		return
 	}
 	if rec == nil {

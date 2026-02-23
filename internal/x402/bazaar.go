@@ -138,6 +138,15 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/ambiental/embargos":                    {"Áreas embargadas pelo IBAMA", "application/json"},
 	"/v1/energia/geracao":                       {"Geração de energia elétrica por fonte (ONS)", "application/json"},
 	"/v1/energia/carga":                         {"Carga de energia elétrica por subsistema (ONS)", "application/json"},
+	// Phase 12: Premium composite endpoints
+	"/v1/empresas/{cnpj}/perfil-completo":       {"Perfil empresarial completo (CNPJ + compliance + judicial + contratos + ambiental)", "application/json"},
+	"/v1/carteira/risco":                        {"Análise de risco de carteira em batch (até 50 CNPJs)", "application/json"},
+	"/v1/rede/{cnpj}/influencia":                {"Rede de influência societária (sócios + empresas conectadas)", "application/json"},
+	"/v1/litigio/{cnpj}/risco":                  {"Risco de litígio empresarial (processos + tendência + exposição)", "application/json"},
+	"/v1/mercado/{cnae}/competicao":             {"Inteligência competitiva setorial (HHI + empresas + licitações)", "application/json"},
+	"/v1/mercado-trabalho/{uf}/analise":         {"Análise do mercado de trabalho por UF (emprego + setores + tendência)", "application/json"},
+	"/v1/setor/{cnae}/regulacao":                {"Panorama regulatório por setor CNAE (agências + compliance + legislação)", "application/json"},
+	"/v1/ambiental/empresa/{cnpj}/esg":          {"Score ESG de empresa (ambiental + social + governança)", "application/json"},
 }
 
 // BazaarMiddleware intercepts HTTP 402 responses and injects an `extensions.bazaar`

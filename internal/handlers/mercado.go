@@ -29,7 +29,7 @@ func (h *MercadoHandler) GetAcoes(w http.ResponseWriter, r *http.Request) {
 	}
 	rec, err := h.store.FindOne(r.Context(), "b3_cotacoes", ticker)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "mercado", err)
 		return
 	}
 	if rec == nil {
@@ -51,7 +51,7 @@ func (h *MercadoHandler) GetFundos(w http.ResponseWriter, r *http.Request) {
 	normalized := cnpj.NormalizeCNPJ(rawCNPJ)
 	rec, err := h.store.FindOne(r.Context(), "cvm_fundos", normalized)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "mercado", err)
 		return
 	}
 	if rec == nil {
@@ -75,7 +75,7 @@ func (h *MercadoHandler) GetCotasByCNPJ(w http.ResponseWriter, r *http.Request) 
 
 	records, err := h.store.FindLatestFiltered(r.Context(), "cvm_cotas", "cnpj_digits", normalizedCNPJ)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "mercado", err)
 		return
 	}
 	if len(records) == 0 {
@@ -127,7 +127,7 @@ func (h *MercadoHandler) GetFatosRelevantes(w http.ResponseWriter, r *http.Reque
 		records, err = h.store.FindLatest(r.Context(), "cvm_fatos")
 	}
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "mercado", err)
 		return
 	}
 	if len(records) == 0 {
@@ -167,7 +167,7 @@ func (h *MercadoHandler) GetFatosById(w http.ResponseWriter, r *http.Request) {
 	protocolo := chi.URLParam(r, "protocolo")
 	rec, err := h.store.FindOne(r.Context(), "cvm_fatos", protocolo)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "mercado", err)
 		return
 	}
 	if rec == nil {

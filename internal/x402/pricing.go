@@ -125,8 +125,21 @@ var priceTable = map[string]string{
 	// $0.010 — judicial process search, panorama, due diligence
 	"/v1/judicial/processos/{doc}":             "0.010",
 	"/v1/economia/panorama":                    "0.010",
+	// $0.015 — enhanced composite: perfil completo, regulação setorial
+	"/v1/empresas/{cnpj}/perfil-completo":      "0.015",
+	"/v1/setor/{cnae}/regulacao":               "0.015",
+	// $0.020 — premium composite: competição, ESG, litígio, mercado de trabalho
+	"/v1/mercado/{cnae}/competicao":            "0.020",
+	"/v1/ambiental/empresa/{cnpj}/esg":        "0.020",
+	"/v1/litigio/{cnpj}/risco":                "0.020",
+	// $0.010 — mercado de trabalho analysis
+	"/v1/mercado-trabalho/{uf}/analise":        "0.010",
+	// $0.030 — network/influence analysis
+	"/v1/rede/{cnpj}/influencia":              "0.030",
 	// $0.050 — due diligence
 	"/v1/empresas/{cnpj}/duediligence":         "0.050",
+	// $0.100 — batch portfolio risk analysis
+	"/v1/carteira/risco":                       "0.100",
 }
 
 const contextSurcharge = "0.001" // ?format=context adds this to base price

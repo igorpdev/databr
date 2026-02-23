@@ -63,7 +63,7 @@ func NewBCBHandlerWithClient(store SourceStore, client *http.Client) *BCBHandler
 func (h *BCBHandler) GetSelic(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "bcb_selic")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	if len(records) == 0 {
@@ -87,7 +87,7 @@ func (h *BCBHandler) GetCambio(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.store.FindLatest(r.Context(), "bcb_ptax")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *BCBHandler) GetCambio(w http.ResponseWriter, r *http.Request) {
 func (h *BCBHandler) GetPIX(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "bcb_pix")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	if len(records) == 0 {
@@ -136,7 +136,7 @@ func (h *BCBHandler) GetPIX(w http.ResponseWriter, r *http.Request) {
 func (h *BCBHandler) GetCredito(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "bcb_credito")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	if len(records) == 0 {
@@ -156,7 +156,7 @@ func (h *BCBHandler) GetCredito(w http.ResponseWriter, r *http.Request) {
 func (h *BCBHandler) GetReservas(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "bcb_reservas")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	if len(records) == 0 {
@@ -177,7 +177,7 @@ func (h *BCBHandler) GetReservas(w http.ResponseWriter, r *http.Request) {
 func (h *BCBHandler) GetTaxasCredito(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "bcb_taxas_credito")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	if len(records) == 0 {
@@ -233,13 +233,13 @@ func (h *BCBHandler) GetIndicadores(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, url, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to build request: "+err.Error())
+		internalError(w, "bcb", err)
 		return
 	}
 
 	upResp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "BCB SGS unavailable: "+err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	defer upResp.Body.Close()
@@ -252,7 +252,7 @@ func (h *BCBHandler) GetIndicadores(w http.ResponseWriter, r *http.Request) {
 
 	var valores []map[string]any
 	if err := json.NewDecoder(upResp.Body).Decode(&valores); err != nil {
-		jsonError(w, http.StatusBadGateway, "failed to decode BCB SGS response: "+err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 
@@ -285,13 +285,13 @@ func (h *BCBHandler) GetCapitais(w http.ResponseWriter, r *http.Request) {
 	)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to build request: "+err.Error())
+		internalError(w, "bcb", err)
 		return
 	}
 
 	upResp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "BCB OLINDA RDE unavailable: "+err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	defer upResp.Body.Close()
@@ -306,7 +306,7 @@ func (h *BCBHandler) GetCapitais(w http.ResponseWriter, r *http.Request) {
 		Value []map[string]any `json:"value"`
 	}
 	if err := json.NewDecoder(upResp.Body).Decode(&envelope); err != nil {
-		jsonError(w, http.StatusBadGateway, "failed to decode BCB OLINDA response: "+err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 
@@ -375,7 +375,7 @@ func (h *BCBHandler) GetSML(w http.ResponseWriter, r *http.Request) {
 		}
 		dados, err := fetch(r.Context(), suffix)
 		if err != nil {
-			jsonError(w, http.StatusBadGateway, err.Error())
+			gatewayError(w, "bcb", err)
 			return
 		}
 		respond(w, r, domain.APIResponse{
@@ -439,13 +439,13 @@ func (h *BCBHandler) GetIFData(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to build request: "+err.Error())
+		internalError(w, "bcb", err)
 		return
 	}
 
 	upResp, err := h.httpClient.Do(req)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "BCB OLINDA IFDATA unavailable: "+err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 	defer upResp.Body.Close()
@@ -460,7 +460,7 @@ func (h *BCBHandler) GetIFData(w http.ResponseWriter, r *http.Request) {
 		Value []map[string]any `json:"value"`
 	}
 	if err := json.NewDecoder(upResp.Body).Decode(&envelope); err != nil {
-		jsonError(w, http.StatusBadGateway, "failed to decode BCB OLINDA IFDATA response: "+err.Error())
+		gatewayError(w, "bcb", err)
 		return
 	}
 
@@ -519,13 +519,13 @@ func (h *BCBHandler) GetBaseMonetaria(w http.ResponseWriter, r *http.Request) {
 
 	m0, errM0 := fetchSGS(27790)
 	if errM0 != nil {
-		jsonError(w, http.StatusBadGateway, "BCB SGS M0 unavailable: "+errM0.Error())
+		gatewayError(w, "bcb", errM0)
 		return
 	}
 
 	m2, errM2 := fetchSGS(27791)
 	if errM2 != nil {
-		jsonError(w, http.StatusBadGateway, "BCB SGS M2 unavailable: "+errM2.Error())
+		gatewayError(w, "bcb", errM2)
 		return
 	}
 

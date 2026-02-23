@@ -38,7 +38,7 @@ func (h *JudicialHandler) GetProcessos(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.searcher.Search(r.Context(), doc)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "judicial", err)
 		return
 	}
 	if len(records) == 0 {

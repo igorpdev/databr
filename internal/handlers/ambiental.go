@@ -22,7 +22,7 @@ func NewAmbientalHandler(store SourceStore) *AmbientalHandler {
 func (h *AmbientalHandler) GetDesmatamento(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "inpe_deter")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ambiental", err)
 		return
 	}
 	if len(records) == 0 {
@@ -44,7 +44,7 @@ func (h *AmbientalHandler) GetDesmatamento(w http.ResponseWriter, r *http.Reques
 func (h *AmbientalHandler) GetProdes(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.FindLatest(r.Context(), "inpe_prodes")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ambiental", err)
 		return
 	}
 	if len(records) == 0 {

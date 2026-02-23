@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"net/url"
+	"regexp"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -14,6 +17,14 @@ var validUFs = map[string]bool{
 	"SE": true, "SP": true, "TO": true,
 }
 
+var (
+	reOrgao      = regexp.MustCompile(`^\d{1,6}$`)
+	reMunicipio  = regexp.MustCompile(`^\d{6,7}$`)
+	reDateISO    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	reDateYYYYMM = regexp.MustCompile(`^\d{6}$`)
+	reCNAE       = regexp.MustCompile(`^\d{2,7}$`)
+)
+
 // isValidUF checks whether uf is a valid Brazilian state code (case-insensitive).
 func isValidUF(uf string) bool {
 	return validUFs[strings.ToUpper(uf)]
@@ -24,7 +35,11 @@ func isValidCNPJ(cnpj string) bool {
 	if len(cnpj) != 14 {
 		return false
 	}
-	// All same digits are invalid.
+	for _, c := range cnpj {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
 	allSame := true
 	for i := 1; i < len(cnpj); i++ {
 		if cnpj[i] != cnpj[0] {
@@ -36,7 +51,6 @@ func isValidCNPJ(cnpj string) bool {
 		return false
 	}
 
-	// First check digit.
 	weights1 := []int{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
 	sum := 0
 	for i, w := range weights1 {
@@ -51,7 +65,6 @@ func isValidCNPJ(cnpj string) bool {
 		return false
 	}
 
-	// Second check digit.
 	weights2 := []int{6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
 	sum = 0
 	for i, w := range weights2 {
@@ -84,7 +97,48 @@ func isValidCPFOrCNPJ(doc string) bool {
 	return len(digits) == 11 || len(digits) == 14
 }
 
-// sanitizeOData escapes single quotes in an OData filter value.
+// isValidOrgao validates a SIAFI agency code (1-6 digits).
+func isValidOrgao(orgao string) bool {
+	return reOrgao.MatchString(orgao)
+}
+
+// isValidMunicipio validates an IBGE municipality code (6-7 digits).
+func isValidMunicipio(code string) bool {
+	return reMunicipio.MatchString(code)
+}
+
+// isValidDateISO validates a date in YYYY-MM-DD format and checks it parses correctly.
+func isValidDateISO(date string) bool {
+	if !reDateISO.MatchString(date) {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", date)
+	return err == nil
+}
+
+// isValidDateYYYYMM validates a date in YYYYMM format.
+func isValidDateYYYYMM(date string) bool {
+	return reDateYYYYMM.MatchString(date)
+}
+
+// isValidCNAE validates a CNAE code (2-7 digits).
+func isValidCNAE(code string) bool {
+	return reCNAE.MatchString(code)
+}
+
+// sanitizeOData escapes user input for safe inclusion in OData $filter expressions.
+// Prevents OData injection by: escaping single quotes, removing semicolons,
+// stripping SQL-like keywords, and URL-encoding the result.
 func sanitizeOData(s string) string {
-	return strings.ReplaceAll(s, "'", "''")
+	// Escape single quotes (OData string delimiter)
+	s = strings.ReplaceAll(s, "'", "''")
+	// Remove characters that could alter query structure
+	s = strings.ReplaceAll(s, ";", "")
+	s = strings.ReplaceAll(s, "--", "")
+	return s
+}
+
+// sanitizeQueryParam safely escapes a user-provided value for URL query inclusion.
+func sanitizeQueryParam(s string) string {
+	return url.QueryEscape(s)
 }

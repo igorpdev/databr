@@ -43,11 +43,7 @@ func (h *EmpresasHandler) GetEmpresa(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.fetcher.FetchByCNPJ(r.Context(), normalized)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": err.Error(),
-		})
+		gatewayError(w, "empresas", err)
 		return
 	}
 
@@ -84,7 +80,7 @@ func (h *EmpresasHandler) GetSimples(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.fetcher.FetchByCNPJ(r.Context(), normalized)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "empresas", err)
 		return
 	}
 
@@ -140,7 +136,7 @@ func (h *EmpresasHandler) GetSocios(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.fetcher.FetchByCNPJ(r.Context(), normalized)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "empresas", err)
 		return
 	}
 

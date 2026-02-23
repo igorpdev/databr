@@ -36,7 +36,7 @@ func (h *SetorHandler) GetSetor(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.cnpjFetcher.FetchByCNPJ(ctx, normalized)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "setor", err)
 		return
 	}
 	if len(records) == 0 {

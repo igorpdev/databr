@@ -37,7 +37,7 @@ func (h *EnergiaHandler) GetTarifas(w http.ResponseWriter, r *http.Request) {
 		records, err = h.store.FindLatest(r.Context(), "aneel_tarifas")
 	}
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "energia", err)
 		return
 	}
 	if len(records) == 0 {

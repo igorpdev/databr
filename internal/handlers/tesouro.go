@@ -64,7 +64,7 @@ func (h *TesouroHandler) GetRREO(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.fetcher.FetchRREO(r.Context(), uf, ano, periodo)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "tesouro", err)
 		return
 	}
 	if len(records) == 0 {
@@ -127,7 +127,7 @@ func (h *TesouroHandler) GetEntes(w http.ResponseWriter, r *http.Request) {
 	endpoint := fmt.Sprintf("entes?pagina=%d&itensPorPagina=%d", pagina, n)
 	items, err := h.siconfiItems(r.Context(), endpoint)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "tesouro", err)
 		return
 	}
 
@@ -168,7 +168,7 @@ func (h *TesouroHandler) GetRGF(w http.ResponseWriter, r *http.Request) {
 	)
 	items, err := h.siconfiItems(r.Context(), endpoint)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "tesouro", err)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *TesouroHandler) GetDCA(w http.ResponseWriter, r *http.Request) {
 	endpoint := fmt.Sprintf("dca?an_exercicio=%d&co_esfera=%s", ano, esfera)
 	items, err := h.siconfiItems(r.Context(), endpoint)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "tesouro", err)
 		return
 	}
 

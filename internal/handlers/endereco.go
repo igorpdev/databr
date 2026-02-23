@@ -47,7 +47,7 @@ func (h *EnderecoHandler) GetEndereco(w http.ResponseWriter, r *http.Request) {
 	url := fmt.Sprintf("https://viacep.com.br/ws/%s/json/", cep)
 	resp, err := h.httpClient.Get(url)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar ViaCEP: "+err.Error())
+		gatewayError(w, "endereco", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -59,7 +59,7 @@ func (h *EnderecoHandler) GetEndereco(w http.ResponseWriter, r *http.Request) {
 
 	var raw map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta ViaCEP: "+err.Error())
+		gatewayError(w, "endereco", err)
 		return
 	}
 

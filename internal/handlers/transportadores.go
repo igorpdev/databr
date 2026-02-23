@@ -38,7 +38,7 @@ func (h *TransportadoresHandler) GetTransportador(w http.ResponseWriter, r *http
 
 	rec, err := h.store.FindOne(r.Context(), "antt_rntrc", rntrc)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transportadores", err)
 		return
 	}
 	if rec == nil {
@@ -79,7 +79,7 @@ func (h *TransportadoresHandler) GetTransportadoresByCNPJ(w http.ResponseWriter,
 
 	records, err := h.store.FindLatestFiltered(r.Context(), "antt_rntrc", "cpf_cnpj_digits", digits)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "transportadores", err)
 		return
 	}
 	if len(records) == 0 {

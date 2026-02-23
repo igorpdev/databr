@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/databr/api/internal/collectors/ambiental"
 	"github.com/databr/api/internal/collectors/b3"
@@ -38,16 +39,18 @@ func main() {
 	}
 
 	// Health endpoint — Railway requires /health to mark the deployment as active.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	healthSrv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8080"
-		}
-		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
 		log.Printf("[INFO] health server on :%s", port)
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
+		if err := healthSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("[WARN] health server: %v", err)
 		}
 	}()
@@ -160,6 +163,14 @@ func main() {
 
 	<-ctx.Done()
 	log.Println("shutting down collector...")
+
+	// Graceful shutdown of health server
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := healthSrv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("[WARN] health server shutdown: %v", err)
+	}
+
 	stopCtx := c.Stop()
 	<-stopCtx.Done()
 	os.Exit(0)

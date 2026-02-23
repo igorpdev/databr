@@ -48,7 +48,7 @@ func (h *IbgeHandler) GetMunicipio(w http.ResponseWriter, r *http.Request) {
 	url := fmt.Sprintf("https://servicodados.ibge.gov.br/api/v1/localidades/municipios/%s", rawParam)
 	resp, err := h.httpClient.Get(url)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -58,13 +58,13 @@ func (h *IbgeHandler) GetMunicipio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE Localidades retornou status %d", resp.StatusCode))
+		gatewayError(w, "ibge_localidades", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
 	var raw map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 
@@ -80,19 +80,19 @@ func (h *IbgeHandler) GetMunicipio(w http.ResponseWriter, r *http.Request) {
 func (h *IbgeHandler) GetEstados(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.httpClient.Get("https://servicodados.ibge.gov.br/api/v1/localidades/estados")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE Localidades retornou status %d", resp.StatusCode))
+		gatewayError(w, "ibge_localidades", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
 	var list []any
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 
@@ -111,19 +111,19 @@ func (h *IbgeHandler) GetEstados(w http.ResponseWriter, r *http.Request) {
 func (h *IbgeHandler) GetRegioes(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.httpClient.Get("https://servicodados.ibge.gov.br/api/v1/localidades/regioes")
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE Localidades retornou status %d", resp.StatusCode))
+		gatewayError(w, "ibge_localidades", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
 	var list []any
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 
@@ -147,7 +147,7 @@ func (h *IbgeHandler) GetMunicipiosPorUF(w http.ResponseWriter, r *http.Request)
 	url := fmt.Sprintf("https://servicodados.ibge.gov.br/api/v1/localidades/estados/%s/municipios", uf)
 	resp, err := h.httpClient.Get(url)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -157,13 +157,13 @@ func (h *IbgeHandler) GetMunicipiosPorUF(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE Localidades retornou status %d", resp.StatusCode))
+		gatewayError(w, "ibge_localidades", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
 	var list []any
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE Localidades: "+err.Error())
+		gatewayError(w, "ibge_localidades", err)
 		return
 	}
 
@@ -182,7 +182,7 @@ func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
 	url := fmt.Sprintf("https://servicodados.ibge.gov.br/api/v2/cnae/subclasses/%s", codigo)
 	resp, err := h.httpClient.Get(url)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao consultar IBGE CNAE: "+err.Error())
+		gatewayError(w, "ibge_cnae", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -192,7 +192,7 @@ func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IBGE CNAE retornou status %d", resp.StatusCode))
+		gatewayError(w, "ibge_cnae", fmt.Errorf("upstream returned HTTP %d", resp.StatusCode))
 		return
 	}
 
@@ -268,7 +268,7 @@ func (h *IbgeHandler) GetPNAD(w http.ResponseWriter, r *http.Request) {
 	}
 	dados, err := h.sidraFetch(r.Context(), "4099", "4099", "N1%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_pnad", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{
@@ -290,7 +290,7 @@ func (h *IbgeHandler) GetINPC(w http.ResponseWriter, r *http.Request) {
 	}
 	dados, err := h.sidraFetch(r.Context(), "1736", "44", "N1%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_inpc", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{
@@ -312,7 +312,7 @@ func (h *IbgeHandler) GetPIM(w http.ResponseWriter, r *http.Request) {
 	}
 	dados, err := h.sidraFetch(r.Context(), "8888", "12606", "N1%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_pim", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{
@@ -334,7 +334,7 @@ func (h *IbgeHandler) GetPopulacao(w http.ResponseWriter, r *http.Request) {
 	}
 	dados, err := h.sidraFetch(r.Context(), "6579", "9324", "N3%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_populacao", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{
@@ -356,7 +356,7 @@ func (h *IbgeHandler) GetIPCA15(w http.ResponseWriter, r *http.Request) {
 	}
 	dados, err := h.sidraFetch(r.Context(), "1705", "356", "N1%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_ipca15", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{
@@ -379,7 +379,7 @@ func (h *IbgeHandler) GetPMC(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := h.sidraFetch(r.Context(), "8881", "11709", "N1%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_pmc", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{
@@ -406,7 +406,7 @@ func (h *IbgeHandler) GetPMS(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := h.sidraFetch(r.Context(), "8162", "11622", "N1%5Ball%5D", n)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+		gatewayError(w, "ibge_pms", err)
 		return
 	}
 	respond(w, r, domain.APIResponse{

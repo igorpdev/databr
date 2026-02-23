@@ -13,6 +13,8 @@ func TestIsValidCNPJ(t *testing.T) {
 		{"00000000000000", false},  // all zeros
 		{"1122233300018", false},   // too short
 		{"112223330001811", false}, // too long
+		{"1122233300018a", false},  // non-digit character
+		{"11111111111111", false},  // all same digits
 	}
 	for _, tt := range tests {
 		if got := isValidCNPJ(tt.cnpj); got != tt.valid {
@@ -67,10 +69,113 @@ func TestIsValidCPFOrCNPJ(t *testing.T) {
 }
 
 func TestSanitizeOData(t *testing.T) {
-	if got := sanitizeOData("O'Brien"); got != "O''Brien" {
-		t.Errorf("sanitizeOData(O'Brien) = %q, want O''Brien", got)
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"O'Brien", "O''Brien"},
+		{"normal", "normal"},
+		{"'; DROP TABLE users;--", "'' DROP TABLE users"},
+		{"test;injection", "testinjection"},
+		{"a--b", "ab"},
 	}
-	if got := sanitizeOData("normal"); got != "normal" {
-		t.Errorf("sanitizeOData(normal) = %q, want normal", got)
+	for _, tt := range tests {
+		if got := sanitizeOData(tt.input); got != tt.want {
+			t.Errorf("sanitizeOData(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestIsValidOrgao(t *testing.T) {
+	tests := []struct {
+		orgao string
+		valid bool
+	}{
+		{"26000", true},
+		{"1", true},
+		{"123456", true},
+		{"1234567", false}, // too long
+		{"", false},
+		{"abc", false},
+		{"26000a", false},
+		{"26 000", false},
+	}
+	for _, tt := range tests {
+		if got := isValidOrgao(tt.orgao); got != tt.valid {
+			t.Errorf("isValidOrgao(%q) = %v, want %v", tt.orgao, got, tt.valid)
+		}
+	}
+}
+
+func TestIsValidMunicipio(t *testing.T) {
+	tests := []struct {
+		code  string
+		valid bool
+	}{
+		{"3550308", true},  // São Paulo
+		{"1302603", true},  // Manaus
+		{"355030", true},   // 6 digits OK
+		{"12345", false},   // too short
+		{"12345678", false}, // too long
+		{"abc", false},
+	}
+	for _, tt := range tests {
+		if got := isValidMunicipio(tt.code); got != tt.valid {
+			t.Errorf("isValidMunicipio(%q) = %v, want %v", tt.code, got, tt.valid)
+		}
+	}
+}
+
+func TestIsValidDateISO(t *testing.T) {
+	tests := []struct {
+		date  string
+		valid bool
+	}{
+		{"2024-01-15", true},
+		{"2024-12-31", true},
+		{"2024-02-29", true}, // leap year
+		{"2024-13-01", false},
+		{"2024-1-1", false},
+		{"20240101", false},
+		{"not-a-date", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := isValidDateISO(tt.date); got != tt.valid {
+			t.Errorf("isValidDateISO(%q) = %v, want %v", tt.date, got, tt.valid)
+		}
+	}
+}
+
+func TestIsValidCNAE(t *testing.T) {
+	tests := []struct {
+		code  string
+		valid bool
+	}{
+		{"62", true},      // 2 digits OK
+		{"6201500", true}, // 7 digits OK
+		{"1", false},      // too short
+		{"12345678", false}, // too long
+	}
+	for _, tt := range tests {
+		if got := isValidCNAE(tt.code); got != tt.valid {
+			t.Errorf("isValidCNAE(%q) = %v, want %v", tt.code, got, tt.valid)
+		}
+	}
+}
+
+func TestSanitizeQueryParam(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"normal", "normal"},
+		{"with space", "with+space"},
+		{"special&chars=yes", "special%26chars%3Dyes"},
+	}
+	for _, tt := range tests {
+		if got := sanitizeQueryParam(tt.input); got != tt.want {
+			t.Errorf("sanitizeQueryParam(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }

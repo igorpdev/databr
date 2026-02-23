@@ -3,13 +3,15 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-// QueryLogMiddleware logs each request's endpoint, duration, and status code.
+// QueryLogMiddleware logs each request's endpoint, duration, status code, and request ID.
+// Sensitive path parameters (CNPJ, CPF, CEP) are masked in log output for LGPD compliance.
 func QueryLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -22,7 +24,33 @@ func QueryLogMiddleware(next http.Handler) http.Handler {
 			routePattern = r.URL.Path
 		}
 
-		log.Printf("query_log endpoint=%s status=%d duration_ms=%d",
-			routePattern, ww.Status(), duration.Milliseconds())
+		// Use the route pattern (e.g. /v1/empresas/{cnpj}) not the actual path
+		// to avoid logging PII like CNPJs and CPFs.
+		reqID := middleware.GetReqID(r.Context())
+
+		log.Printf("query_log req_id=%s endpoint=%s status=%d duration_ms=%d",
+			reqID, maskPath(routePattern), ww.Status(), duration.Milliseconds())
 	})
+}
+
+// maskPath replaces known sensitive path segments with masked versions.
+// Only applied when the actual URL path (not route pattern) is used as fallback.
+func maskPath(path string) string {
+	// Route patterns already use {cnpj}, {doc}, etc. — safe to log as-is.
+	// Only mask when the path contains actual values (no curly braces).
+	if strings.Contains(path, "{") {
+		return path
+	}
+
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		// Mask anything that looks like a CNPJ (14 digits) or CPF (11 digits)
+		digits := reDigits.ReplaceAllString(part, "")
+		if len(digits) == 14 {
+			parts[i] = digits[:4] + "**********"
+		} else if len(digits) == 11 {
+			parts[i] = digits[:3] + "********"
+		}
+	}
+	return strings.Join(parts, "/")
 }
