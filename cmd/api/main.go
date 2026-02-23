@@ -309,6 +309,20 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})
 	})
 
+	// SEO: robots.txt and sitemap.xml
+	r.Get("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("User-agent: *\nAllow: /\nAllow: /docs\nDisallow: /v1/\nDisallow: /mcp\n\nSitemap: https://databr.api.br/sitemap.xml\n"))
+	})
+	r.Get("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://databr.api.br/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://databr.api.br/docs</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+</urlset>`))
+	})
+
 	// Landing page
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy",
