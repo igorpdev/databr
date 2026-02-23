@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
-	"strings"
 )
 
 // priceTable maps Chi route patterns to their USDC prices (as decimal strings).
@@ -191,13 +190,3 @@ func AllRoutePatterns() []string {
 // Matches the lowest pricing tier ($0.003 basic lookups).
 const DefaultPrice = "0.003"
 
-// IsPublicPath returns true for paths that must bypass x402 (health, metrics).
-func IsPublicPath(path string) bool {
-	public := []string{"/health", "/metrics", "/favicon.ico", "/.well-known/"}
-	for _, p := range public {
-		if strings.HasPrefix(path, p) {
-			return true
-		}
-	}
-	return false
-}

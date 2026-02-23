@@ -121,27 +121,3 @@ func TestPricedMiddleware_ValidPayment_PassesThrough(t *testing.T) {
 	}
 }
 
-func TestPricedMiddleware_HealthBypass(t *testing.T) {
-	fac := mockFacilitator(t, true)
-	defer fac.Close()
-
-	cfg := x402.MiddlewareConfig{
-		WalletAddress:  "0xWALLET",
-		FacilitatorURL: fac.URL,
-		Network:        "eip155:84532",
-	}
-
-	mw := x402.HealthBypassMiddleware(x402.NewPricedMiddleware(cfg, "0.001"))
-	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`)) //nolint:errcheck
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("/health should bypass x402, got %d", rec.Code)
-	}
-}

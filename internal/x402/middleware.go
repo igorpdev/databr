@@ -152,10 +152,14 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 				return
 			}
 
-			if settleResp.Success {
-				respJSON, _ := json.Marshal(settleResp)
-				w.Header().Set("X-PAYMENT-RESPONSE", string(respJSON))
+			if !settleResp.Success {
+				log.Printf("x402: settlement rejected")
+				write402Response(w, r, baseReq)
+				return
 			}
+
+			respJSON, _ := json.Marshal(settleResp)
+			w.Header().Set("X-PAYMENT-RESPONSE", string(respJSON))
 
 			next.ServeHTTP(w, r)
 		})
@@ -309,19 +313,6 @@ func write402Response(w http.ResponseWriter, r *http.Request, req x402types.Paym
 	w.Write(body) //nolint:errcheck
 }
 
-// HealthBypassMiddleware wraps another middleware and skips x402 for public paths
-// (e.g. /health, /metrics). Must wrap the payment middleware, not the handler.
-func HealthBypassMiddleware(paymentMiddleware func(http.Handler) http.Handler) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if IsPublicPath(r.URL.Path) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			paymentMiddleware(next).ServeHTTP(w, r)
-		})
-	}
-}
 
 // ---- CDP JWT Authentication ----
 
