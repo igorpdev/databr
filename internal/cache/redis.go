@@ -81,3 +81,6 @@ func (c *Client) Delete(ctx context.Context, keys ...string) error {
 func (c *Client) Close() error {
 	return c.rdb.Close()
 }
+
+// Compile-time check: *Client implements Cacher.
+var _ Cacher = (*Client)(nil)
