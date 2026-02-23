@@ -145,6 +145,32 @@ func (h *BCBHandler) GetReservas(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetTaxasCredito handles GET /v1/bcb/taxas-credito.
+// Returns the latest credit market interest rates from BCB OLINDA (TaxaJuros service).
+func (h *BCBHandler) GetTaxasCredito(w http.ResponseWriter, r *http.Request) {
+	records, err := h.store.FindLatest(r.Context(), "bcb_taxas_credito")
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, "Taxas de crédito não disponíveis ainda")
+		return
+	}
+
+	taxas := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		taxas = append(taxas, rec.Data)
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "bcb_taxas_credito",
+		UpdatedAt: records[0].FetchedAt,
+		CostUSDC:  "0.001",
+		Data:      map[string]any{"taxas": taxas},
+	})
+}
+
 // jsonError writes a JSON error response.
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")

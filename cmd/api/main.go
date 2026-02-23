@@ -67,21 +67,24 @@ func main() {
 	// HTTP handlers (on-demand, always available)
 	empHandler := handlers.NewEmpresasHandler(cnpjCollector)
 	compHandler := handlers.NewComplianceHandler(cguCollector)
+	enderecoHandler := handlers.NewEnderecoHandler()
+	transparenciaFedHandler := handlers.NewTransparenciaFederalHandler(cguCollector)
 	tesouroHand := handlers.NewTesouroHandler(tesouroCol)
 	douHandler := handlers.NewDOUHandler(qdCollector)
 	judicialHand := handlers.NewJudicialHandler(djCollector)
 
 	// Store-backed handlers (only available when DB is connected)
 	var (
-		bcbHandler            *handlers.BCBHandler
-		ecoHandler            *handlers.EconomiaHandler
-		mercHandler           *handlers.MercadoHandler
-		transHandler          *handlers.TransparenciaHandler
-		saudeHandler          *handlers.SaudeHandler
-		energiaHandler        *handlers.EnergiaHandler
-		ambientalHandler      *handlers.AmbientalHandler
-		transporteHandler     *handlers.TransporteHandler
+		bcbHandler             *handlers.BCBHandler
+		ecoHandler             *handlers.EconomiaHandler
+		mercHandler            *handlers.MercadoHandler
+		transHandler           *handlers.TransparenciaHandler
+		saudeHandler           *handlers.SaudeHandler
+		energiaHandler         *handlers.EnergiaHandler
+		ambientalHandler       *handlers.AmbientalHandler
+		transporteHandler      *handlers.TransporteHandler
 		transportadoresHandler *handlers.TransportadoresHandler
+		titulosHandler         *handlers.TitulosHandler
 	)
 	if store != nil {
 		bcbHandler = handlers.NewBCBHandler(store)
@@ -93,6 +96,7 @@ func main() {
 		ambientalHandler = handlers.NewAmbientalHandler(store)
 		transporteHandler = handlers.NewTransporteHandler(store)
 		transportadoresHandler = handlers.NewTransportadoresHandler(store)
+		titulosHandler = handlers.NewTitulosHandler(store)
 	}
 
 	// MCP server (proxies to this REST API via SSE transport)
@@ -125,16 +129,25 @@ func main() {
 			r.Use(optionalX402(x402Cfg, "0.001"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
 			r.Get("/empresas/{cnpj}/socios", empHandler.GetSocios)
+			r.Get("/empresas/{cnpj}/simples", empHandler.GetSimples)
+			r.Get("/endereco/{cep}", enderecoHandler.GetEndereco)
 			r.Get("/tesouro/rreo", tesouroHand.GetRREO)
 			r.Get("/compliance/ceis/{cnpj}", compHandler.GetCEIS)
 			r.Get("/compliance/cnep/{cnpj}", compHandler.GetCNEP)
 			r.Get("/compliance/cepim/{cnpj}", compHandler.GetCEPIM)
+			r.Get("/transparencia/contratos", transparenciaFedHandler.GetContratos)
+			r.Get("/transparencia/servidores", transparenciaFedHandler.GetServidores)
+			r.Get("/transparencia/beneficios", transparenciaFedHandler.GetBolsaFamilia)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
 				r.Get("/bcb/pix/estatisticas", bcbHandler.GetPIX)
 				r.Get("/bcb/credito", bcbHandler.GetCredito)
 				r.Get("/bcb/reservas", bcbHandler.GetReservas)
+				r.Get("/bcb/taxas-credito", bcbHandler.GetTaxasCredito)
+			}
+			if titulosHandler != nil {
+				r.Get("/tesouro/titulos", titulosHandler.GetTitulos)
 			}
 			if ecoHandler != nil {
 				r.Get("/economia/ipca", ecoHandler.GetIPCA)
@@ -169,6 +182,7 @@ func main() {
 			if mercHandler != nil {
 				r.Get("/mercado/acoes/{ticker}", mercHandler.GetAcoes)
 				r.Get("/mercado/fatos-relevantes", mercHandler.GetFatosRelevantes)
+				r.Get("/mercado/fundos/{cnpj}/cotas", mercHandler.GetCotasByCNPJ)
 			}
 			if ambientalHandler != nil {
 				r.Get("/ambiental/desmatamento", ambientalHandler.GetDesmatamento)

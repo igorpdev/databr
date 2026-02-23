@@ -88,6 +88,11 @@ func main() {
 		// Phase 5: Transport
 		transporte.NewANACCollector(""),
 		transporte.NewANTTCollector("", ""),
+
+		// Phase 6: Financial rates & market data
+		bcb.NewTaxasCreditoCollector(""),
+		tesouro.NewTesouroDiretoCollector(""),
+		cvm.NewCotasCollector(""),
 	}
 
 	// Run all collectors on startup to populate the DB.

@@ -52,6 +52,15 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/transporte/aeronaves":           {"Consulta de aeronaves cadastradas no RAB (ANAC)", "application/json"},
 	"/v1/transporte/transportadores/{rntrc}": {"Transportador rodoviário por RNTRC (ANTT)", "application/json"},
 	"/v1/transporte/transportadores":         {"Transportadores rodoviários por CNPJ (ANTT RNTRC)", "application/json"},
+	// Phase 6: new endpoints
+	"/v1/endereco/{cep}":                        {"Endereço completo por CEP (ViaCEP)", "application/json"},
+	"/v1/empresas/{cnpj}/simples":               {"Situação no Simples Nacional e MEI por CNPJ", "application/json"},
+	"/v1/transparencia/contratos":               {"Contratos públicos por fornecedor (Portal da Transparência)", "application/json"},
+	"/v1/transparencia/servidores":              {"Servidores públicos federais por órgão (CGU)", "application/json"},
+	"/v1/transparencia/beneficios":              {"Beneficiários do Bolsa Família por município (CGU)", "application/json"},
+	"/v1/bcb/taxas-credito":                     {"Taxas de juros do mercado de crédito (BCB OLINDA)", "application/json"},
+	"/v1/tesouro/titulos":                       {"Preços e taxas dos títulos do Tesouro Direto", "application/json"},
+	"/v1/mercado/fundos/{cnpj}/cotas":           {"Histórico de cotas de fundos de investimento (CVM)", "application/json"},
 }
 
 // BazaarMiddleware intercepts HTTP 402 responses and injects an `extensions.bazaar`

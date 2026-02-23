@@ -104,6 +104,135 @@ func (c *CGUCollector) FetchGranularByCNPJ(ctx context.Context, cnpjNum, list st
 	return []domain.SourceRecord{record}, nil
 }
 
+// FetchContratos fetches public contracts for a given government agency (codigoOrgao).
+// orgao is the SIAFI agency code (e.g. "26000" for MEC). cnpjFornecedor is optional (pass "" to skip).
+// Returns a single SourceRecord aggregating contract items.
+func (c *CGUCollector) FetchContratos(ctx context.Context, orgao, cnpjFornecedor string) ([]domain.SourceRecord, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("cgu_contratos: TRANSPARENCIA_API_KEY is not set")
+	}
+
+	u := fmt.Sprintf("%s/contratos?codigoOrgao=%s&pagina=1", c.baseURL, orgao)
+	if cnpjFornecedor != "" {
+		u += "&cnpjFornecedor=" + cnpjFornecedor
+	}
+	items, err := c.fetchURL(ctx, u)
+	if err != nil {
+		return nil, fmt.Errorf("cgu_contratos: fetch: %w", err)
+	}
+
+	record := domain.SourceRecord{
+		Source:    "cgu_contratos",
+		RecordKey: orgao,
+		Data: map[string]any{
+			"orgao":     orgao,
+			"contratos": items,
+			"total":     len(items),
+		},
+		FetchedAt: time.Now().UTC(),
+	}
+	return []domain.SourceRecord{record}, nil
+}
+
+// FetchServidores fetches federal public servants for a given SIAPE organ code.
+// Returns a single SourceRecord aggregating servant records.
+func (c *CGUCollector) FetchServidores(ctx context.Context, orgao string) ([]domain.SourceRecord, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("cgu_servidores: TRANSPARENCIA_API_KEY is not set")
+	}
+
+	url := fmt.Sprintf("%s/servidores?pagina=1&orgaoServidorLotacao=%s", c.baseURL, orgao)
+	items, err := c.fetchURL(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("cgu_servidores: fetch: %w", err)
+	}
+
+	record := domain.SourceRecord{
+		Source:    "cgu_servidores",
+		RecordKey: orgao,
+		Data: map[string]any{
+			"orgao":      orgao,
+			"servidores": items,
+			"total":      len(items),
+		},
+		FetchedAt: time.Now().UTC(),
+	}
+	return []domain.SourceRecord{record}, nil
+}
+
+// FetchBolsaFamilia fetches Bolsa Família beneficiaries for a given IBGE municipality code and month.
+// mesAno must be in YYYYMM format (e.g. "202501"). Returns a single SourceRecord.
+func (c *CGUCollector) FetchBolsaFamilia(ctx context.Context, municipioIBGE, mesAno string) ([]domain.SourceRecord, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("cgu_beneficios: TRANSPARENCIA_API_KEY is not set")
+	}
+
+	url := fmt.Sprintf("%s/novo-bolsa-familia-por-municipio?mesAno=%s&codigoIbge=%s&pagina=1",
+		c.baseURL, mesAno, municipioIBGE)
+	items, err := c.fetchURL(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("cgu_beneficios: fetch: %w", err)
+	}
+
+	record := domain.SourceRecord{
+		Source:    "cgu_beneficios",
+		RecordKey: municipioIBGE + "_" + mesAno,
+		Data: map[string]any{
+			"municipio_ibge": municipioIBGE,
+			"mes":            mesAno,
+			"beneficios":     items,
+			"total":          len(items),
+		},
+		FetchedAt: time.Now().UTC(),
+	}
+	return []domain.SourceRecord{record}, nil
+}
+
+// fetchURL fetches a full URL and returns the response as a []any slice.
+// It handles both raw JSON arrays and {"data": [...]} envelopes.
+func (c *CGUCollector) fetchURL(ctx context.Context, url string) ([]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("chave-api-dados", c.apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("invalid API key (401)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("upstream returned %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var list []any
+	if err := json.Unmarshal(body, &list); err == nil {
+		return list, nil
+	}
+
+	var wrapped map[string]any
+	if err := json.Unmarshal(body, &wrapped); err == nil {
+		if data, ok := wrapped["data"]; ok {
+			if l, ok := data.([]any); ok {
+				return l, nil
+			}
+		}
+	}
+
+	return []any{}, nil
+}
+
 // fetchList fetches a list endpoint (e.g. /ceis) filtered by CNPJ.
 func (c *CGUCollector) fetchList(ctx context.Context, path, cnpjNum string) ([]any, error) {
 	url := fmt.Sprintf("%s%s?cnpjSancionado=%s&pagina=1", c.baseURL, path, cnpjNum)

@@ -27,6 +27,7 @@ func newRouter(h *handlers.EmpresasHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/v1/empresas/{cnpj}", h.GetEmpresa)
 	r.Get("/v1/empresas/{cnpj}/socios", h.GetSocios)
+	r.Get("/v1/empresas/{cnpj}/simples", h.GetSimples)
 	return r
 }
 
@@ -245,5 +246,143 @@ func TestGetSocios_InvalidCNPJ(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid CNPJ, got %d", rec.Code)
+	}
+}
+
+// ---------- GetSimples tests ----------
+
+func TestGetSimples_OK(t *testing.T) {
+	fetcher := &stubCNPJFetcher{
+		records: []domain.SourceRecord{{
+			Source:    "cnpj",
+			RecordKey: "12345678000195",
+			Data: map[string]any{
+				"cnpj":         "12345678000195",
+				"razao_social": "EMPRESA XPTO LTDA",
+				"simples": map[string]any{
+					"optante":        true,
+					"data_opcao":     "2010-07-01",
+					"data_exclusao":  nil,
+				},
+				"mei": map[string]any{
+					"optante": false,
+				},
+			},
+			FetchedAt: time.Now(),
+		}},
+	}
+
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/simples", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "cnpj_simples" {
+		t.Errorf("Source = %q, want cnpj_simples", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+	if resp.Data == nil {
+		t.Fatal("Data must not be nil")
+	}
+	if _, ok := resp.Data["simples"]; !ok {
+		t.Error("Data must contain key 'simples'")
+	}
+	if _, ok := resp.Data["mei"]; !ok {
+		t.Error("Data must contain key 'mei'")
+	}
+	if cnpjVal, _ := resp.Data["cnpj"].(string); cnpjVal != "12345678000195" {
+		t.Errorf("Data[cnpj] = %q, want 12345678000195", cnpjVal)
+	}
+}
+
+func TestGetSimples_NoSimples_Returns404(t *testing.T) {
+	fetcher := &stubCNPJFetcher{
+		records: []domain.SourceRecord{{
+			Source:    "cnpj",
+			RecordKey: "12345678000195",
+			Data: map[string]any{
+				"cnpj":         "12345678000195",
+				"razao_social": "EMPRESA SEM SIMPLES",
+			},
+			FetchedAt: time.Now(),
+		}},
+	}
+
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/simples", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when simples/mei absent, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetSimples_InvalidCNPJ_Returns400(t *testing.T) {
+	h := handlers.NewEmpresasHandler(&stubCNPJFetcher{})
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/123/simples", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid CNPJ, got %d", rec.Code)
+	}
+}
+
+func TestGetSimples_CNPJNotFound_Returns404(t *testing.T) {
+	fetcher := &stubCNPJFetcher{records: nil}
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/simples", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when CNPJ not found, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetSimples_OnlySimples_OK(t *testing.T) {
+	// mei key absent — should still return 200 because simples is present.
+	fetcher := &stubCNPJFetcher{
+		records: []domain.SourceRecord{{
+			Source:    "cnpj",
+			RecordKey: "12345678000195",
+			Data: map[string]any{
+				"cnpj": "12345678000195",
+				"simples": map[string]any{
+					"optante": true,
+				},
+			},
+			FetchedAt: time.Now(),
+		}},
+	}
+
+	h := handlers.NewEmpresasHandler(fetcher)
+	r := newRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/empresas/12345678000195/simples", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

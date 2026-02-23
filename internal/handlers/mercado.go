@@ -62,6 +62,46 @@ func (h *MercadoHandler) GetFundos(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetCotasByCNPJ handles GET /v1/mercado/fundos/{cnpj}/cotas.
+// Returns the historical daily quota values (NAV) for the given fund CNPJ.
+// The CNPJ can be passed with or without formatting (dots, slashes, dashes).
+func (h *MercadoHandler) GetCotasByCNPJ(w http.ResponseWriter, r *http.Request) {
+	rawCNPJ := chi.URLParam(r, "cnpj")
+	normalizedCNPJ := cnpj.NormalizeCNPJ(rawCNPJ)
+
+	records, err := h.store.FindLatestFiltered(r.Context(), "cvm_cotas", "cnpj_digits", normalizedCNPJ)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, "Cotas não encontradas para o CNPJ: "+normalizedCNPJ)
+		return
+	}
+
+	// Limit to 30 most recent records
+	limit := 30
+	if len(records) < limit {
+		limit = len(records)
+	}
+	records = records[:limit]
+
+	cotas := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		cotas = append(cotas, rec.Data)
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "cvm_cotas",
+		UpdatedAt: records[0].FetchedAt,
+		CostUSDC:  "0.002",
+		Data: map[string]any{
+			"cnpj":  normalizedCNPJ,
+			"cotas": cotas,
+		},
+	})
+}
+
 // GetFatosRelevantes handles GET /v1/mercado/fatos-relevantes.
 // Returns recent CVM "Fato Relevante" filings collected from the annual IPE CSV.
 //

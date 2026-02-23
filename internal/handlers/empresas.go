@@ -70,6 +70,46 @@ func (h *EmpresasHandler) GetEmpresa(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetSimples handles GET /v1/empresas/{cnpj}/simples.
+// Extracts the Simples Nacional and MEI status from the CNPJ record returned
+// by minhareceita.org (keys "simples" and "mei" inside Data).
+func (h *EmpresasHandler) GetSimples(w http.ResponseWriter, r *http.Request) {
+	rawCNPJ := chi.URLParam(r, "cnpj")
+	normalized := cnpj.NormalizeCNPJ(rawCNPJ)
+
+	if len(normalized) != 14 {
+		jsonError(w, http.StatusBadRequest, "CNPJ must have 14 digits")
+		return
+	}
+
+	records, err := h.fetcher.FetchByCNPJ(r.Context(), normalized)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, "CNPJ not found")
+		return
+	}
+
+	rec := records[0]
+	simples := rec.Data["simples"]
+	mei := rec.Data["mei"]
+
+	if simples == nil && mei == nil {
+		jsonError(w, http.StatusNotFound, "Dados do Simples Nacional não disponíveis para este CNPJ")
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "cnpj_simples",
+		UpdatedAt: rec.FetchedAt,
+		CostUSDC:  "0.001",
+		Data:      map[string]any{"cnpj": normalized, "simples": simples, "mei": mei},
+	})
+}
+
 // GetSocios handles GET /v1/empresas/{cnpj}/socios.
 // Calls FetchByCNPJ and extracts the "qsa" field (quadro societário) from the returned data.
 func (h *EmpresasHandler) GetSocios(w http.ResponseWriter, r *http.Request) {

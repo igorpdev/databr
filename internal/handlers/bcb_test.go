@@ -193,6 +193,83 @@ func TestBCBHandler_GetReservas_OK(t *testing.T) {
 	}
 }
 
+func TestBCBHandler_GetTaxasCredito_OK(t *testing.T) {
+	store := &stubBCBStore{
+		records: []domain.SourceRecord{
+			{
+				Source:    "bcb_taxas_credito",
+				RecordKey: "Crédito pessoal não consignado_2025-01",
+				Data: map[string]any{
+					"segmento":        "Pessoa Física",
+					"modalidade":      "Crédito pessoal não consignado",
+					"posicao":         "A vista",
+					"data_referencia": "2025-01",
+					"taxa_mensal":     7.23,
+					"taxa_anual":      130.45,
+				},
+				FetchedAt: time.Now(),
+			},
+			{
+				Source:    "bcb_taxas_credito",
+				RecordKey: "Cartão de crédito total_2025-01",
+				Data: map[string]any{
+					"segmento":        "Pessoa Física",
+					"modalidade":      "Cartão de crédito total",
+					"posicao":         "A vista",
+					"data_referencia": "2025-01",
+					"taxa_mensal":     15.12,
+					"taxa_anual":      432.18,
+				},
+				FetchedAt: time.Now(),
+			},
+		},
+	}
+	h := handlers.NewBCBHandler(store)
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/taxas-credito", h.GetTaxasCredito)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/taxas-credito", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "bcb_taxas_credito" {
+		t.Errorf("Source = %q, want bcb_taxas_credito", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+	taxas, ok := resp.Data["taxas"].([]any)
+	if !ok {
+		t.Fatalf("expected data.taxas to be []any, got %T", resp.Data["taxas"])
+	}
+	if len(taxas) != 2 {
+		t.Errorf("expected 2 taxas, got %d", len(taxas))
+	}
+}
+
+func TestBCBHandler_GetTaxasCredito_Empty(t *testing.T) {
+	store := &stubBCBStore{records: nil}
+	h := handlers.NewBCBHandler(store)
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/taxas-credito", h.GetTaxasCredito)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/taxas-credito", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when no data, got %d", rec.Code)
+	}
+}
+
 func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
 	store := &stubBCBStore{
 		records: []domain.SourceRecord{{

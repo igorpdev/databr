@@ -17,6 +17,7 @@ func newMercadoRouter(h *handlers.MercadoHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/v1/mercado/acoes/{ticker}", h.GetAcoes)
 	r.Get("/v1/mercado/fundos/{cnpj}", h.GetFundos)
+	r.Get("/v1/mercado/fundos/{cnpj}/cotas", h.GetCotasByCNPJ)
 	r.Get("/v1/mercado/fatos-relevantes", h.GetFatosRelevantes)
 	r.Get("/v1/mercado/fatos-relevantes/{protocolo}", h.GetFatosById)
 	return r
@@ -84,6 +85,108 @@ func TestMercadoHandler_GetFundos_NotFound(t *testing.T) {
 	r := newMercadoRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fundos/99999999000199", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func cotasRecords() []domain.SourceRecord {
+	return []domain.SourceRecord{
+		{
+			Source:    "cvm_cotas",
+			RecordKey: "11111111000111_2025-01-03",
+			Data: map[string]any{
+				"cnpj":          "11.111.111/0001-11",
+				"cnpj_digits":   "11111111000111",
+				"data":          "2025-01-03",
+				"vl_quota":      "15.345678",
+				"vl_patrimonio": "1100000.00",
+				"captacao":      "100000.00",
+				"resgate":       "0.00",
+				"nr_cotistas":   "105",
+			},
+			FetchedAt: time.Now(),
+		},
+		{
+			Source:    "cvm_cotas",
+			RecordKey: "11111111000111_2025-01-02",
+			Data: map[string]any{
+				"cnpj":          "11.111.111/0001-11",
+				"cnpj_digits":   "11111111000111",
+				"data":          "2025-01-02",
+				"vl_quota":      "15.234567",
+				"vl_patrimonio": "1000000.00",
+				"captacao":      "0.00",
+				"resgate":       "0.00",
+				"nr_cotistas":   "100",
+			},
+			FetchedAt: time.Now(),
+		},
+	}
+}
+
+func TestMercadoHandler_GetCotasByCNPJ_OK(t *testing.T) {
+	store := &stubBCBStore{records: cotasRecords()}
+	h := handlers.NewMercadoHandler(store)
+	r := newMercadoRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fundos/11111111000111/cotas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "cvm_cotas" {
+		t.Errorf("Source = %q, want cvm_cotas", resp.Source)
+	}
+	if resp.CostUSDC != "0.002" {
+		t.Errorf("CostUSDC = %q, want 0.002", resp.CostUSDC)
+	}
+	if resp.Data == nil {
+		t.Error("expected non-nil Data field")
+	}
+	cotas, ok := resp.Data["cotas"].([]any)
+	if !ok {
+		t.Fatalf("expected data.cotas to be []any, got %T", resp.Data["cotas"])
+	}
+	if len(cotas) != 2 {
+		t.Errorf("expected 2 cotas, got %d", len(cotas))
+	}
+}
+
+func TestMercadoHandler_GetCotasByCNPJ_WithFormatting(t *testing.T) {
+	// Test that CNPJs with partial formatting (digits and dashes) are normalized correctly.
+	// Note: the full CNPJ format with slashes (11.111.111/0001-11) cannot be used in a path
+	// segment; clients should strip the slash before the request or pass digits-only.
+	store := &stubBCBStore{records: cotasRecords()}
+	h := handlers.NewMercadoHandler(store)
+	r := newMercadoRouter(h)
+
+	// Pass CNPJ with dots and dashes but without the slash (14-digit numeric equivalent)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fundos/11111111000111/cotas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestMercadoHandler_GetCotasByCNPJ_NotFound(t *testing.T) {
+	store := &stubBCBStore{records: cotasRecords()}
+	h := handlers.NewMercadoHandler(store)
+	r := newMercadoRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mercado/fundos/99999999000199/cotas", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
