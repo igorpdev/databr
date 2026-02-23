@@ -73,13 +73,15 @@ func main() {
 
 	// Store-backed handlers (only available when DB is connected)
 	var (
-		bcbHandler      *handlers.BCBHandler
-		ecoHandler      *handlers.EconomiaHandler
-		mercHandler     *handlers.MercadoHandler
-		transHandler    *handlers.TransparenciaHandler
-		saudeHandler    *handlers.SaudeHandler
-		energiaHandler  *handlers.EnergiaHandler
-		ambientalHandler *handlers.AmbientalHandler
+		bcbHandler            *handlers.BCBHandler
+		ecoHandler            *handlers.EconomiaHandler
+		mercHandler           *handlers.MercadoHandler
+		transHandler          *handlers.TransparenciaHandler
+		saudeHandler          *handlers.SaudeHandler
+		energiaHandler        *handlers.EnergiaHandler
+		ambientalHandler      *handlers.AmbientalHandler
+		transporteHandler     *handlers.TransporteHandler
+		transportadoresHandler *handlers.TransportadoresHandler
 	)
 	if store != nil {
 		bcbHandler = handlers.NewBCBHandler(store)
@@ -89,6 +91,8 @@ func main() {
 		saudeHandler = handlers.NewSaudeHandler(store)
 		energiaHandler = handlers.NewEnergiaHandler(store)
 		ambientalHandler = handlers.NewAmbientalHandler(store)
+		transporteHandler = handlers.NewTransporteHandler(store)
+		transportadoresHandler = handlers.NewTransportadoresHandler(store)
 	}
 
 	// MCP server (proxies to this REST API via SSE transport)
@@ -150,6 +154,12 @@ func main() {
 			if mercHandler != nil {
 				r.Get("/mercado/fatos-relevantes/{protocolo}", mercHandler.GetFatosById)
 			}
+			if transporteHandler != nil {
+				r.Get("/transporte/aeronaves/{prefixo}", transporteHandler.GetAeronave)
+			}
+			if transportadoresHandler != nil {
+				r.Get("/transporte/transportadores/{rntrc}", transportadoresHandler.GetTransportador)
+			}
 		})
 
 		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data
@@ -163,6 +173,12 @@ func main() {
 			if ambientalHandler != nil {
 				r.Get("/ambiental/desmatamento", ambientalHandler.GetDesmatamento)
 				r.Get("/ambiental/prodes", ambientalHandler.GetProdes)
+			}
+			if transporteHandler != nil {
+				r.Get("/transporte/aeronaves", transporteHandler.GetAeronaves)
+			}
+			if transportadoresHandler != nil {
+				r.Get("/transporte/transportadores", transportadoresHandler.GetTransportadoresByCNPJ)
 			}
 		})
 

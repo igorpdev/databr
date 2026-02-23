@@ -18,6 +18,7 @@ import (
 	"github.com/databr/api/internal/collectors/ibge"
 	"github.com/databr/api/internal/collectors/saude"
 	"github.com/databr/api/internal/collectors/tesouro"
+	"github.com/databr/api/internal/collectors/transporte"
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/collectors/tse"
 	"github.com/databr/api/internal/domain"
@@ -83,6 +84,10 @@ func main() {
 		saude.NewAnvisaCollector(""),
 		ambiental.NewDETERCollector(""),
 		ambiental.NewPRODESCollector(""),
+
+		// Phase 5: Transport
+		transporte.NewANACCollector(""),
+		transporte.NewANTTCollector("", ""),
 	}
 
 	// Run all collectors on startup to populate the DB.

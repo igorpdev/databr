@@ -48,6 +48,10 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/energia/tarifas":              {"Tarifas de energia elétrica homologadas pela ANEEL", "application/json"},
 	"/v1/ambiental/desmatamento":       {"Alertas de desmatamento em tempo real (INPE DETER)", "application/json"},
 	"/v1/ambiental/prodes":             {"Desmatamento anual consolidado (INPE PRODES)", "application/json"},
+	"/v1/transporte/aeronaves/{prefixo}": {"Aeronave por prefixo de matrícula (ANAC RAB)", "application/json"},
+	"/v1/transporte/aeronaves":           {"Consulta de aeronaves cadastradas no RAB (ANAC)", "application/json"},
+	"/v1/transporte/transportadores/{rntrc}": {"Transportador rodoviário por RNTRC (ANTT)", "application/json"},
+	"/v1/transporte/transportadores":         {"Transportadores rodoviários por CNPJ (ANTT RNTRC)", "application/json"},
 }
 
 // BazaarMiddleware intercepts HTTP 402 responses and injects an `extensions.bazaar`
