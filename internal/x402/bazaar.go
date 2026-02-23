@@ -218,13 +218,19 @@ func (bw *bazaarWriter) finalize(pattern string) {
 		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
 	}
 
-	body["extensions"] = map[string]interface{}{
-		"bazaar": map[string]interface{}{
-			"discoverable":   true,
-			"method":         "GET",
-			"description":    meta.description,
-			"outputMimeType": meta.mimeType,
-		},
+	// Inject discovery fields into each accepts item so the CDP facilitator
+	// can index them in the Bazaar. The facilitator reads discoverable,
+	// method, description, and mimeType from inside each accepts entry.
+	if accepts, ok := body["accepts"].([]interface{}); ok {
+		for i, item := range accepts {
+			if m, ok := item.(map[string]interface{}); ok {
+				m["discoverable"] = true
+				m["method"] = "GET"
+				m["description"] = meta.description
+				m["mimeType"] = meta.mimeType
+				accepts[i] = m
+			}
+		}
 	}
 
 	modified, err := json.Marshal(body)
