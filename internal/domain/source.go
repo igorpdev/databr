@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// Version is the current API version, reported in /health.
+const Version = "1.0.0"
+
 // SourceRecord is the normalized, persisted representation of a data point from any source.
 // All collectors produce []SourceRecord; all handlers read from it.
 type SourceRecord struct {

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,7 +16,10 @@ import (
 	"github.com/databr/api/internal/collectors/juridico"
 	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transparencia"
+	"github.com/databr/api/internal/cache"
+	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	"github.com/databr/api/internal/logging"
 	"github.com/databr/api/internal/mcp"
 	"github.com/databr/api/internal/repositories"
 	x402pkg "github.com/databr/api/internal/x402"
@@ -30,24 +33,36 @@ import (
 )
 
 func main() {
+	logging.Setup(nil)
+
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file, using environment variables")
+		slog.Info("no .env file, using environment variables")
 	}
 
+	startTime := time.Now()
 	ctx := context.Background()
 
 	// Database (optional — store-backed handlers degrade gracefully when nil)
 	var store handlers.SourceStore
 	var pool interface{ Ping(context.Context) error }
 	if p, err := repositories.NewPool(ctx); err != nil {
-		log.Printf("DB unavailable (%v) — store-backed endpoints disabled", err)
+		slog.Warn("database unavailable, store-backed endpoints disabled", "error", err)
 	} else {
 		if err := repositories.RunMigrations(ctx, p, migpkg.FS); err != nil {
-			log.Printf("WARNING: migrations failed: %v", err)
+			slog.Warn("migrations failed", "error", err)
 		}
 		store = repositories.NewSourceRecordRepository(p)
 		pool = p
 		defer p.Close()
+	}
+
+	// Redis cache (optional — degrades gracefully when unavailable)
+	var cacher cache.Cacher
+	if rc, err := cache.NewClient(); err != nil {
+		slog.Warn("Redis unavailable, cache disabled", "error", err)
+	} else {
+		cacher = rc
+		defer rc.Close()
 	}
 
 	// x402 payment config (wallet required; set to empty string in dev = no-op middleware)
@@ -177,7 +192,6 @@ func main() {
 			w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 			w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 			w.Header().Set("X-XSS-Protection", "1; mode=block")
-			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0, private")
 			next.ServeHTTP(w, r)
 		})
 	})
@@ -209,37 +223,81 @@ func main() {
 	// Query logging middleware
 	r.Use(handlers.QueryLogMiddleware)
 
-	// Health check with DB verification (no internal details exposed)
+	// Health check with DB + Redis verification
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		healthCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
-		status := map[string]string{"api": "ok"}
+		checks := map[string]string{}
+		status := "ok"
 		httpCode := http.StatusOK
 
 		if pool != nil {
 			if err := pool.Ping(healthCtx); err != nil {
-				log.Printf("ERROR: health check DB ping failed: %v", err)
-				status["db"] = "error"
+				slog.Error("health check DB ping failed", "error", err)
+				checks["database"] = "error"
+				status = "degraded"
 				httpCode = http.StatusServiceUnavailable
 			} else {
-				status["db"] = "ok"
+				checks["database"] = "ok"
 			}
 		} else {
-			status["db"] = "not configured"
+			checks["database"] = "not configured"
+		}
+
+		if cacher != nil {
+			if err := cacher.Set(healthCtx, "health:ping", "ok", 10*time.Second); err != nil {
+				checks["redis"] = "error"
+				if status == "ok" {
+					status = "degraded"
+				}
+			} else {
+				checks["redis"] = "ok"
+			}
+		} else {
+			checks["redis"] = "not configured"
+		}
+
+		resp := map[string]any{
+			"status":         status,
+			"version":        domain.Version,
+			"uptime_seconds": int(time.Since(startTime).Seconds()),
+			"checks":         checks,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(httpCode)
-		if err := json.NewEncoder(w).Encode(status); err != nil {
-			log.Printf("ERROR: health check encode: %v", err)
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	// Readiness probe for Railway/k8s
+	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if pool != nil {
+			rctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+			defer cancel()
+			if err := pool.Ping(rctx); err != nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				json.NewEncoder(w).Encode(map[string]bool{"ready": false})
+				return
+			}
 		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ready": true})
+	})
+
+	// API Documentation (Scalar UI)
+	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "docs/scalar.html")
+	})
+	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "docs/openapi.yaml")
 	})
 
 	// /v1 API routes, grouped by x402 price tier
 	r.Route("/v1", func(r chi.Router) {
 		// $0.001 — company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.001"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
@@ -340,6 +398,7 @@ func main() {
 
 		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.002"))
 			if mercHandler != nil {
@@ -361,6 +420,7 @@ func main() {
 
 		// $0.003 — compliance via empresa sub-route, DOU/diários search, premium cross-references
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
@@ -382,6 +442,7 @@ func main() {
 
 		// $0.005 — full compliance check, CVM fund data, fund analysis, credit score
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
@@ -398,6 +459,7 @@ func main() {
 
 		// $0.010 — judicial process search, economic panorama, labor market
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
@@ -411,6 +473,7 @@ func main() {
 
 		// $0.015 — perfil completo, sector regulation
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.015"))
 			if perfilCompletoHandler != nil {
@@ -423,6 +486,7 @@ func main() {
 
 		// $0.020 — competition analysis, ESG scoring, litigation risk
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.020"))
 			if competicaoHandler != nil {
@@ -438,6 +502,7 @@ func main() {
 
 		// $0.030 — influence network
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.030"))
 			if redeInfluenciaHandler != nil {
@@ -447,6 +512,7 @@ func main() {
 
 		// $0.050 — due diligence
 		r.Group(func(r chi.Router) {
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.050"))
 			if dueDiligenceHandler != nil {
@@ -454,7 +520,7 @@ func main() {
 			}
 		})
 
-		// $0.100 — portfolio risk (batch, POST)
+		// $0.100 — portfolio risk (batch, POST — no cache)
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.100"))
@@ -482,13 +548,14 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("databr API listening on %s (wallet=%s, network=%s)",
-			addr,
-			maskWallet(x402Cfg.WalletAddress),
-			x402Cfg.Network,
+		slog.Info("databr API listening",
+			"addr", addr,
+			"wallet", maskWallet(x402Cfg.WalletAddress),
+			"network", x402Cfg.Network,
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s", err)
+			slog.Error("listen failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -496,15 +563,15 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutdown signal received, draining connections...")
+	slog.Info("shutdown signal received, draining connections")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Server forced shutdown: %v", err)
+		slog.Error("server forced shutdown", "error", err)
 	}
-	log.Println("Server stopped gracefully")
+	slog.Info("server stopped gracefully")
 }
 
 // serverPort returns the HTTP port from PORT env var, defaulting to 8080.
@@ -530,13 +597,14 @@ func networkName(eipNetwork string) string {
 
 // optionalX402 returns a pass-through middleware when wallet address is not set (dev mode).
 // When wallet is set, creates a real x402 payment gate for the given USDC price.
-// In production (Railway/Fly.io), panics if WALLET_ADDRESS is not set.
+// In production (Railway/Fly.io), exits if WALLET_ADDRESS is not set.
 func optionalX402(cfg x402pkg.MiddlewareConfig, priceUSDC string) func(http.Handler) http.Handler {
 	if cfg.WalletAddress == "" {
 		if os.Getenv("RAILWAY_ENVIRONMENT") != "" || os.Getenv("FLY_APP_NAME") != "" {
-			log.Fatal("FATAL: WALLET_ADDRESS must be set in production — x402 payment disabled")
+			slog.Error("WALLET_ADDRESS must be set in production")
+			os.Exit(1)
 		}
-		log.Println("WARN: WALLET_ADDRESS not set — x402 payment disabled (dev mode)")
+		slog.Warn("WALLET_ADDRESS not set, x402 payment disabled (dev mode)")
 		return func(next http.Handler) http.Handler { return next }
 	}
 	return x402pkg.NewPricedMiddleware(cfg, priceUSDC)

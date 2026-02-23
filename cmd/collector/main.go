@@ -4,7 +4,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,14 +28,17 @@ import (
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/collectors/tse"
 	"github.com/databr/api/internal/domain"
+	"github.com/databr/api/internal/logging"
 	"github.com/databr/api/internal/repositories"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
 
 func main() {
+	logging.Setup(nil)
+
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file, using environment variables")
+		slog.Info("no .env file, using environment variables")
 	}
 
 	// Health endpoint — Railway requires /health to mark the deployment as active.
@@ -49,9 +52,9 @@ func main() {
 	})
 	healthSrv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
-		log.Printf("[INFO] health server on :%s", port)
+		slog.Info("health server started", "port", port)
 		if err := healthSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[WARN] health server: %v", err)
+			slog.Warn("health server error", "error", err)
 		}
 	}()
 
@@ -60,12 +63,13 @@ func main() {
 
 	pool, err := repositories.NewPool(ctx)
 	if err != nil {
-		log.Fatalf("DB connection failed: %v", err)
+		slog.Error("database connection failed", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 	repo := repositories.NewSourceRecordRepository(pool)
 
-	// All scheduled collectors (Phases 1–3)
+	// All scheduled collectors (Phases 1–9)
 	collectors := []domain.Collector{
 		// Phase 1: Core economic data
 		bcb.NewSelicCollector(""),
@@ -125,7 +129,7 @@ func main() {
 
 	// Run all collectors on startup to populate the DB.
 	// Heavy collectors (@yearly) run in a separate goroutine to avoid blocking.
-	log.Println("[INFO] running initial collection for all sources...")
+	slog.Info("running initial collection for all sources")
 	go func() {
 		for _, col := range collectors {
 			if col.Schedule() == "@yearly" {
@@ -133,7 +137,7 @@ func main() {
 			}
 			runCollector(ctx, col, repo)
 		}
-		log.Println("[INFO] initial collection complete (fast sources)")
+		slog.Info("initial collection complete (fast sources)")
 	}()
 	for _, col := range collectors {
 		if col.Schedule() != "@yearly" {
@@ -141,7 +145,7 @@ func main() {
 		}
 		col := col
 		go func() {
-			log.Printf("[INFO] running %s in background (large dataset)...", col.Source())
+			slog.Info("running collector in background (large dataset)", "source", col.Source())
 			runCollector(ctx, col, repo)
 		}()
 	}
@@ -152,23 +156,23 @@ func main() {
 		if _, err := c.AddFunc(col.Schedule(), func() {
 			runCollector(ctx, col, repo)
 		}); err != nil {
-			log.Printf("[WARN] failed to schedule %s: %v", col.Source(), err)
+			slog.Warn("failed to schedule collector", "source", col.Source(), "error", err)
 		} else {
-			log.Printf("[INFO] scheduled %s at %q", col.Source(), col.Schedule())
+			slog.Info("scheduled collector", "source", col.Source(), "schedule", col.Schedule())
 		}
 	}
 
 	c.Start()
-	log.Println("[INFO] collector scheduler started — waiting for schedules")
+	slog.Info("collector scheduler started")
 
 	<-ctx.Done()
-	log.Println("shutting down collector...")
+	slog.Info("shutting down collector")
 
 	// Graceful shutdown of health server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	if err := healthSrv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("[WARN] health server shutdown: %v", err)
+		slog.Warn("health server shutdown error", "error", err)
 	}
 
 	stopCtx := c.Stop()
@@ -178,20 +182,20 @@ func main() {
 
 // runCollector executes a single collector and upserts results into the database.
 func runCollector(ctx context.Context, col domain.Collector, repo *repositories.SourceRecordRepository) {
-	log.Printf("[INFO] collecting %s...", col.Source())
+	slog.Info("collecting", "source", col.Source())
 	records, err := col.Collect(ctx)
 	if err != nil {
-		log.Printf("[ERROR] %s collect: %v", col.Source(), err)
+		slog.Error("collect failed", "source", col.Source(), "error", err)
 		return
 	}
 	if len(records) == 0 {
-		log.Printf("[INFO] %s: no records returned (weekend/holiday?)", col.Source())
+		slog.Info("no records returned", "source", col.Source())
 		return
 	}
-	log.Printf("[INFO] %s: collected %d records, starting upsert...", col.Source(), len(records))
+	slog.Info("collected records, starting upsert", "source", col.Source(), "count", len(records))
 	if err := repo.Upsert(ctx, records); err != nil {
-		log.Printf("[ERROR] %s upsert: %v", col.Source(), err)
+		slog.Error("upsert failed", "source", col.Source(), "error", err)
 		return
 	}
-	log.Printf("[INFO] %s: done — upserted %d records", col.Source(), len(records))
+	slog.Info("upsert complete", "source", col.Source(), "count", len(records))
 }
