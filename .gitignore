@@ -3,6 +3,7 @@
 *.env
 databr-api
 databr-collector
+bazaar-test
 /collector
 /api
 /tmp/
