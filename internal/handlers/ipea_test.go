@@ -122,6 +122,70 @@ func TestGetSerie_UpstreamError(t *testing.T) {
 	}
 }
 
+// mockIPEASimple is a convenience wrapper around mockIPEA for simple status+body mocks.
+func mockIPEASimple(t *testing.T, statusCode int, body string) (*handlers.IPEAHandler, *httptest.Server) {
+	t.Helper()
+	return mockIPEA(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		w.Write([]byte(body))
+	})
+}
+
+func TestGetBusca_OK(t *testing.T) {
+	body := `{"value":[{"SERCODIGO":"PRECOS12_IPCA12","SERNOME":"IPCA - variação mensal"}]}`
+	h, srv := mockIPEASimple(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/ipea/busca", h.GetBusca)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ipea/busca?q=IPCA", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	data := resp["data"].(map[string]any)
+	series, _ := data["series"].([]any)
+	if len(series) == 0 {
+		t.Error("expected at least one series")
+	}
+}
+
+func TestGetBusca_ShortQuery(t *testing.T) {
+	h := handlers.NewIPEAHandler()
+	r := chi.NewRouter()
+	r.Get("/v1/ipea/busca", h.GetBusca)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ipea/busca?q=I", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", rec.Code)
+	}
+}
+
+func TestGetTemas_OK(t *testing.T) {
+	body := `{"value":[{"TEMCODIGO":1,"TEMNOME":"Macroeconomia"}]}`
+	h, srv := mockIPEASimple(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/ipea/temas", h.GetTemas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ipea/temas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestGetSerie_NotFound verifies that an empty value array returns 404.
 func TestGetSerie_NotFound(t *testing.T) {
 	h, srv := mockIPEA(t, func(w http.ResponseWriter, r *http.Request) {

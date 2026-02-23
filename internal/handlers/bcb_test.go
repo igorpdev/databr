@@ -391,6 +391,89 @@ func TestGetIndicadores_InvalidSerie(t *testing.T) {
 	}
 }
 
+// bcbOLINDARedirectTransport rewrites BCB OLINDA requests to the test server.
+type bcbOLINDARedirectTransport struct {
+	base string
+}
+
+func (t *bcbOLINDARedirectTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req2 := req.Clone(req.Context())
+	req2.URL.Scheme = "http"
+	req2.URL.Host = t.base[len("http://"):]
+	return http.DefaultTransport.RoundTrip(req2)
+}
+
+func mockBCBOLINDA(t *testing.T, statusCode int, body string) (*handlers.BCBHandler, *httptest.Server) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		w.Write([]byte(body))
+	}))
+	client := &http.Client{
+		Transport: &bcbOLINDARedirectTransport{base: srv.URL},
+	}
+	h := handlers.NewBCBHandlerWithClient(nil, client)
+	return h, srv
+}
+
+func TestGetCapitais_OK(t *testing.T) {
+	body := `{"value":[{"IdrRegistroIed":1,"DataRegistro":"2026-01-15"}]}`
+	h, srv := mockBCBOLINDA(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/capitais", h.GetCapitais)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/capitais", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := resp["data"].(map[string]any)
+	regs, _ := data["registros"].([]any)
+	if len(regs) == 0 {
+		t.Error("expected at least 1 registro")
+	}
+}
+
+func TestGetSML_All_OK(t *testing.T) {
+	body := `{"value":[{"Moeda":"Real","Data":"15/02/2026","Cotacao":1.25}]}`
+	h, srv := mockBCBOLINDA(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/sml", h.GetSML)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/sml", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetSML_PaisInvalido(t *testing.T) {
+	h := handlers.NewBCBHandler(nil)
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/sml", h.GetSML)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/sml?pais=invalido", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", rec.Code)
+	}
+}
+
 func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
 	store := &stubBCBStore{
 		records: []domain.SourceRecord{{

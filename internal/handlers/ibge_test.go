@@ -219,3 +219,97 @@ func TestGetCNAE_NotFound(t *testing.T) {
 		t.Fatalf("expected 404 for unknown CNAE, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// newIbgeSidraRouter builds a minimal Chi router for SIDRA handler methods.
+func newIbgeSidraRouter(h *handlers.IbgeHandler) http.Handler {
+	r := chi.NewRouter()
+	r.Get("/v1/ibge/pnad", h.GetPNAD)
+	r.Get("/v1/ibge/inpc", h.GetINPC)
+	r.Get("/v1/ibge/pim", h.GetPIM)
+	r.Get("/v1/ibge/populacao", h.GetPopulacao)
+	r.Get("/v1/ibge/ipca15", h.GetIPCA15)
+	return r
+}
+
+func TestGetPNAD_OK(t *testing.T) {
+	body := `[{"D1N":"Brasil","V":"8.5","D3N":"2025T4"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := newIbgeSidraRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/pnad", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	data := resp["data"].(map[string]any)
+	if data["descricao"] == nil {
+		t.Error("expected descricao field")
+	}
+}
+
+func TestGetINPC_OK(t *testing.T) {
+	body := `[{"D1N":"Brasil","V":"0.52","D3N":"202501"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := newIbgeSidraRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/inpc", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetIPCA15_OK(t *testing.T) {
+	body := `[{"D1N":"Brasil","V":"0.4","D3N":"202501"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := newIbgeSidraRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/ipca15", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetPopulacao_OK(t *testing.T) {
+	body := `[{"D1N":"São Paulo","V":"46289333","D3N":"2024"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := newIbgeSidraRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/populacao", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetPIM_OK(t *testing.T) {
+	body := `[{"D1N":"Brasil","V":"105.3","D3N":"202501"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := newIbgeSidraRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/pim", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}

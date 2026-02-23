@@ -2,11 +2,17 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	"github.com/go-chi/chi/v5"
 )
 
 // TransparenciaFetcher retrieves on-demand CGU Portal da Transparência data.
@@ -22,12 +28,23 @@ type TransparenciaFetcher interface {
 // TransparenciaFederalHandler handles /v1/transparencia/contratos,
 // /v1/transparencia/servidores, and /v1/transparencia/beneficios.
 type TransparenciaFederalHandler struct {
-	fetcher TransparenciaFetcher
+	fetcher    TransparenciaFetcher
+	httpClient *http.Client
+	apiKey     string
 }
 
 // NewTransparenciaFederalHandler creates a TransparenciaFederalHandler.
 func NewTransparenciaFederalHandler(f TransparenciaFetcher) *TransparenciaFederalHandler {
-	return &TransparenciaFederalHandler{fetcher: f}
+	return &TransparenciaFederalHandler{
+		fetcher:    f,
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+		apiKey:     os.Getenv("TRANSPARENCIA_API_KEY"),
+	}
+}
+
+// NewTransparenciaFederalHandlerWithClient creates a TransparenciaFederalHandler with a custom HTTP client and API key.
+func NewTransparenciaFederalHandlerWithClient(f TransparenciaFetcher, client *http.Client, apiKey string) *TransparenciaFederalHandler {
+	return &TransparenciaFederalHandler{fetcher: f, httpClient: client, apiKey: apiKey}
 }
 
 var reDigits = regexp.MustCompile(`\D`)
@@ -171,5 +188,128 @@ func (h *TransparenciaFederalHandler) GetCartoes(w http.ResponseWriter, r *http.
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.001",
 		Data:      rec.Data,
+	})
+}
+
+// GetCEAF handles GET /v1/transparencia/ceaf/{cnpj}.
+// Returns CEAF (Cadastro de Entidades sem Fins Lucrativos) data for a CNPJ.
+// Requires TRANSPARENCIA_API_KEY env variable.
+func (h *TransparenciaFederalHandler) GetCEAF(w http.ResponseWriter, r *http.Request) {
+	cnpj := chi.URLParam(r, "cnpj")
+	cnpj = normalizeCNPJdigits(cnpj)
+	if len(cnpj) != 14 {
+		jsonError(w, http.StatusBadRequest, "CNPJ inválido — deve ter 14 dígitos")
+		return
+	}
+
+	upURL := fmt.Sprintf(
+		"https://api.portaldatransparencia.gov.br/api-de-dados/ceaf?CNPJ=%s&pagina=1",
+		cnpj,
+	)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		jsonError(w, http.StatusNotFound, "CNPJ não encontrado no CEAF: "+cnpj)
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	var dados any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_ceaf",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"cnpj": cnpj, "ceaf": dados},
+	})
+}
+
+// GetViagens handles GET /v1/transparencia/viagens.
+// Returns government travel records from Portal da Transparência.
+// Required query param: orgao (SIAFI agency code, e.g. "26000" for MEC).
+// Optional: de (YYYY-MM-DD, default last 30 days), ate (YYYY-MM-DD), n (default 20, max 100).
+// Requires TRANSPARENCIA_API_KEY env variable.
+func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.Request) {
+	orgao := r.URL.Query().Get("orgao")
+	if orgao == "" {
+		jsonError(w, http.StatusBadRequest, "query param 'orgao' is required (SIAFI agency code, e.g. '26000')")
+		return
+	}
+	de := r.URL.Query().Get("de")
+	ate := r.URL.Query().Get("ate")
+	if de == "" {
+		de = time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02")
+	}
+	if ate == "" {
+		ate = time.Now().UTC().Format("2006-01-02")
+	}
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf(
+		"https://api.portaldatransparencia.gov.br/api-de-dados/viagens?pagina=1&quantidade=%d&codigoOrgao=%s&dataIdaDe=%s&dataIdaAte=%s&dataRetornoDe=%s&dataRetornoAte=%s",
+		n, orgao, de, ate, de, ate,
+	)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	var dados []any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_viagens",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"viagens": dados, "total": len(dados), "de": de, "ate": ate},
 	})
 }

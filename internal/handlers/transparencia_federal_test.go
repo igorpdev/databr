@@ -420,6 +420,128 @@ func TestTransparenciaFederal_GetCartoes_Empty(t *testing.T) {
 	}
 }
 
+// --- GetCEAF ---
+
+// transparenciaRedirectTransport rewrites requests to point at a test server.
+type transparenciaRedirectTransport struct {
+	base string
+}
+
+func (t *transparenciaRedirectTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req2 := req.Clone(req.Context())
+	req2.URL.Scheme = "http"
+	req2.URL.Host = t.base[len("http://"):]
+	return http.DefaultTransport.RoundTrip(req2)
+}
+
+func mockTransparenciaHTTP(t *testing.T, statusCode int, body string) (*handlers.TransparenciaFederalHandler, *httptest.Server) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		w.Write([]byte(body))
+	}))
+	client := &http.Client{Transport: &transparenciaRedirectTransport{base: srv.URL}}
+	h := handlers.NewTransparenciaFederalHandlerWithClient(&stubTransparenciaFetcher{}, client, "test-api-key")
+	return h, srv
+}
+
+func TestTransparenciaFederal_GetCEAF_OK(t *testing.T) {
+	body := `[{"cnpj":"00000000000191","nome":"Entidade Teste"}]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/ceaf/{cnpj}", h.GetCEAF)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/ceaf/00000000000191", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["source"] != "cgu_ceaf" {
+		t.Errorf("source = %q, want cgu_ceaf", resp["source"])
+	}
+}
+
+func TestTransparenciaFederal_GetCEAF_InvalidCNPJ(t *testing.T) {
+	h := handlers.NewTransparenciaFederalHandlerWithClient(&stubTransparenciaFetcher{}, &http.Client{}, "key")
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/ceaf/{cnpj}", h.GetCEAF)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/ceaf/123", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", rec.Code)
+	}
+}
+
+func TestTransparenciaFederal_GetCEAF_NotFound(t *testing.T) {
+	h, srv := mockTransparenciaHTTP(t, http.StatusNotFound, `{}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/ceaf/{cnpj}", h.GetCEAF)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/ceaf/00000000000191", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 got %d", rec.Code)
+	}
+}
+
+// --- GetViagens ---
+
+func TestTransparenciaFederal_GetViagens_OK(t *testing.T) {
+	body := `[{"id":1,"destino":"Brasília","valor":1500.00}]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/viagens", h.GetViagens)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/viagens?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["source"] != "cgu_viagens" {
+		t.Errorf("source = %q, want cgu_viagens", resp["source"])
+	}
+}
+
+func TestTransparenciaFederal_GetViagens_BadGateway(t *testing.T) {
+	h, srv := mockTransparenciaHTTP(t, http.StatusInternalServerError, `{"error":"oops"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/viagens", h.GetViagens)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/viagens?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d", rec.Code)
+	}
+}
+
 func TestTransparenciaFederal_GetCartoes_DefaultDates(t *testing.T) {
 	// When de/ate omitted, defaults should apply and fetcher is called.
 	stub := &stubTransparenciaFetcher{

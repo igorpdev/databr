@@ -130,3 +130,105 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+// GetBusca handles GET /v1/ipea/busca.
+// Searches IPEAData series metadata by name prefix.
+// Required query param: q (search term, minimum 2 chars).
+// Optional: n (max results, default 20, max 50).
+func (h *IPEAHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if len(q) < 2 {
+		jsonError(w, http.StatusBadRequest, "query param 'q' deve ter pelo menos 2 caracteres")
+		return
+	}
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 50 {
+			n = v
+		}
+	}
+
+	filterExpr := fmt.Sprintf("startswith(SERNOME,'%s')", q)
+	params := url.Values{}
+	params.Set("$filter", filterExpr)
+	params.Set("$top", strconv.Itoa(n))
+	upstreamURL := "http://ipeadata.gov.br/api/odata4/Metadados?" + params.Encode()
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição IPEAData: "+err.Error())
+		return
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar IPEAData: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IPEAData retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var envelope struct {
+		Value []map[string]any `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IPEAData: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "ipea_metadados",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"busca":  q,
+			"series": envelope.Value,
+			"total":  len(envelope.Value),
+		},
+	})
+}
+
+// GetTemas handles GET /v1/ipea/temas.
+// Returns the list of IPEAData thematic categories.
+func (h *IPEAHandler) GetTemas(w http.ResponseWriter, r *http.Request) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet,
+		"http://ipeadata.gov.br/api/odata4/Temas", nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição IPEAData: "+err.Error())
+		return
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar IPEAData: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("IPEAData retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var envelope struct {
+		Value []map[string]any `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IPEAData: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "ipea_temas",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"temas": envelope.Value,
+			"total": len(envelope.Value),
+		},
+	})
+}

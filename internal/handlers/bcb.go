@@ -269,6 +269,141 @@ func (h *BCBHandler) GetIndicadores(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetCapitais handles GET /v1/bcb/capitais.
+// Returns recent registrations of foreign direct investment (IED) from BCB OLINDA.
+// Optional query param: n (number of results, default 20, max 100).
+func (h *BCBHandler) GetCapitais(w http.ResponseWriter, r *http.Request) {
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf(
+		"https://olinda.bcb.gov.br/olinda/servico/RDE_Publicacao/versao/v1/odata/RegistrosIED?$top=%d&$format=json",
+		n,
+	)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to build request: "+err.Error())
+		return
+	}
+
+	upResp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "BCB OLINDA RDE unavailable: "+err.Error())
+		return
+	}
+	defer upResp.Body.Close()
+
+	if upResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(upResp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("BCB OLINDA returned %d: %s", upResp.StatusCode, string(body)))
+		return
+	}
+
+	var envelope struct {
+		Value []map[string]any `json:"value"`
+	}
+	if err := json.NewDecoder(upResp.Body).Decode(&envelope); err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to decode BCB OLINDA response: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "bcb_rde",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"registros": envelope.Value,
+			"total":     len(envelope.Value),
+		},
+	})
+}
+
+// GetSML handles GET /v1/bcb/sml.
+// Returns the latest SML exchange rates between Brazil and Paraguay, Uruguay, and Argentina.
+// Optional query param: pais (paraguai|uruguai|argentina|all, default "all").
+func (h *BCBHandler) GetSML(w http.ResponseWriter, r *http.Request) {
+	pais := r.URL.Query().Get("pais")
+	if pais == "" {
+		pais = "all"
+	}
+
+	// Map friendly name to OLINDA entity name suffix (case-sensitive).
+	paisMap := map[string]string{
+		"paraguai":  "Paraguai",
+		"uruguai":   "Uruguai",
+		"argentina": "Argentina",
+	}
+
+	type smlResult struct {
+		Pais  string           `json:"pais"`
+		Dados []map[string]any `json:"dados"`
+	}
+
+	fetch := func(ctx context.Context, suffix string) ([]map[string]any, error) {
+		upURL := fmt.Sprintf(
+			"https://olinda.bcb.gov.br/olinda/servico/SML/versao/v1/odata/CotacaoTaxaSMLBrasil%s?$top=5&$format=json",
+			suffix,
+		)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, upURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := h.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("BCB SML returned %d for %s", resp.StatusCode, suffix)
+		}
+		var env struct {
+			Value []map[string]any `json:"value"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
+			return nil, err
+		}
+		return env.Value, nil
+	}
+
+	if pais != "all" {
+		suffix, ok := paisMap[pais]
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "pais inválido — use paraguai, uruguai, argentina ou all")
+			return
+		}
+		dados, err := fetch(r.Context(), suffix)
+		if err != nil {
+			jsonError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		respond(w, r, domain.APIResponse{
+			Source:   "bcb_sml",
+			CostUSDC: "0.001",
+			Data:     map[string]any{"pais": pais, "cotacoes": dados, "total": len(dados)},
+		})
+		return
+	}
+
+	// Fetch all 3 countries.
+	var resultados []smlResult
+	for name, suffix := range paisMap {
+		dados, err := fetch(r.Context(), suffix)
+		if err != nil {
+			continue // skip unavailable
+		}
+		resultados = append(resultados, smlResult{Pais: name, Dados: dados})
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "bcb_sml",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"paises": resultados},
+	})
+}
+
 // jsonError writes a JSON error response.
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")

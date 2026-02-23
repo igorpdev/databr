@@ -302,6 +302,76 @@ func containsSubstrInner(s, sub string) bool {
 	return false
 }
 
+func TestGetFrentes_OK(t *testing.T) {
+	body := `{"dados":[{"id":1,"titulo":"Frente Parlamentar da Agropecuária"}],"links":[]}`
+	h, srv := mockLegislativo(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/legislativo/frentes", h.GetFrentes)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/legislativo/frentes", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	data := resp["data"].(map[string]any)
+	frentes, _ := data["frentes"].([]any)
+	if len(frentes) == 0 {
+		t.Error("expected at least one frente")
+	}
+}
+
+func TestGetBlocos_OK(t *testing.T) {
+	body := `{"dados":[{"id":1,"nome":"Bloco Parlamentar"}],"links":[]}`
+	h, srv := mockLegislativo(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/legislativo/blocos", h.GetBlocos)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/legislativo/blocos", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetDespesas_OK(t *testing.T) {
+	body := `{"dados":[{"ano":2026,"mes":1,"valorLiquido":1500.00}],"links":[]}`
+	h, srv := mockLegislativo(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/legislativo/deputados/{id}/despesas", h.GetDespesas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/legislativo/deputados/73291/despesas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetDespesas_InvalidID(t *testing.T) {
+	h := handlers.NewLegislativoHandler()
+	r := chi.NewRouter()
+	r.Get("/v1/legislativo/deputados/{id}/despesas", h.GetDespesas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/legislativo/deputados/abc/despesas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", rec.Code)
+	}
+}
+
 func TestGetMateriasSenado_OK(t *testing.T) {
 	body := `{"Materias":{"Materia":[{"CodigoMateria":"1"}]}}`
 	h, srv := mockLegislativo(t, http.StatusOK, body)

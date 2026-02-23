@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/databr/api/internal/domain"
@@ -204,5 +206,141 @@ func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
 		Source:   "ibge_cnae",
 		CostUSDC: "0.001",
 		Data:     raw,
+	})
+}
+
+// sidraFetch fetches the latest n periods from IBGE SIDRA for the given table/variable/localidade.
+// localidade should be "N1%5Ball%5D" for national or "N3%5Ball%5D" for states.
+func (h *IbgeHandler) sidraFetch(ctx context.Context, tabela, variavel, localidade string, n int) ([]any, error) {
+	url := fmt.Sprintf(
+		"https://servicodados.ibge.gov.br/api/v3/agregados/%s/periodos/-%d/variaveis/%s?localidades=%s&view=flat",
+		tabela, n, variavel, localidade,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("IBGE SIDRA retornou %d para tabela %s", resp.StatusCode, tabela)
+	}
+	var list []any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, fmt.Errorf("erro ao decodificar SIDRA: %w", err)
+	}
+	return list, nil
+}
+
+// GetPNAD handles GET /v1/ibge/pnad.
+// Returns recent PNAD Contínua unemployment rate (table 4099, var 4099) — Brasil.
+// Optional query param: n (periods, default 6).
+func (h *IbgeHandler) GetPNAD(w http.ResponseWriter, r *http.Request) {
+	n := 6
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 40 {
+			n = v
+		}
+	}
+	dados, err := h.sidraFetch(r.Context(), "4099", "4099", "N1%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_pnad",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "PNAD Contínua - Taxa de desocupação (%)"},
+	})
+}
+
+// GetINPC handles GET /v1/ibge/inpc.
+// Returns recent INPC monthly variation (table 1736, var 44) — Brasil.
+// Optional query param: n (periods, default 12).
+func (h *IbgeHandler) GetINPC(w http.ResponseWriter, r *http.Request) {
+	n := 12
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 60 {
+			n = v
+		}
+	}
+	dados, err := h.sidraFetch(r.Context(), "1736", "44", "N1%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_inpc",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "INPC - Variação mensal (%)"},
+	})
+}
+
+// GetPIM handles GET /v1/ibge/pim.
+// Returns recent PIM-PF industrial production index (table 8888, var 12606) — Brasil.
+// Optional query param: n (periods, default 12).
+func (h *IbgeHandler) GetPIM(w http.ResponseWriter, r *http.Request) {
+	n := 12
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 60 {
+			n = v
+		}
+	}
+	dados, err := h.sidraFetch(r.Context(), "8888", "12606", "N1%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_pim",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "PIM-PF - Índice base fixa sem ajuste sazonal (Dez 2022=100)"},
+	})
+}
+
+// GetPopulacao handles GET /v1/ibge/populacao.
+// Returns population estimates by state (table 6579, var 9324) — N3 (estados).
+// Optional query param: n (periods, default 3).
+func (h *IbgeHandler) GetPopulacao(w http.ResponseWriter, r *http.Request) {
+	n := 3
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 10 {
+			n = v
+		}
+	}
+	dados, err := h.sidraFetch(r.Context(), "6579", "9324", "N3%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_populacao",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "Estimativa de população por estado"},
+	})
+}
+
+// GetIPCA15 handles GET /v1/ibge/ipca15.
+// Returns recent IPCA-15 monthly variation (table 1705, var 356) — Brasil.
+// Optional query param: n (periods, default 12).
+func (h *IbgeHandler) GetIPCA15(w http.ResponseWriter, r *http.Request) {
+	n := 12
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 60 {
+			n = v
+		}
+	}
+	dados, err := h.sidraFetch(r.Context(), "1705", "356", "N1%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_ipca15",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "IPCA-15 - Variação mensal (%)"},
 	})
 }

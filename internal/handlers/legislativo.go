@@ -423,6 +423,134 @@ func (h *LegislativoHandler) GetComissoes(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// GetFrentes handles GET /v1/legislativo/frentes.
+// Returns parliamentary fronts (frentes parlamentares) from Câmara dos Deputados.
+// Optional query params: pagina (default "1").
+func (h *LegislativoHandler) GetFrentes(w http.ResponseWriter, r *http.Request) {
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/frentes?formato=json&itens=100&pagina=%s", pagina)
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar frentes parlamentares: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+	var body struct {
+		Dados []any `json:"dados"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_frentes",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"frentes": dados, "total": len(dados)},
+	})
+}
+
+// GetBlocos handles GET /v1/legislativo/blocos.
+// Returns party blocs (blocos partidários) from Câmara dos Deputados.
+// Optional query params: pagina (default "1").
+func (h *LegislativoHandler) GetBlocos(w http.ResponseWriter, r *http.Request) {
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/blocos?formato=json&itens=100&pagina=%s", pagina)
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar blocos partidários: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+	var body struct {
+		Dados []any `json:"dados"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_blocos",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"blocos": dados, "total": len(dados)},
+	})
+}
+
+// GetDespesas handles GET /v1/legislativo/deputados/{id}/despesas.
+// Returns expense reports for a specific deputy.
+// Optional query params: ano (default current year), pagina (default "1").
+func (h *LegislativoHandler) GetDespesas(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" || !onlyDigits.MatchString(id) {
+		jsonError(w, http.StatusBadRequest, "ID de deputado inválido")
+		return
+	}
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+	ano := r.URL.Query().Get("ano")
+	if ano == "" {
+		ano = fmt.Sprintf("%d", time.Now().Year())
+	}
+
+	url := fmt.Sprintf(
+		"https://dadosabertos.camara.leg.br/api/v2/deputados/%s/despesas?formato=json&itens=50&pagina=%s&ano=%s",
+		id, pagina, ano,
+	)
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar despesas do deputado: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		jsonError(w, http.StatusNotFound, "Deputado não encontrado: "+id)
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+	var body struct {
+		Dados []any `json:"dados"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_despesas",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"despesas": dados, "total": len(dados), "deputado_id": id, "ano": ano},
+	})
+}
+
 // GetMateriasSenado handles GET /v1/legislativo/senado/materias.
 // Optional query params: ano (default: current year), sigla, pagina (default "1").
 func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Request) {
