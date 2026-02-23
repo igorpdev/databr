@@ -20,23 +20,23 @@ import (
 // when the database is unavailable.
 type HandlerDeps struct {
 	// On-demand handlers (always available — call external APIs directly)
-	Empresas      http.HandlerFunc // GET /v1/empresas/{cnpj}
-	Compliance    http.HandlerFunc // GET /v1/compliance/{cnpj}
-	ProxyBCB      http.HandlerFunc // GET /v1/bcb/cambio/{moeda}
-	Judicial      http.HandlerFunc // GET /v1/judicial/processos/{doc}
-	DOU           http.HandlerFunc // GET /v1/dou/busca
-	Orcamento     http.HandlerFunc // GET /v1/orcamento/despesas
-	TCU           http.HandlerFunc // GET /v1/tcu/certidao/{cnpj}
-	Legislativo   http.HandlerFunc // GET /v1/legislativo/deputados
-	PNCP          http.HandlerFunc // GET /v1/pncp/orgaos
+	Empresas    http.HandlerFunc // GET /v1/empresas/{cnpj}
+	Compliance  http.HandlerFunc // GET /v1/compliance/{cnpj}
+	Judicial    http.HandlerFunc // GET /v1/judicial/processos/{doc}
+	DOU         http.HandlerFunc // GET /v1/dou/busca
+	Orcamento   http.HandlerFunc // GET /v1/orcamento/despesas
+	TCU         http.HandlerFunc // GET /v1/tcu/certidao/{cnpj}
+	Legislativo http.HandlerFunc // GET /v1/legislativo/deputados
+	PNCP        http.HandlerFunc // GET /v1/pncp/orgaos
 
 	// Store-backed handlers (nil when DB is unavailable)
-	BCBSelic      http.HandlerFunc // GET /v1/bcb/selic
-	EconomiaIPCA  http.HandlerFunc // GET /v1/economia/ipca
-	EconomiaPIB   http.HandlerFunc // GET /v1/economia/pib
-	MercadoAcoes  http.HandlerFunc // GET /v1/mercado/acoes/{ticker}
-	Energia       http.HandlerFunc // GET /v1/energia/tarifas
-	Saude         http.HandlerFunc // GET /v1/saude/medicamentos/{registro}
+	BCBSelic     http.HandlerFunc // GET /v1/bcb/selic
+	BCBCambio    http.HandlerFunc // GET /v1/bcb/cambio/{moeda}
+	EconomiaIPCA http.HandlerFunc // GET /v1/economia/ipca
+	EconomiaPIB  http.HandlerFunc // GET /v1/economia/pib
+	MercadoAcoes http.HandlerFunc // GET /v1/mercado/acoes/{ticker}
+	Energia      http.HandlerFunc // GET /v1/energia/tarifas
+	Saude        http.HandlerFunc // GET /v1/saude/medicamentos/{registro}
 }
 
 // Server wraps the mcp-go server with DataBR tool registrations.
@@ -156,7 +156,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			moeda := req.GetString("moeda", "USD")
-			return invokeHandler(ctx, s.deps.ProxyBCB, "/v1/bcb/cambio/"+moeda, map[string]string{"moeda": moeda}, "")
+			return invokeHandler(ctx, s.deps.BCBCambio, "/v1/bcb/cambio/"+moeda, map[string]string{"moeda": moeda}, "")
 		},
 	)
 
@@ -175,7 +175,7 @@ func (s *Server) registerTools() {
 			if r, err := invokeHandler(ctx, s.deps.EconomiaPIB, "/v1/economia/pib", nil, ""); err == nil {
 				result["pib"] = extractJSON(r)
 			}
-			if r, err := invokeHandler(ctx, s.deps.ProxyBCB, "/v1/bcb/cambio/USD", map[string]string{"moeda": "USD"}, ""); err == nil {
+			if r, err := invokeHandler(ctx, s.deps.BCBCambio, "/v1/bcb/cambio/USD", map[string]string{"moeda": "USD"}, ""); err == nil {
 				result["cambio"] = extractJSON(r)
 			}
 

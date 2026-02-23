@@ -185,7 +185,6 @@ func main() {
 		// On-demand handlers (always available)
 		Empresas:    empHandler.GetEmpresa,
 		Compliance:  compHandler.GetCompliance,
-		ProxyBCB:    proxyBCBHandler.GetCambio,
 		Judicial:    judicialHand.GetProcessos,
 		DOU:         douHandler.GetBusca,
 		Orcamento:   orcamentoHandler.GetDespesas,
@@ -196,6 +195,7 @@ func main() {
 	// Store-backed handlers (only when DB is connected)
 	if bcbHandler != nil {
 		mcpDeps.BCBSelic = bcbHandler.GetSelic
+		mcpDeps.BCBCambio = bcbHandler.GetCambio
 	}
 	if ecoHandler != nil {
 		mcpDeps.EconomiaIPCA = ecoHandler.GetIPCA
