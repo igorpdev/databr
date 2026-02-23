@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>DataBR — API de Dados Públicos Brasileiros</title>
+  <meta name="description" content="API de dados públicos brasileiros para agentes de IA, com pagamento on-chain via protocolo x402 (USDC na rede Base)."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0e17;
+      --bg2: #111827;
+      --bg3: #1e293b;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --accent: #3b82f6;
+      --accent2: #60a5fa;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --purple: #a78bfa;
+      --pink: #f472b6;
+      --orange: #fb923c;
+      --radius: 12px;
+    }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Nav */
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,14,23,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+    }
+    nav .inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    nav .logo { font-size: 1.25rem; font-weight: 700; color: var(--text); }
+    nav .logo span { color: var(--accent); }
+    nav .links { display: flex; gap: 1.5rem; align-items: center; }
+    nav .links a { color: var(--text2); font-size: 0.875rem; font-weight: 500; }
+    nav .links a:hover { color: var(--text); text-decoration: none; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); text-decoration: none; }
+    .btn-ghost { border: 1px solid var(--border); color: var(--text2); }
+    .btn-ghost:hover { border-color: var(--text2); color: var(--text); text-decoration: none; }
+
+    /* Hero */
+    .hero {
+      max-width: 1200px; margin: 0 auto;
+      padding: 6rem 2rem 4rem;
+      text-align: center;
+    }
+    .hero .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600;
+      background: rgba(59,130,246,0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(59,130,246,0.3);
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent2), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 1.125rem;
+      color: var(--text2);
+      max-width: 640px;
+      margin: 0 auto 2rem;
+    }
+    .hero .actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    /* Stats */
+    .stats {
+      max-width: 1200px; margin: 0 auto;
+      padding: 0 2rem 4rem;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;
+    }
+    .stat {
+      text-align: center;
+      padding: 1.5rem;
+      border-radius: var(--radius);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+    }
+    .stat .num { font-size: 2rem; font-weight: 700; color: var(--accent2); }
+    .stat .label { font-size: 0.875rem; color: var(--text2); margin-top: 0.25rem; }
+
+    /* Section */
+    section { max-width: 1200px; margin: 0 auto; padding: 4rem 2rem; }
+    section h2 {
+      font-size: 1.75rem; font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    section .subtitle { color: var(--text2); margin-bottom: 2rem; }
+
+    /* How it works */
+    .flow {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem; margin-top: 2rem;
+    }
+    .flow-step {
+      padding: 1.5rem;
+      border-radius: var(--radius);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .flow-step .num-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      font-size: 0.75rem; font-weight: 700;
+      background: rgba(59,130,246,0.2); color: var(--accent2);
+      margin-bottom: 0.75rem;
+    }
+    .flow-step h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .flow-step p { font-size: 0.875rem; color: var(--text2); }
+    .flow-step code {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      background: var(--bg3);
+      font-size: 0.8rem;
+      color: var(--green);
+    }
+
+    /* Endpoints */
+    .endpoints-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1rem;
+    }
+    .ep-card {
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      transition: border-color 0.15s;
+    }
+    .ep-card:hover { border-color: var(--accent); }
+    .ep-card .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .ep-card h3 { font-size: 1rem; font-weight: 600; }
+    .ep-card .price-tag {
+      font-size: 0.75rem; font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+    }
+    .price-003 { background: rgba(34,197,94,0.15); color: var(--green); }
+    .price-005 { background: rgba(59,130,246,0.15); color: var(--accent2); }
+    .price-007 { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .price-010 { background: rgba(167,139,250,0.15); color: var(--purple); }
+    .price-high { background: rgba(244,114,182,0.15); color: var(--pink); }
+    .ep-card ul { list-style: none; }
+    .ep-card li {
+      font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--text2);
+      padding: 0.2rem 0;
+    }
+    .ep-card li::before { content: "GET "; color: var(--green); font-weight: 600; }
+    .ep-card .count { font-size: 0.75rem; color: var(--text2); margin-top: 0.5rem; }
+
+    /* Code example */
+    .code-tabs { display: flex; gap: 0; margin-bottom: 0; }
+    .code-tab {
+      padding: 0.5rem 1.25rem;
+      font-size: 0.8rem; font-weight: 600;
+      background: var(--bg3);
+      color: var(--text2);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+    }
+    .code-tab.active { background: var(--bg2); color: var(--text); border-bottom: 1px solid var(--bg2); }
+    .code-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 0 var(--radius) var(--radius) var(--radius);
+      padding: 1.5rem;
+      overflow-x: auto;
+      display: none;
+    }
+    .code-block.active { display: block; }
+    .code-block pre {
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: var(--text2);
+    }
+    .code-block .comment { color: #6b7280; }
+    .code-block .string { color: var(--green); }
+    .code-block .keyword { color: var(--purple); }
+    .code-block .status { color: var(--yellow); }
+    .code-block .url { color: var(--accent2); }
+
+    /* Pricing tiers */
+    .tiers {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem; margin-top: 2rem;
+    }
+    .tier {
+      text-align: center;
+      padding: 1.25rem;
+      border-radius: var(--radius);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+    }
+    .tier .price { font-size: 1.5rem; font-weight: 700; }
+    .tier .name { font-size: 0.8rem; color: var(--text2); margin-top: 0.25rem; }
+    .tier .desc { font-size: 0.75rem; color: var(--text2); margin-top: 0.5rem; }
+
+    /* Footer */
+    footer {
+      max-width: 1200px; margin: 0 auto;
+      padding: 3rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+      font-size: 0.875rem; color: var(--text2);
+    }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      nav .links a:not(.btn) { display: none; }
+      .hero { padding: 4rem 1.5rem 3rem; }
+      .endpoints-grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <div class="logo">Data<span>BR</span></div>
+    <div class="links">
+      <a href="#how-it-works">Como funciona</a>
+      <a href="#endpoints">Endpoints</a>
+      <a href="#pricing">Preços</a>
+      <a href="/docs" class="btn btn-primary">Documentação</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="badge">x402 Protocol &middot; USDC on Base</div>
+  <h1>Dados públicos brasileiros<br/><span class="gradient">prontos para agentes de IA</span></h1>
+  <p>API unificada com 120+ endpoints cobrindo economia, empresas, mercado, legislativo, transparência e mais. Pagamento instantâneo via protocolo x402 — sem cadastro, sem API key, sem limites artificiais.</p>
+  <div class="actions">
+    <a href="/docs" class="btn btn-primary">Explorar API &rarr;</a>
+    <a href="#quick-start" class="btn btn-ghost">Quick Start</a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num">120+</div><div class="label">Endpoints</div></div>
+  <div class="stat"><div class="num">30+</div><div class="label">Fontes oficiais</div></div>
+  <div class="stat"><div class="num">$0.003</div><div class="label">A partir de</div></div>
+  <div class="stat"><div class="num">&lt;200ms</div><div class="label">Latência média</div></div>
+</div>
+
+<section id="how-it-works">
+  <h2>Como funciona</h2>
+  <p class="subtitle">Protocolo x402 — pagamento nativo em HTTP, sem intermediários.</p>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num-badge">1</div>
+      <h3>Request</h3>
+      <p>Agente faz <code>GET /v1/bcb/selic</code></p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge">2</div>
+      <h3>402 Payment Required</h3>
+      <p>API retorna preço e endereço de pagamento em USDC (Base network)</p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge">3</div>
+      <h3>Pagamento on-chain</h3>
+      <p>SDK paga automaticamente e envia header <code>X-PAYMENT</code></p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge">4</div>
+      <h3>200 OK + Dados</h3>
+      <p>Dados retornados em JSON — prontos para consumo</p>
+    </div>
+  </div>
+</section>
+
+<section id="endpoints">
+  <h2>Endpoints</h2>
+  <p class="subtitle">Dados de 30+ fontes governamentais e de mercado, organizados por domínio.</p>
+  <div class="endpoints-grid">
+
+    <div class="ep-card">
+      <div class="header"><h3>Banco Central</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/bcb/selic</li>
+        <li>/v1/bcb/cambio/{moeda}</li>
+        <li>/v1/bcb/pix/estatisticas</li>
+        <li>/v1/bcb/credito</li>
+        <li>/v1/bcb/reservas</li>
+        <li>/v1/bcb/taxas-credito</li>
+        <li>/v1/bcb/indicadores/{serie}</li>
+        <li>/v1/bcb/capitais</li>
+      </ul>
+      <div class="count">+ sml, ifdata, base-monetaria</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Empresas</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/empresas/{cnpj}</li>
+        <li>/v1/empresas/{cnpj}/socios</li>
+        <li>/v1/empresas/{cnpj}/simples</li>
+        <li>/v1/endereco/{cep}</li>
+      </ul>
+      <div class="count">+ compliance ($0.007), perfil-completo ($0.020), due diligence ($0.075)</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Economia</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/economia/ipca</li>
+        <li>/v1/economia/pib</li>
+        <li>/v1/economia/focus</li>
+        <li>/v1/economia/panorama</li>
+      </ul>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>IBGE</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/ibge/municipio/{ibge}</li>
+        <li>/v1/ibge/municipios/{uf}</li>
+        <li>/v1/ibge/estados</li>
+        <li>/v1/ibge/populacao</li>
+        <li>/v1/ibge/pnad</li>
+        <li>/v1/ibge/cnae/{codigo}</li>
+      </ul>
+      <div class="count">+ regioes, inpc, pim, ipca15, pmc, pms</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Mercado Financeiro</h3><span class="price-tag price-005">$0.005</span></div>
+      <ul>
+        <li>/v1/mercado/acoes/{ticker}</li>
+        <li>/v1/mercado/fundos/{cnpj}</li>
+        <li>/v1/mercado/fundos/{cnpj}/cotas</li>
+        <li>/v1/mercado/fatos-relevantes</li>
+        <li>/v1/mercado/indices/ibovespa</li>
+      </ul>
+      <div class="count">+ análise de fundos ($0.010)</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Legislativo</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/legislativo/deputados</li>
+        <li>/v1/legislativo/deputados/{id}/despesas</li>
+        <li>/v1/legislativo/proposicoes</li>
+        <li>/v1/legislativo/votacoes</li>
+        <li>/v1/legislativo/senado/senadores</li>
+      </ul>
+      <div class="count">+ partidos, eventos, comissoes, frentes, blocos, materias</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Transparência</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/transparencia/contratos</li>
+        <li>/v1/transparencia/licitacoes</li>
+        <li>/v1/transparencia/servidores</li>
+        <li>/v1/transparencia/emendas</li>
+        <li>/v1/transparencia/obras</li>
+      </ul>
+      <div class="count">+ beneficios, cartoes, viagens, transferencias, pensionistas</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Compliance</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/compliance/ceis/{cnpj}</li>
+        <li>/v1/compliance/cnep/{cnpj}</li>
+        <li>/v1/compliance/cepim/{cnpj}</li>
+        <li>/v1/compliance/{cnpj}</li>
+      </ul>
+      <div class="count">Full compliance ($0.010) &middot; Score ($0.010)</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Tesouro Nacional</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/tesouro/rreo</li>
+        <li>/v1/tesouro/rgf</li>
+        <li>/v1/tesouro/entes</li>
+        <li>/v1/tesouro/dca</li>
+        <li>/v1/tesouro/titulos</li>
+      </ul>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Eleições</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/eleicoes/candidatos</li>
+        <li>/v1/eleicoes/bens</li>
+        <li>/v1/eleicoes/doacoes</li>
+        <li>/v1/eleicoes/resultados</li>
+      </ul>
+      <div class="count">+ compliance eleitoral ($0.007)</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Ambiental</h3><span class="price-tag price-005">$0.005</span></div>
+      <ul>
+        <li>/v1/ambiental/desmatamento</li>
+        <li>/v1/ambiental/prodes</li>
+        <li>/v1/ambiental/uso-solo</li>
+        <li>/v1/ambiental/embargos</li>
+        <li>/v1/ambiental/risco/{municipio}</li>
+      </ul>
+      <div class="count">+ ESG empresarial ($0.030)</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Mais domínios</h3><span class="price-tag price-003">$0.003+</span></div>
+      <ul>
+        <li>/v1/ipea/serie/{codigo}</li>
+        <li>/v1/energia/combustiveis</li>
+        <li>/v1/saude/medicamentos/{registro}</li>
+        <li>/v1/transporte/aeronaves/{prefixo}</li>
+        <li>/v1/tcu/acordaos</li>
+        <li>/v1/pncp/orgaos</li>
+      </ul>
+      <div class="count">IPEA, Energia, Saúde, Transporte, TCU, PNCP, Orçamento</div>
+    </div>
+
+  </div>
+</section>
+
+<section id="quick-start">
+  <h2>Quick Start</h2>
+  <p class="subtitle">Integre em minutos — o SDK x402 cuida do pagamento automaticamente.</p>
+
+  <div class="code-tabs">
+    <div class="code-tab active" onclick="showTab('curl')">cURL</div>
+    <div class="code-tab" onclick="showTab('python')">Python</div>
+    <div class="code-tab" onclick="showTab('typescript')">TypeScript</div>
+  </div>
+
+  <div class="code-block active" id="tab-curl">
+<pre><span class="comment"># 1. Primeira chamada retorna 402 com dados de pagamento</span>
+curl -s <span class="url">https://databr.api.br/v1/bcb/selic</span>
+<span class="comment"># {"x402Version":1,"accepts":[{"scheme":"exact","network":"eip155:8453",</span>
+<span class="comment">#   "maxAmountRequired":"3000","asset":"0x833589...","payTo":"0x..."}]}</span>
+
+<span class="comment"># 2. Use o x402 SDK para pagamento automático:</span>
+<span class="comment">#    npm install x402 / pip install x402 / go get github.com/coinbase/x402/go</span>
+
+<span class="comment"># 3. Com o SDK, a chamada é transparente:</span>
+<span class="comment">#    client.get("https://databr.api.br/v1/bcb/selic")</span>
+<span class="comment">#    → Paga automaticamente → Retorna dados JSON</span></pre>
+  </div>
+
+  <div class="code-block" id="tab-python">
+<pre><span class="keyword">from</span> x402.client <span class="keyword">import</span> PaymentClient
+
+<span class="comment"># Configure com sua wallet (USDC na rede Base)</span>
+client = PaymentClient(
+    private_key=<span class="string">"0xYOUR_PRIVATE_KEY"</span>,
+    network=<span class="string">"base-mainnet"</span>
+)
+
+<span class="comment"># O SDK cuida do fluxo 402 → pagamento → retry automaticamente</span>
+resp = client.get(<span class="string">"https://databr.api.br/v1/bcb/selic"</span>)
+data = resp.json()
+
+print(data[<span class="string">"data"</span>][<span class="string">"valor"</span>])   <span class="comment"># 14.25</span>
+print(data[<span class="string">"cost_usdc"</span>])        <span class="comment"># "0.003"</span></pre>
+  </div>
+
+  <div class="code-block" id="tab-typescript">
+<pre><span class="keyword">import</span> { createx402Client } <span class="keyword">from</span> <span class="string">"x402"</span>;
+
+<span class="comment">// Configure com sua wallet (USDC na rede Base)</span>
+<span class="keyword">const</span> client = createx402Client({
+  privateKey: process.env.WALLET_PRIVATE_KEY,
+  network: <span class="string">"base-mainnet"</span>,
+});
+
+<span class="comment">// Pagamento automático via x402</span>
+<span class="keyword">const</span> resp = <span class="keyword">await</span> client.get(
+  <span class="string">"https://databr.api.br/v1/empresas/33000167000101"</span>
+);
+
+console.log(resp.data.razao_social); <span class="comment">// "PETROLEO BRASILEIRO S.A."</span>
+console.log(resp.cost_usdc);         <span class="comment">// "0.003"</span></pre>
+  </div>
+</section>
+
+<section id="pricing">
+  <h2>Preços</h2>
+  <p class="subtitle">Pague apenas pelo que usar. Sem assinatura, sem limites, sem cadastro.</p>
+  <div class="tiers">
+    <div class="tier">
+      <div class="price" style="color:var(--green)">$0.003</div>
+      <div class="name">Basic</div>
+      <div class="desc">BCB, IBGE, empresas, legislativo, tesouro</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--accent2)">$0.005</div>
+      <div class="name">Standard</div>
+      <div class="desc">Ações B3, CVM, ambiental, comércio exterior</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--yellow)">$0.007</div>
+      <div class="name">Enhanced</div>
+      <div class="desc">Compliance cruzado, DOU, risco ambiental</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--purple)">$0.010</div>
+      <div class="name">Premium</div>
+      <div class="desc">Compliance completo, fundos CVM, score</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--pink)">$0.015</div>
+      <div class="name">Advanced</div>
+      <div class="desc">Processos judiciais, panorama econômico</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--orange)">$0.020</div>
+      <div class="name">Composite</div>
+      <div class="desc">Perfil completo, regulação setorial</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--pink)">$0.030</div>
+      <div class="name">Deep Analysis</div>
+      <div class="desc">Competição, ESG, risco de litígio</div>
+    </div>
+    <div class="tier">
+      <div class="price" style="color:var(--orange)">$0.075</div>
+      <div class="name">Due Diligence</div>
+      <div class="desc">Análise completa de empresa</div>
+    </div>
+  </div>
+  <p style="text-align:center;color:var(--text2);font-size:0.875rem;margin-top:1.5rem">
+    Formato <code>?format=context</code> (LLM-ready) adiciona +$0.002 ao preço base.
+  </p>
+</section>
+
+<section>
+  <h2>Para agentes de IA</h2>
+  <p class="subtitle">Construído para consumo programático por LLMs e agentes autônomos.</p>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>Sem cadastro</h3>
+      <p>Nada de API keys, OAuth, ou formulários. Pague e use.</p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>Sem rate limit artificial</h3>
+      <p>Limite apenas pelo throughput real. Cada request pago é processado.</p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>format=context</h3>
+      <p>Respostas em texto estruturado otimizado para contexto de LLM.</p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>MCP Server</h3>
+      <p>Disponível via Model Context Protocol em <code>/mcp</code>.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>DataBR &copy; 2026 &mdash; Dados públicos brasileiros para agentes de IA</div>
+  <div style="display:flex;gap:1.5rem">
+    <a href="/docs">Docs</a>
+    <a href="/openapi.yaml">OpenAPI</a>
+    <a href="/health">Status</a>
+  </div>
+</footer>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.code-block').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+</script>
+</body>
+</html>

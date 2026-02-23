@@ -307,6 +307,16 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})
 	})
 
+	// Landing page
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; script-src 'self' 'unsafe-inline'; "+
+				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "+
+				"font-src 'self' https://fonts.gstatic.com; "+
+				"img-src 'self' data: https:; connect-src 'self'")
+		http.ServeFile(w, r, "docs/landing.html")
+	})
+
 	// API Documentation (Scalar UI)
 	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
 		// Relax CSP for docs page so Scalar CDN scripts/styles load correctly.
