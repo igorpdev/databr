@@ -368,8 +368,8 @@ func main() {
 	r.Route("/v1", func(r chi.Router) {
 		// $0.003 — basic lookups: company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(optionalX402(x402Cfg, "0.003"))
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
 			r.Get("/empresas/{cnpj}/socios", empHandler.GetSocios)
 			r.Get("/empresas/{cnpj}/simples", empHandler.GetSimples)
@@ -476,8 +476,8 @@ func main() {
 
 		// $0.005 — standard: B3 stock quotes, CVM fatos relevantes, INPE deforestation data, budget documents
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
 			r.Use(optionalX402(x402Cfg, "0.005"))
+			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
 			r.Get("/orcamento/documentos", orcamentoHandler.GetDocumentos)
 			r.Get("/orcamento/favorecidos", orcamentoHandler.GetFavorecidos)
 			if mercHandler != nil {
@@ -524,8 +524,8 @@ func main() {
 
 		// $0.007 — enhanced: compliance via empresa, DOU/diários search, cross-references
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Use(optionalX402(x402Cfg, "0.007"))
+			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
 			r.Get("/dou/busca", douHandler.GetBusca)
 			r.Get("/diarios/busca", douHandler.GetDiarios)
@@ -545,8 +545,8 @@ func main() {
 
 		// $0.010 — premium: full compliance, CVM fund data, fund analysis, credit score
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Use(optionalX402(x402Cfg, "0.010"))
+			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
 			if mercHandler != nil {
 				r.Get("/mercado/fundos/{cnpj}", mercHandler.GetFundos)
@@ -561,8 +561,8 @@ func main() {
 
 		// $0.015 — advanced: judicial process search, economic panorama, labor market
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(optionalX402(x402Cfg, "0.015"))
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
 			if panoramaHandler != nil {
 				r.Get("/economia/panorama", panoramaHandler.GetPanorama)
@@ -574,8 +574,8 @@ func main() {
 
 		// $0.020 — composite: perfil completo, sector regulation
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(optionalX402(x402Cfg, "0.020"))
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			if perfilCompletoHandler != nil {
 				r.Get("/empresas/{cnpj}/perfil-completo", perfilCompletoHandler.GetPerfilCompleto)
 			}
@@ -586,8 +586,8 @@ func main() {
 
 		// $0.030 — deep analysis: competition, ESG scoring, litigation risk
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(optionalX402(x402Cfg, "0.030"))
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			if competicaoHandler != nil {
 				r.Get("/mercado/{cnae}/competicao", competicaoHandler.GetCompeticao)
 			}
@@ -601,8 +601,8 @@ func main() {
 
 		// $0.050 — network/influence analysis
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(optionalX402(x402Cfg, "0.050"))
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			if redeInfluenciaHandler != nil {
 				r.Get("/rede/{cnpj}/influencia", redeInfluenciaHandler.GetRedeInfluencia)
 			}
@@ -610,8 +610,8 @@ func main() {
 
 		// $0.075 — due diligence
 		r.Group(func(r chi.Router) {
-			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			r.Use(optionalX402(x402Cfg, "0.075"))
+			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
 			if dueDiligenceHandler != nil {
 				r.Get("/empresas/{cnpj}/duediligence", dueDiligenceHandler.GetDueDiligence)
 			}
