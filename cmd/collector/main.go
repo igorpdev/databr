@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/collectors/ambiental"
+	"github.com/databr/api/internal/collectors/anp"
+	"github.com/databr/api/internal/collectors/ans"
 	"github.com/databr/api/internal/collectors/b3"
 	"github.com/databr/api/internal/collectors/bcb"
 	"github.com/databr/api/internal/collectors/comex"
@@ -20,6 +22,7 @@ import (
 	"github.com/databr/api/internal/collectors/emprego"
 	"github.com/databr/api/internal/collectors/energia"
 	"github.com/databr/api/internal/collectors/ibge"
+	"github.com/databr/api/internal/collectors/ipea"
 	"github.com/databr/api/internal/collectors/juridico"
 	"github.com/databr/api/internal/collectors/legislativo"
 	"github.com/databr/api/internal/collectors/saude"
@@ -132,6 +135,11 @@ func main() {
 
 		// Phase 12+: TCU
 		tcu.NewAcordaosCollector(""),
+
+		// New collectors: ANP, ANS, IPEA
+		anp.NewCombustiveisCollector(""),
+		ans.NewOperadorasCollector(""),
+		ipea.NewSeriesCollector(""),
 	}
 
 	// Run all collectors on startup to populate the DB.

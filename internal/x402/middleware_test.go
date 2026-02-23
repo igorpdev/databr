@@ -121,3 +121,43 @@ func TestPricedMiddleware_ValidPayment_PassesThrough(t *testing.T) {
 	}
 }
 
+func TestWalletContextInjection(t *testing.T) {
+	fac := mockFacilitator(t, true)
+	defer fac.Close()
+
+	cfg := x402.MiddlewareConfig{
+		WalletAddress:  "0xWALLET",
+		FacilitatorURL: fac.URL,
+		Network:        "eip155:84532",
+	}
+
+	var capturedWallet string
+	mw := x402.NewPricedMiddleware(cfg, "0.001")
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedWallet = x402.WalletFromRequest(r)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
+	req.Header.Set("X-Payment", `{"x402Version":1,"scheme":"exact","payload":{"sig":"0xtest"}}`)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if capturedWallet == "" {
+		t.Error("wallet should be injected into context after successful settlement")
+	}
+	if capturedWallet != "0xCLIENT" {
+		t.Errorf("wallet = %q, want %q", capturedWallet, "0xCLIENT")
+	}
+}
+
+func TestWalletFromRequest_NoWallet(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
+	if w := x402.WalletFromRequest(req); w != "" {
+		t.Errorf("expected empty wallet, got %q", w)
+	}
+}
+

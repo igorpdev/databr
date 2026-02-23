@@ -162,6 +162,11 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 			respJSON, _ := json.Marshal(settleResp)
 			w.Header().Set("X-PAYMENT-RESPONSE", string(respJSON))
 
+			// Inject payer wallet into context for downstream rate limiting.
+			if settleResp.Payer != "" {
+				r = injectWallet(r, settleResp.Payer)
+			}
+
 			next.ServeHTTP(w, r)
 		})
 	}

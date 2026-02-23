@@ -394,6 +394,23 @@ func main() {
 
 	// /v1 API routes, grouped by x402 price tier
 	r.Route("/v1", func(r chi.Router) {
+		// Wallet-aware rate limit (500 req/min per wallet; falls back to IP for non-paying requests).
+		// Applied inside /v1 so the x402 middleware can inject the wallet into context first.
+		r.Use(httprate.Limit(
+			500,
+			1*time.Minute,
+			httprate.WithKeyFuncs(func(r *http.Request) (string, error) {
+				if w := x402pkg.WalletFromRequest(r); w != "" {
+					return "wallet:" + w, nil
+				}
+				// Fallback to IP for non-paying requests (already limited at 100/min by outer limiter).
+				return "ip:" + r.RemoteAddr, nil
+			}),
+			httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
+				handlers.RateLimitExceeded(w)
+			}),
+		))
+
 		// $0.003 — basic lookups: company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.003"))

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv" // used by parsePagination
+	"strings"
 	"time"
 
 	"github.com/databr/api/internal/domain"
@@ -47,9 +48,25 @@ func internalError(w http.ResponseWriter, source string, err error) {
 	jsonError(w, http.StatusInternalServerError, "internal error")
 }
 
-// respond writes the API response, applying ?format=context if requested.
+// respond writes the API response, applying ?fields, ?since/until, and ?format=context.
 func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
-	if r.URL.Query().Get("format") == "context" {
+	q := r.URL.Query()
+
+	// Temporal filter: if since/until are set and UpdatedAt is outside the range,
+	// return empty data with a note.
+	if since, until := parseDateFilter(r, "since"), parseDateFilter(r, "until"); since != nil || until != nil {
+		if (since != nil && resp.UpdatedAt.Before(*since)) ||
+			(until != nil && resp.UpdatedAt.After(*until)) {
+			resp.Data = map[string]any{"note": "no data in requested time range"}
+		}
+	}
+
+	// Field projection: keep only requested fields from resp.Data.
+	if fields := q.Get("fields"); fields != "" && resp.Data != nil {
+		resp.Data = projectFields(resp.Data, fields)
+	}
+
+	if q.Get("format") == "context" {
 		b, err := json.Marshal(resp.Data)
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, "failed to serialize context")
@@ -63,6 +80,36 @@ func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		slog.Error("failed to encode API response", "error", err)
 	}
+}
+
+// projectFields filters a map to keep only the comma-separated field names.
+// Unknown fields are silently ignored; if no requested field exists, returns empty map.
+func projectFields(data map[string]any, fields string) map[string]any {
+	wanted := strings.Split(fields, ",")
+	out := make(map[string]any, len(wanted))
+	for _, f := range wanted {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		if v, ok := data[f]; ok {
+			out[f] = v
+		}
+	}
+	return out
+}
+
+// parseDateFilter parses a YYYY-MM-DD query parameter and returns nil if absent or invalid.
+func parseDateFilter(r *http.Request, param string) *time.Time {
+	raw := r.URL.Query().Get(param)
+	if raw == "" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 // serveLatest is a helper for the common pattern: look up the latest record(s)
@@ -89,6 +136,7 @@ func serveLatest(w http.ResponseWriter, r *http.Request, store SourceStore, sour
 }
 
 // serveLatestAll serves all records for a source as an array.
+// Supports ?since/until to filter records by FetchedAt before building the response.
 // Price is read from the request context (set by x402 middleware via PriceFromRequest).
 func serveLatestAll(w http.ResponseWriter, r *http.Request, store SourceStore, source, dataKey string) {
 	records, err := store.FindLatest(r.Context(), source)
@@ -100,6 +148,28 @@ func serveLatestAll(w http.ResponseWriter, r *http.Request, store SourceStore, s
 		jsonError(w, http.StatusNotFound, source+" data not yet available")
 		return
 	}
+
+	// Apply temporal filter on individual records before building the response.
+	since, until := parseDateFilter(r, "since"), parseDateFilter(r, "until")
+	if since != nil || until != nil {
+		filtered := records[:0]
+		for _, rec := range records {
+			if since != nil && rec.FetchedAt.Before(*since) {
+				continue
+			}
+			if until != nil && rec.FetchedAt.After(*until) {
+				continue
+			}
+			filtered = append(filtered, rec)
+		}
+		records = filtered
+	}
+
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, source+" no data in requested time range")
+		return
+	}
+
 	items := make([]map[string]any, 0, len(records))
 	for _, rec := range records {
 		items = append(items, rec.Data)
@@ -172,7 +242,7 @@ func fetchJSON(ctx context.Context, client *http.Client, url string, headers map
 // RateLimitExceeded writes a 429 Too Many Requests response.
 // Exported so it can be used by the rate limit handler in cmd/api/main.go.
 func RateLimitExceeded(w http.ResponseWriter) {
-	jsonError(w, http.StatusTooManyRequests, "rate limit exceeded, max 100 req/min")
+	jsonError(w, http.StatusTooManyRequests, "rate limit exceeded")
 }
 
 // limitedReadAll reads up to maxResponseSize bytes from r.
