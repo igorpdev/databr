@@ -153,6 +153,102 @@ func (s *Server) registerTools() {
 			return s.callAPI(ctx, path)
 		},
 	)
+
+	s.addTool("consultar_orcamento",
+		"Consulta despesas do orçamento federal por órgão e ano (dados SIAFI via Portal da Transparência).",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("ano", mcpgosdk.Required(), mcpgosdk.Description("Ano do orçamento (ex: 2025)")),
+			mcpgosdk.WithString("orgao", mcpgosdk.Description("Código SIAFI do órgão (ex: 26000 para MEC). Opcional.")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			ano := req.GetString("ano", "")
+			orgao := req.GetString("orgao", "")
+			path := "/v1/orcamento/despesas?ano=" + ano
+			if orgao != "" {
+				path += "&orgao=" + orgao
+			}
+			return s.callAPI(ctx, path)
+		},
+	)
+
+	s.addTool("consultar_tcu_certidao",
+		"Verifica certidão de regularidade de empresa no TCU (Tribunal de Contas da União).",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnpj", mcpgosdk.Required(), mcpgosdk.Description("CNPJ da empresa")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnpj := req.GetString("cnpj", "")
+			return s.callAPI(ctx, fmt.Sprintf("/v1/tcu/certidao/%s", cnpj))
+		},
+	)
+
+	s.addTool("cotacao_acoes",
+		"Retorna cotação de ação na B3 (Bolsa de Valores do Brasil) pelo ticker.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("ticker", mcpgosdk.Required(), mcpgosdk.Description("Ticker da ação (ex: PETR4, VALE3, ITUB4)")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			ticker := req.GetString("ticker", "")
+			return s.callAPI(ctx, fmt.Sprintf("/v1/mercado/acoes/%s", ticker))
+		},
+	)
+
+	s.addTool("consultar_deputados",
+		"Busca deputados federais na Câmara dos Deputados. Filtre por UF e/ou partido.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("uf", mcpgosdk.Description("Sigla do estado (ex: SP, RJ). Opcional.")),
+			mcpgosdk.WithString("partido", mcpgosdk.Description("Sigla do partido (ex: PT, PL). Opcional.")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			uf := req.GetString("uf", "")
+			partido := req.GetString("partido", "")
+			path := "/v1/legislativo/deputados?"
+			if uf != "" {
+				path += "uf=" + uf + "&"
+			}
+			if partido != "" {
+				path += "partido=" + partido
+			}
+			return s.callAPI(ctx, path)
+		},
+	)
+
+	s.addTool("buscar_licitacao",
+		"Busca licitações e contratações públicas no PNCP (Portal Nacional de Contratações Públicas).",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnpj", mcpgosdk.Required(), mcpgosdk.Description("CNPJ do órgão contratante")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnpj := req.GetString("cnpj", "")
+			return s.callAPI(ctx, fmt.Sprintf("/v1/pncp/orgaos?cnpj=%s", cnpj))
+		},
+	)
+
+	s.addTool("consultar_tarifas_energia",
+		"Retorna tarifas de energia elétrica da ANEEL por distribuidora.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("distribuidora", mcpgosdk.Description("Nome da distribuidora (ex: ENEL, CEMIG). Opcional.")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			dist := req.GetString("distribuidora", "")
+			path := "/v1/energia/tarifas"
+			if dist != "" {
+				path += "?distribuidora=" + dist
+			}
+			return s.callAPI(ctx, path)
+		},
+	)
+
+	s.addTool("consultar_medicamento",
+		"Busca medicamento registrado na ANVISA pelo número de registro.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("registro", mcpgosdk.Required(), mcpgosdk.Description("Número de registro ANVISA do medicamento")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			registro := req.GetString("registro", "")
+			return s.callAPI(ctx, fmt.Sprintf("/v1/saude/medicamentos/%s", registro))
+		},
+	)
 }
 
 // addTool registers a tool and records its name for introspection.

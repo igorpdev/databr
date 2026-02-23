@@ -24,6 +24,13 @@ func TestMCPServer_ToolsRegistered(t *testing.T) {
 		"indicadores_macro",
 		"buscar_processos_judiciais",
 		"buscar_diario_oficial",
+		"consultar_orcamento",
+		"consultar_tcu_certidao",
+		"cotacao_acoes",
+		"consultar_deputados",
+		"buscar_licitacao",
+		"consultar_tarifas_energia",
+		"consultar_medicamento",
 	}
 
 	toolSet := make(map[string]bool, len(tools))

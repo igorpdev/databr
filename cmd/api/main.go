@@ -101,6 +101,7 @@ func main() {
 	tseExtrasHandler := handlers.NewTSEExtrasHandler()
 	ansHandler := handlers.NewANSHandler()
 	tcuHandler := handlers.NewTCUHandler()
+	orcamentoHandler := handlers.NewOrcamentoHandler()
 	// Proxy BCB handler for routes that call external APIs directly (no DB needed).
 	proxyBCBHandler := handlers.NewBCBHandler(nil)
 
@@ -372,6 +373,9 @@ func main() {
 			r.Get("/tcu/inabilitados", tcuHandler.GetInabilitados)
 			r.Get("/tcu/inabilitados/{cpf}", tcuHandler.GetInabilitadoByCPF)
 			r.Get("/tcu/contratos", tcuHandler.GetContratos)
+			r.Get("/orcamento/despesas", orcamentoHandler.GetDespesas)
+			r.Get("/orcamento/funcional-programatica", orcamentoHandler.GetFuncionalProgramatica)
+			r.Get("/orcamento/documento/{codigo}", orcamentoHandler.GetDocumento)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
@@ -409,11 +413,13 @@ func main() {
 			}
 		})
 
-		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data
+		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data, budget documents
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.002"))
+			r.Get("/orcamento/documentos", orcamentoHandler.GetDocumentos)
+			r.Get("/orcamento/favorecidos", orcamentoHandler.GetFavorecidos)
 			if mercHandler != nil {
 				r.Get("/mercado/acoes/{ticker}", mercHandler.GetAcoes)
 				r.Get("/mercado/fatos-relevantes", mercHandler.GetFatosRelevantes)
