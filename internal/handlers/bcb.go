@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/databr/api/internal/domain"
 	"github.com/go-chi/chi/v5"
@@ -22,14 +24,40 @@ type SourceStore interface {
 	FindLatestFiltered(ctx context.Context, source, jsonbKey, jsonbValue string) ([]domain.SourceRecord, error)
 }
 
+// sgsIndicadores maps friendly names to BCB SGS series codes and descriptions.
+var sgsIndicadores = map[string]struct {
+	code int
+	nome string
+}{
+	"cdi":         {12, "CDI - Certificado de Depósito Interbancário"},
+	"selic":       {11, "SELIC - Taxa básica acumulada no período"},
+	"selic-meta":  {4392, "SELIC meta fixada pelo COPOM"},
+	"igpm":        {189, "IGP-M - Índice Geral de Preços ao Mercado"},
+	"dolar":       {1, "Dólar americano (compra) - cotação diária"},
+	"desemprego":  {7326, "Taxa de desemprego - Pesquisa Mensal de Emprego"},
+	"ipca-mensal": {433, "IPCA - variação mensal"},
+	"inpc":        {188, "INPC - variação mensal"},
+	"igp-di":      {190, "IGP-DI - variação mensal"},
+	"poupanca":    {195, "Poupança - rendimento mensal"},
+}
+
 // BCBHandler handles requests for /v1/bcb/*.
 type BCBHandler struct {
-	store SourceStore
+	store      SourceStore
+	httpClient *http.Client
 }
 
 // NewBCBHandler creates a BCB handler.
 func NewBCBHandler(store SourceStore) *BCBHandler {
-	return &BCBHandler{store: store}
+	return &BCBHandler{
+		store:      store,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+// NewBCBHandlerWithClient creates a BCB handler with a custom HTTP client (useful for testing).
+func NewBCBHandlerWithClient(store SourceStore, client *http.Client) *BCBHandler {
+	return &BCBHandler{store: store, httpClient: client}
 }
 
 // GetSelic handles GET /v1/bcb/selic.
@@ -168,6 +196,76 @@ func (h *BCBHandler) GetTaxasCredito(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: records[0].FetchedAt,
 		CostUSDC:  "0.001",
 		Data:      map[string]any{"taxas": taxas},
+	})
+}
+
+// GetIndicadores handles GET /v1/bcb/indicadores/{serie}.
+// serie can be a friendly name (cdi, igpm, dolar, etc.) or a numeric SGS code.
+// Optional query param: n (number of values, default 12, max 100).
+func (h *BCBHandler) GetIndicadores(w http.ResponseWriter, r *http.Request) {
+	serie := chi.URLParam(r, "serie")
+
+	// Resolve series code and name.
+	var code int
+	var nomeSerie string
+
+	if ind, ok := sgsIndicadores[serie]; ok {
+		code = ind.code
+		nomeSerie = ind.nome
+	} else {
+		parsed, err := strconv.Atoi(serie)
+		if err != nil || parsed <= 0 {
+			jsonError(w, http.StatusBadRequest, "Série inválida. Use um nome (cdi, igpm, dolar, selic, selic-meta, desemprego, ipca-mensal, inpc, igp-di, poupanca) ou código numérico SGS.")
+			return
+		}
+		code = parsed
+		nomeSerie = fmt.Sprintf("BCB SGS Série %d", code)
+	}
+
+	// Number of values to return (default 12, max 100).
+	n := 12
+	if nStr := r.URL.Query().Get("n"); nStr != "" {
+		if parsed, err := strconv.Atoi(nStr); err == nil && parsed > 0 && parsed <= 100 {
+			n = parsed
+		}
+	}
+
+	url := fmt.Sprintf("https://api.bcb.gov.br/dados/serie/bcdata.sgs.%d/dados/ultimos/%d?formato=json", code, n)
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to build request: "+err.Error())
+		return
+	}
+
+	upResp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "BCB SGS unavailable: "+err.Error())
+		return
+	}
+	defer upResp.Body.Close()
+
+	if upResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(upResp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("BCB SGS returned %d: %s", upResp.StatusCode, string(body)))
+		return
+	}
+
+	var valores []map[string]any
+	if err := json.NewDecoder(upResp.Body).Decode(&valores); err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to decode BCB SGS response: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "bcb_sgs",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"serie":  nomeSerie,
+			"codigo": code,
+			"n":      n,
+			"valores": valores,
+		},
 	})
 }
 

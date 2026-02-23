@@ -74,6 +74,7 @@ func main() {
 	judicialHand := handlers.NewJudicialHandler(djCollector)
 	ibgeHandler := handlers.NewIbgeHandler()
 	legislativoHandler := handlers.NewLegislativoHandler()
+	ipeaHandler := handlers.NewIPEAHandler()
 
 	// Store-backed handlers (only available when DB is connected)
 	var (
@@ -153,7 +154,11 @@ func main() {
 			r.Get("/legislativo/partidos", legislativoHandler.GetPartidos)
 			r.Get("/legislativo/senado/senadores", legislativoHandler.GetSenadores)
 			r.Get("/legislativo/senado/materias", legislativoHandler.GetMateriasSenado)
+			r.Get("/legislativo/eventos", legislativoHandler.GetEventos)
+			r.Get("/legislativo/comissoes", legislativoHandler.GetComissoes)
+			r.Get("/ipea/serie/{codigo}", ipeaHandler.GetSerie)
 			if bcbHandler != nil {
+				r.Get("/bcb/indicadores/{serie}", bcbHandler.GetIndicadores)
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
 				r.Get("/bcb/pix/estatisticas", bcbHandler.GetPIX)

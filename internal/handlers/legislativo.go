@@ -321,6 +321,108 @@ func (h *LegislativoHandler) GetSenadores(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// GetEventos handles GET /v1/legislativo/eventos.
+// Optional query params: pagina (default "1"), dataInicio, dataFim, orgao (committee sigla, e.g. "PLEN").
+func (h *LegislativoHandler) GetEventos(w http.ResponseWriter, r *http.Request) {
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+	dataInicio := r.URL.Query().Get("dataInicio")
+	dataFim := r.URL.Query().Get("dataFim")
+	orgao := r.URL.Query().Get("orgao")
+
+	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/eventos?formato=json&itens=50&pagina=%s", pagina)
+	if dataInicio != "" {
+		url += "&dataInicio=" + dataInicio
+	}
+	if dataFim != "" {
+		url += "&dataFim=" + dataFim
+	}
+	if orgao != "" {
+		url += "&siglaOrgao=" + orgao
+	}
+
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar eventos da Câmara: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var body struct {
+		Dados []any `json:"dados"`
+		Links []any `json:"links"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_eventos",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"eventos": dados, "total": len(dados)},
+	})
+}
+
+// GetComissoes handles GET /v1/legislativo/comissoes.
+// Optional query params: pagina (default "1"), tipo (codTipoOrgao, default "2" for permanent committees).
+func (h *LegislativoHandler) GetComissoes(w http.ResponseWriter, r *http.Request) {
+	pagina := r.URL.Query().Get("pagina")
+	if pagina == "" {
+		pagina = "1"
+	}
+	tipo := r.URL.Query().Get("tipo")
+	if tipo == "" {
+		tipo = "2"
+	}
+
+	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/orgaos?codTipoOrgao=%s&formato=json&itens=100&pagina=%s", tipo, pagina)
+
+	resp, err := h.httpClient.Get(url)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar comissões da Câmara: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Câmara retornou status %d", resp.StatusCode))
+		return
+	}
+
+	var body struct {
+		Dados []any `json:"dados"`
+		Links []any `json:"links"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta da Câmara: "+err.Error())
+		return
+	}
+
+	dados := body.Dados
+	if dados == nil {
+		dados = []any{}
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "camara_comissoes",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"comissoes": dados, "total": len(dados)},
+	})
+}
+
 // GetMateriasSenado handles GET /v1/legislativo/senado/materias.
 // Optional query params: ano (default: current year), sigla, pagina (default "1").
 func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Request) {

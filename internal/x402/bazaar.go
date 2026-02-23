@@ -68,6 +68,11 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/legislativo/senado/materias":      {"Matérias legislativas do Senado Federal", "application/json"},
 	// Phase 7: cartões do governo
 	"/v1/transparencia/cartoes": {"Gastos com cartões corporativos do governo federal (CGU)", "application/json"},
+	// Phase 8: BCB SGS indicadores, Câmara eventos/comissões, IPEAData
+	"/v1/bcb/indicadores/{serie}":  {"Séries históricas do BCB SGS (CDI, IGP-M, Dólar, Desemprego, etc.)", "application/json"},
+	"/v1/legislativo/eventos":      {"Eventos e reuniões legislativas na Câmara dos Deputados", "application/json"},
+	"/v1/legislativo/comissoes":    {"Comissões permanentes da Câmara dos Deputados", "application/json"},
+	"/v1/ipea/serie/{codigo}":      {"Séries históricas do IPEAData (dados econômicos e sociais)", "application/json"},
 	// Phase 6: new endpoints
 	"/v1/endereco/{cep}":                        {"Endereço completo por CEP (ViaCEP)", "application/json"},
 	"/v1/empresas/{cnpj}/simples":               {"Situação no Simples Nacional e MEI por CNPJ", "application/json"},

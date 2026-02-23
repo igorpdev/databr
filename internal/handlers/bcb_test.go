@@ -14,6 +14,35 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// bcbSGSRedirectTransport rewrites BCB SGS API requests to point at the test server.
+type bcbSGSRedirectTransport struct {
+	base string
+}
+
+func (t *bcbSGSRedirectTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req2 := req.Clone(req.Context())
+	req2.URL.Scheme = "http"
+	req2.URL.Host = t.base[len("http://"):]
+	return http.DefaultTransport.RoundTrip(req2)
+}
+
+// mockBCBSGS starts a test server returning the given body/status and returns a
+// BCBHandler whose HTTP client redirects all BCB SGS calls to that server.
+func mockBCBSGS(t *testing.T, statusCode int, body string) (*handlers.BCBHandler, *httptest.Server) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		w.Write([]byte(body))
+	}))
+	client := &http.Client{
+		Transport: &bcbSGSRedirectTransport{base: srv.URL},
+	}
+	store := &stubBCBStore{}
+	h := handlers.NewBCBHandlerWithClient(store, client)
+	return h, srv
+}
+
 type stubBCBStore struct {
 	records []domain.SourceRecord
 	err     error
@@ -267,6 +296,98 @@ func TestBCBHandler_GetTaxasCredito_Empty(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 when no data, got %d", rec.Code)
+	}
+}
+
+// --- GetIndicadores tests ---
+
+func newIndicadoresRouter(h *handlers.BCBHandler) http.Handler {
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/indicadores/{serie}", h.GetIndicadores)
+	return r
+}
+
+func TestGetIndicadores_ByName(t *testing.T) {
+	body := `[{"data":"21/02/2026","valor":"0.0551"}]`
+	h, srv := mockBCBSGS(t, http.StatusOK, body)
+	defer srv.Close()
+
+	router := newIndicadoresRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/indicadores/cdi", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Source != "bcb_sgs" {
+		t.Errorf("Source = %q, want bcb_sgs", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+	if resp.Data == nil {
+		t.Fatal("Data must not be nil")
+	}
+	valores, ok := resp.Data["valores"].([]any)
+	if !ok {
+		t.Fatalf("Data[valores] is not a slice, got %T", resp.Data["valores"])
+	}
+	if len(valores) != 1 {
+		t.Errorf("expected 1 valor, got %d", len(valores))
+	}
+	if resp.Data["codigo"] == nil {
+		t.Error("Data[codigo] must be set")
+	}
+}
+
+func TestGetIndicadores_ByCode(t *testing.T) {
+	body := `[{"data":"21/02/2026","valor":"0.0551"}]`
+	h, srv := mockBCBSGS(t, http.StatusOK, body)
+	defer srv.Close()
+
+	router := newIndicadoresRouter(h)
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/indicadores/12", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Source != "bcb_sgs" {
+		t.Errorf("Source = %q, want bcb_sgs", resp.Source)
+	}
+	if resp.Data == nil {
+		t.Fatal("Data must not be nil")
+	}
+	// Numeric code should produce a generic name
+	serie, _ := resp.Data["serie"].(string)
+	if serie == "" {
+		t.Error("Data[serie] must be a non-empty string")
+	}
+}
+
+func TestGetIndicadores_InvalidSerie(t *testing.T) {
+	store := &stubBCBStore{}
+	h := handlers.NewBCBHandler(store)
+	router := newIndicadoresRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/indicadores/xyz", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid serie, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 
