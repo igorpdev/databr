@@ -1,13 +1,30 @@
 package x402
 
 import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
-	x402sdk "github.com/mark3labs/x402-go"
-	x402http "github.com/mark3labs/x402-go/http"
-	cdpcoinbase "github.com/mark3labs/x402-go/signers/coinbase"
+	x402types "github.com/coinbase/x402/go/types"
+	fachttp "github.com/coinbase/x402/go/http"
 )
+
+// USDC contract addresses per CAIP-2 network identifier.
+var usdcAssets = map[string]string{
+	"eip155:8453":  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Base mainnet
+	"eip155:84532": "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia
+}
 
 // MiddlewareConfig holds configuration for the x402 payment middleware.
 type MiddlewareConfig struct {
@@ -15,11 +32,11 @@ type MiddlewareConfig struct {
 	WalletAddress string
 
 	// FacilitatorURL is the x402 facilitator endpoint.
-	// Testnet: https://facilitator.x402.rs
+	// Testnet: https://x402.org/facilitator
 	// Mainnet: https://api.cdp.coinbase.com/platform/v2/x402
 	FacilitatorURL string
 
-	// Network is the blockchain network name: "base-sepolia" or "base".
+	// Network is the CAIP-2 chain identifier: "eip155:8453" (mainnet) or "eip155:84532" (testnet).
 	Network string
 
 	// CDPKeyID is the Coinbase Developer Platform API key ID (UUID from the portal).
@@ -35,61 +52,143 @@ type MiddlewareConfig struct {
 // for the given fixed USDC price (e.g. "0.001").
 // Use separate middleware instances per price tier, applied to route groups.
 func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handler) http.Handler {
-	chainConfig := resolveChain(cfg.Network)
+	asset := usdcAssets[cfg.Network]
+	if asset == "" {
+		asset = usdcAssets["eip155:84532"] // default testnet
+	}
 
-	requirement, err := x402sdk.NewUSDCPaymentRequirement(x402sdk.USDCRequirementConfig{
-		Chain:             chainConfig,
-		Amount:            priceUSDC,
-		RecipientAddress:  cfg.WalletAddress,
-		Description:       "DataBR — dados públicos brasileiros",
+	baseReq := x402types.PaymentRequirements{
+		Scheme:            "exact",
+		Network:           cfg.Network,
+		Asset:             asset,
+		Amount:            USDCToAtomicUnits(priceUSDC),
+		PayTo:             cfg.WalletAddress,
 		MaxTimeoutSeconds: 300,
-	})
-	if err != nil {
-		// This only fails if parameters are malformed (e.g. empty wallet address).
-		// In production this would panic at startup, which is intentional.
-		panic("x402: invalid payment requirement config: " + err.Error())
 	}
 
-	// Attach OutputSchema so the CDP facilitator indexes this endpoint
-	// in the Bazaar discovery layer. The Description and MimeType on the
-	// PaymentRequirement are per-tier (generic), while the BazaarMiddleware
-	// overrides them per-route in the 402 JSON response for clients.
-	requirement.OutputSchema = &x402sdk.OutputSchema{
-		Input: x402sdk.InputSchema{
-			Type:   "http",
-			Method: "GET",
-		},
-		Output: map[string]x402sdk.FieldDef{
-			"type": {Type: "object"},
-		},
+	facURL := cfg.FacilitatorURL
+	if facURL == "" {
+		facURL = "https://x402.org/facilitator"
 	}
 
-	httpCfg := &x402http.Config{
-		FacilitatorURL:      cfg.FacilitatorURL,
-		PaymentRequirements: []x402sdk.PaymentRequirement{requirement},
-		VerifyOnly:          false,
-	}
-
-	// Wire CDP JWT authentication for the mainnet facilitator when credentials are present.
-	// The CDP facilitator requires a short-lived Bearer JWT signed with the EC/Ed25519 key;
-	// the AuthorizationProvider is called per-request so tokens are always fresh.
+	var authProvider fachttp.AuthProvider
 	if cfg.CDPKeyID != "" && cfg.CDPKeySecret != "" {
-		cdpAuth, err := cdpcoinbase.NewCDPAuth(cfg.CDPKeyID, cfg.CDPKeySecret, "")
+		auth, err := newCDPAuthProvider(cfg.CDPKeyID, cfg.CDPKeySecret, facURL)
 		if err != nil {
 			panic("x402: invalid CDP credentials: " + err.Error())
 		}
-		httpCfg.FacilitatorAuthorizationProvider = func(r *http.Request) string {
-			token, err := cdpAuth.GenerateBearerToken(r.Method, r.URL.Path)
-			if err != nil {
-				log.Printf("x402: CDP JWT generation failed: %v", err)
-				return ""
-			}
-			return "Bearer " + token
-		}
+		authProvider = auth
 		log.Printf("x402: CDP mainnet facilitator auth enabled (key=%s…)", cfg.CDPKeyID[:8])
 	}
 
-	return x402http.NewX402Middleware(httpCfg)
+	facClient := fachttp.NewHTTPFacilitatorClient(&fachttp.FacilitatorConfig{
+		URL:          facURL,
+		AuthProvider: authProvider,
+		Timeout:      30 * time.Second,
+	})
+
+	reqBytes, _ := json.Marshal(baseReq)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			payloadBytes := extractPaymentHeader(r)
+			if payloadBytes == nil {
+				write402Response(w, r, baseReq)
+				return
+			}
+
+			verifyResp, err := facClient.Verify(r.Context(), payloadBytes, reqBytes)
+			if err != nil {
+				log.Printf("x402: verify error: %v", err)
+				http.Error(w, `{"error":"payment verification failed"}`, http.StatusBadGateway)
+				return
+			}
+			if !verifyResp.IsValid {
+				log.Printf("x402: payment invalid: %s", verifyResp.InvalidReason)
+				write402Response(w, r, baseReq)
+				return
+			}
+
+			settleResp, err := facClient.Settle(r.Context(), payloadBytes, reqBytes)
+			if err != nil {
+				log.Printf("x402: settle error: %v", err)
+				http.Error(w, `{"error":"payment settlement failed"}`, http.StatusBadGateway)
+				return
+			}
+
+			if settleResp.Success {
+				respJSON, _ := json.Marshal(settleResp)
+				w.Header().Set("X-PAYMENT-RESPONSE", string(respJSON))
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// extractPaymentHeader reads the payment proof from the request.
+// Supports both V2 (Payment-Signature, base64) and V1 (X-Payment, raw JSON).
+func extractPaymentHeader(r *http.Request) []byte {
+	// V2: Payment-Signature header (base64-encoded JSON)
+	if sig := r.Header.Get("Payment-Signature"); sig != "" {
+		if decoded, err := base64.StdEncoding.DecodeString(sig); err == nil {
+			return decoded
+		}
+		if decoded, err := base64.RawStdEncoding.DecodeString(sig); err == nil {
+			return decoded
+		}
+	}
+	// V1: X-Payment header (raw JSON)
+	if payment := r.Header.Get("X-Payment"); payment != "" {
+		return []byte(payment)
+	}
+	return nil
+}
+
+// write402Response writes a V2 PaymentRequired JSON response with Bazaar discovery extension.
+func write402Response(w http.ResponseWriter, r *http.Request, req x402types.PaymentRequirements) {
+	scheme := "https"
+	if r.TLS == nil {
+		scheme = "http"
+	}
+	resourceURL := scheme + "://" + r.Host + r.URL.Path
+
+	meta, ok := matchRouteMeta(r.URL.Path)
+	if !ok {
+		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
+	}
+
+	method := "GET"
+	if r.Method == http.MethodPost {
+		method = "POST"
+	}
+
+	resp := x402types.PaymentRequired{
+		X402Version: 2,
+		Resource: &x402types.ResourceInfo{
+			URL:         resourceURL,
+			Description: meta.description,
+			MimeType:    meta.mimeType,
+		},
+		Accepts: []x402types.PaymentRequirements{req},
+		Extensions: map[string]interface{}{
+			"bazaar": map[string]interface{}{
+				"input": map[string]interface{}{
+					"type":   "http",
+					"method": method,
+				},
+				"output": map[string]interface{}{
+					"type":   "json",
+					"format": meta.mimeType,
+				},
+			},
+		},
+	}
+
+	body, _ := json.Marshal(resp)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusPaymentRequired)
+	w.Write(body) //nolint:errcheck
 }
 
 // HealthBypassMiddleware wraps another middleware and skips x402 for public paths
@@ -106,18 +205,154 @@ func HealthBypassMiddleware(paymentMiddleware func(http.Handler) http.Handler) f
 	}
 }
 
-// resolveChain maps a network name string to the x402-go ChainConfig.
-func resolveChain(network string) x402sdk.ChainConfig {
-	switch network {
-	case "base":
-		return x402sdk.BaseMainnet
-	case "base-sepolia":
-		return x402sdk.BaseSepolia
-	case "polygon":
-		return x402sdk.PolygonMainnet
-	case "polygon-amoy":
-		return x402sdk.PolygonAmoy
-	default:
-		return x402sdk.BaseSepolia // safe default for tests and development
+// ---- CDP JWT Authentication ----
+
+// cdpAuthProvider implements fachttp.AuthProvider for Coinbase Developer Platform JWT auth.
+type cdpAuthProvider struct {
+	keyID       string
+	privateKey  interface{} // *ecdsa.PrivateKey or ed25519.PrivateKey
+	algorithm   string      // "ES256" or "EdDSA"
+	facHost     string      // e.g. "api.cdp.coinbase.com"
+	facBasePath string      // e.g. "/platform/v2/x402"
+}
+
+func newCDPAuthProvider(keyID, keySecretB64, facilitatorURL string) (*cdpAuthProvider, error) {
+	keyBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(keySecretB64))
+	if err != nil {
+		keyBytes, err = base64.URLEncoding.DecodeString(strings.TrimSpace(keySecretB64))
+		if err != nil {
+			return nil, fmt.Errorf("invalid base64 key: %w", err)
+		}
 	}
+
+	var privateKey interface{}
+	var algorithm string
+
+	switch {
+	case len(keyBytes) == ed25519.PrivateKeySize: // 64-byte raw Ed25519
+		privateKey = ed25519.PrivateKey(keyBytes)
+		algorithm = "EdDSA"
+	case len(keyBytes) == ed25519.SeedSize: // 32-byte Ed25519 seed
+		privateKey = ed25519.NewKeyFromSeed(keyBytes)
+		algorithm = "EdDSA"
+	default:
+		// Try PKCS8
+		if key, pkErr := x509.ParsePKCS8PrivateKey(keyBytes); pkErr == nil {
+			switch k := key.(type) {
+			case *ecdsa.PrivateKey:
+				privateKey = k
+				algorithm = "ES256"
+			case ed25519.PrivateKey:
+				privateKey = k
+				algorithm = "EdDSA"
+			}
+		}
+		// Try SEC1/EC
+		if privateKey == nil {
+			if key, ecErr := x509.ParseECPrivateKey(keyBytes); ecErr == nil {
+				privateKey = key
+				algorithm = "ES256"
+			}
+		}
+	}
+
+	if privateKey == nil {
+		return nil, fmt.Errorf("unsupported key format (tried Ed25519, PKCS8, SEC1)")
+	}
+
+	u, err := url.Parse(facilitatorURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid facilitator URL: %w", err)
+	}
+
+	return &cdpAuthProvider{
+		keyID:       keyID,
+		privateKey:  privateKey,
+		algorithm:   algorithm,
+		facHost:     u.Host,
+		facBasePath: strings.TrimRight(u.Path, "/"),
+	}, nil
+}
+
+// GetAuthHeaders generates fresh CDP JWT tokens for each facilitator endpoint.
+func (a *cdpAuthProvider) GetAuthHeaders(_ context.Context) (fachttp.AuthHeaders, error) {
+	verifyToken, err := a.generateJWT("POST", a.facBasePath+"/verify")
+	if err != nil {
+		return fachttp.AuthHeaders{}, fmt.Errorf("verify JWT: %w", err)
+	}
+	settleToken, err := a.generateJWT("POST", a.facBasePath+"/settle")
+	if err != nil {
+		return fachttp.AuthHeaders{}, fmt.Errorf("settle JWT: %w", err)
+	}
+	supportedToken, err := a.generateJWT("GET", a.facBasePath+"/supported")
+	if err != nil {
+		return fachttp.AuthHeaders{}, fmt.Errorf("supported JWT: %w", err)
+	}
+
+	return fachttp.AuthHeaders{
+		Verify:    map[string]string{"Authorization": "Bearer " + verifyToken},
+		Settle:    map[string]string{"Authorization": "Bearer " + settleToken},
+		Supported: map[string]string{"Authorization": "Bearer " + supportedToken},
+	}, nil
+}
+
+// generateJWT creates a short-lived CDP JWT for the given HTTP method and path.
+// Format matches Coinbase Developer Platform API auth specification.
+func (a *cdpAuthProvider) generateJWT(method, path string) (string, error) {
+	now := time.Now()
+
+	// Nonce: 8 random bytes as hex (16 chars)
+	nonceBytes := make([]byte, 8)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return "", err
+	}
+	nonce := fmt.Sprintf("%x", nonceBytes)
+
+	header := map[string]interface{}{
+		"alg":   a.algorithm,
+		"typ":   "JWT",
+		"kid":   a.keyID,
+		"nonce": nonce,
+	}
+
+	uri := method + " " + a.facHost + path
+	claims := map[string]interface{}{
+		"sub":  a.keyID,
+		"iss":  "cdp",
+		"aud":  []string{"cdp_service"},
+		"nbf":  now.Unix(),
+		"exp":  now.Add(120 * time.Second).Unix(),
+		"uris": []string{uri},
+	}
+
+	headerJSON, _ := json.Marshal(header)
+	claimsJSON, _ := json.Marshal(claims)
+
+	headerB64 := base64.RawURLEncoding.EncodeToString(headerJSON)
+	claimsB64 := base64.RawURLEncoding.EncodeToString(claimsJSON)
+
+	signingInput := headerB64 + "." + claimsB64
+
+	var sigBytes []byte
+	switch key := a.privateKey.(type) {
+	case *ecdsa.PrivateKey:
+		hash := sha256.Sum256([]byte(signingInput))
+		r, s, err := ecdsa.Sign(rand.Reader, key, hash[:])
+		if err != nil {
+			return "", err
+		}
+		byteLen := (key.Curve.Params().BitSize + 7) / 8
+		sigBytes = make([]byte, 2*byteLen)
+		rBytes := r.Bytes()
+		sBytes := s.Bytes()
+		copy(sigBytes[byteLen-len(rBytes):byteLen], rBytes)
+		copy(sigBytes[2*byteLen-len(sBytes):2*byteLen], sBytes)
+	case ed25519.PrivateKey:
+		sigBytes = ed25519.Sign(key, []byte(signingInput))
+	default:
+		return "", fmt.Errorf("unsupported key type: %T", key)
+	}
+
+	sigB64 := base64.RawURLEncoding.EncodeToString(sigBytes)
+	return signingInput + "." + sigB64, nil
 }

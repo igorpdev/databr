@@ -10,19 +10,20 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// sample402Body simulates a real 402 response from the x402 middleware with
-// at least one accepts entry so the BazaarMiddleware can inject fields into it.
-const sample402Body = `{"x402Version":1,"accepts":[{"scheme":"exact","network":"base","asset":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","maxAmountRequired":"1000","payTo":"0xABC"}]}`
+// TestV2Response_KnownRoute verifies that a 402 response for a known route
+// includes proper V2 format with bazaar extension and resource metadata.
+func TestV2Response_KnownRoute(t *testing.T) {
+	fac := mockFacilitator(t, true)
+	defer fac.Close()
 
-// TestBazaarMiddleware_InjectsIntoAccepts verifies that a 402 response gets
-// discovery fields injected into each accepts item.
-func TestBazaarMiddleware_InjectsIntoAccepts(t *testing.T) {
 	r := chi.NewRouter()
-	r.Use(x402.BazaarMiddleware())
+	r.Use(x402.NewPricedMiddleware(x402.MiddlewareConfig{
+		WalletAddress:  "0xWALLET",
+		FacilitatorURL: fac.URL,
+		Network:        "eip155:84532",
+	}, "0.001"))
 	r.Get("/v1/bcb/selic", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusPaymentRequired)
-		w.Write([]byte(sample402Body)) //nolint:errcheck
+		w.WriteHeader(http.StatusOK)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
@@ -38,79 +39,77 @@ func TestBazaarMiddleware_InjectsIntoAccepts(t *testing.T) {
 		t.Fatalf("response body is not valid JSON: %v\nbody: %s", err, rr.Body.String())
 	}
 
+	// V2 format: x402Version = 2
+	if body["x402Version"] != float64(2) {
+		t.Errorf("x402Version: want 2, got %v", body["x402Version"])
+	}
+
+	// Resource metadata
+	resource, ok := body["resource"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected resource object, got %v", body["resource"])
+	}
+	if resource["description"] != "Taxa Selic do Banco Central" {
+		t.Errorf("resource.description: want 'Taxa Selic do Banco Central', got %v", resource["description"])
+	}
+	if resource["mimeType"] != "application/json" {
+		t.Errorf("resource.mimeType: want application/json, got %v", resource["mimeType"])
+	}
+
+	// Accepts array with payment requirements
 	accepts, ok := body["accepts"].([]interface{})
 	if !ok || len(accepts) == 0 {
 		t.Fatalf("expected non-empty accepts array, body: %s", rr.Body.String())
 	}
-
 	item := accepts[0].(map[string]interface{})
+	if item["scheme"] != "exact" {
+		t.Errorf("accepts[0].scheme: want exact, got %v", item["scheme"])
+	}
+	if item["network"] != "eip155:84532" {
+		t.Errorf("accepts[0].network: want eip155:84532, got %v", item["network"])
+	}
 
-	if item["description"] != "Taxa Selic do Banco Central" {
-		t.Errorf("description: want 'Taxa Selic do Banco Central', got %v", item["description"])
-	}
-	if item["mimeType"] != "application/json" {
-		t.Errorf("mimeType: want application/json, got %v", item["mimeType"])
-	}
-
-	// discoverable and method live inside outputSchema.input
-	schema, ok := item["outputSchema"].(map[string]interface{})
+	// Bazaar discovery extension
+	extensions, ok := body["extensions"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("expected outputSchema, got %v", item["outputSchema"])
+		t.Fatalf("expected extensions object, got %v", body["extensions"])
 	}
-	input, ok := schema["input"].(map[string]interface{})
+	bazaar, ok := extensions["bazaar"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("expected outputSchema.input, got %v", schema["input"])
+		t.Fatalf("expected extensions.bazaar object, got %v", extensions["bazaar"])
 	}
-	if input["discoverable"] != true {
-		t.Errorf("discoverable: want true, got %v", input["discoverable"])
+	input, ok := bazaar["input"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected bazaar.input, got %v", bazaar["input"])
+	}
+	if input["type"] != "http" {
+		t.Errorf("bazaar.input.type: want http, got %v", input["type"])
 	}
 	if input["method"] != "GET" {
-		t.Errorf("method: want GET, got %v", input["method"])
+		t.Errorf("bazaar.input.method: want GET, got %v", input["method"])
 	}
-
-	// Original 402 fields must still be present.
-	if body["x402Version"] == nil {
-		t.Error("original x402Version field was lost after injection")
+	output, ok := bazaar["output"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected bazaar.output, got %v", bazaar["output"])
 	}
-	if item["scheme"] != "exact" {
-		t.Error("original accepts fields were lost")
-	}
-}
-
-// TestBazaarMiddleware_PassesThrough200 verifies that successful responses are
-// not modified.
-func TestBazaarMiddleware_PassesThrough200(t *testing.T) {
-	r := chi.NewRouter()
-	r.Use(x402.BazaarMiddleware())
-	r.Get("/v1/bcb/selic", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"data":"ok"}`)) //nolint:errcheck
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
-	rr := httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rr.Code)
-	}
-
-	// 200 body should be untouched
-	if rr.Body.String() != `{"data":"ok"}` {
-		t.Errorf("200 body was modified: %s", rr.Body.String())
+	if output["format"] != "application/json" {
+		t.Errorf("bazaar.output.format: want application/json, got %v", output["format"])
 	}
 }
 
-// TestBazaarMiddleware_UnknownRoute uses a fallback description when the route
-// pattern is not in the routeMeta table.
-func TestBazaarMiddleware_UnknownRoute(t *testing.T) {
+// TestV2Response_UnknownRoute uses a fallback description for routes not in routeMeta.
+func TestV2Response_UnknownRoute(t *testing.T) {
+	fac := mockFacilitator(t, true)
+	defer fac.Close()
+
 	r := chi.NewRouter()
-	r.Use(x402.BazaarMiddleware())
+	r.Use(x402.NewPricedMiddleware(x402.MiddlewareConfig{
+		WalletAddress:  "0xWALLET",
+		FacilitatorURL: fac.URL,
+		Network:        "eip155:84532",
+	}, "0.001"))
 	r.Get("/v1/unknown/route", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusPaymentRequired)
-		w.Write([]byte(sample402Body)) //nolint:errcheck
+		w.WriteHeader(http.StatusOK)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/unknown/route", nil)
@@ -126,16 +125,24 @@ func TestBazaarMiddleware_UnknownRoute(t *testing.T) {
 		t.Fatalf("response body is not valid JSON: %v", err)
 	}
 
-	accepts := body["accepts"].([]interface{})
-	item := accepts[0].(map[string]interface{})
-
-	// Fallback description
-	if item["description"] != "DataBR — dados públicos brasileiros" {
-		t.Errorf("expected fallback description, got %v", item["description"])
+	resource := body["resource"].(map[string]interface{})
+	if resource["description"] != "DataBR — dados públicos brasileiros" {
+		t.Errorf("expected fallback description, got %v", resource["description"])
 	}
-	schema := item["outputSchema"].(map[string]interface{})
-	input := schema["input"].(map[string]interface{})
-	if input["discoverable"] != true {
-		t.Error("unknown route should still be discoverable")
+
+	// Bazaar extension should still be present
+	extensions := body["extensions"].(map[string]interface{})
+	if _, ok := extensions["bazaar"]; !ok {
+		t.Error("unknown route should still have bazaar extension")
+	}
+}
+
+// TestRouteMeta_Coverage verifies that all pricing table routes have metadata.
+func TestRouteMeta_Coverage(t *testing.T) {
+	for _, pattern := range x402.AllRoutePatterns() {
+		desc, _ := x402.RouteMeta(pattern)
+		if desc == "DataBR — dados públicos brasileiros" {
+			t.Errorf("route %q uses fallback description — add it to routeMeta", pattern)
+		}
 	}
 }

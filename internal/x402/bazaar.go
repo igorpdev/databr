@@ -1,13 +1,6 @@
 package x402
 
-import (
-	"bytes"
-	"encoding/json"
-	"net/http"
-	"strconv"
-
-	"github.com/go-chi/chi/v5"
-)
+import "strings"
 
 // routeMetaEntry holds human-readable metadata for a single API endpoint.
 type routeMetaEntry struct {
@@ -147,110 +140,53 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/mercado-trabalho/{uf}/analise":         {"Análise do mercado de trabalho por UF (emprego + setores + tendência)", "application/json"},
 	"/v1/setor/{cnae}/regulacao":                {"Panorama regulatório por setor CNAE (agências + compliance + legislação)", "application/json"},
 	"/v1/ambiental/empresa/{cnpj}/esg":          {"Score ESG de empresa (ambiental + social + governança)", "application/json"},
+	// TCU + Orçamento
+	"/v1/tcu/acordaos":                          {"Acórdãos do Tribunal de Contas da União", "application/json"},
+	"/v1/tcu/certidao/{cnpj}":                   {"Certidão de licitante do TCU por CNPJ", "application/json"},
+	"/v1/tcu/inabilitados":                      {"Responsáveis inabilitados pelo TCU", "application/json"},
+	"/v1/tcu/inabilitados/{cpf}":                {"Responsável inabilitado por CPF (TCU)", "application/json"},
+	"/v1/tcu/contratos":                         {"Contratos fiscalizados pelo TCU", "application/json"},
+	"/v1/orcamento/despesas":                    {"Despesas da execução orçamentária federal (SIAFI via CGU)", "application/json"},
+	"/v1/orcamento/funcional-programatica":      {"Execução orçamentária funcional-programática", "application/json"},
+	"/v1/orcamento/documento/{codigo}":          {"Documento orçamentário por código", "application/json"},
+	"/v1/orcamento/documentos":                  {"Documentos orçamentários por período", "application/json"},
+	"/v1/orcamento/favorecidos":                 {"Favorecidos da execução orçamentária federal", "application/json"},
 }
 
-// BazaarMiddleware intercepts HTTP 402 responses and injects an `extensions.bazaar`
-// field into the JSON body, making the endpoint discoverable by the x402 Bazaar index.
-//
-// Register BEFORE the x402 payment middleware in the Chi middleware chain so that
-// this wrapper sees the 402 emitted by the payment gate:
-//
-//	r.Use(x402pkg.BazaarMiddleware())
-//	r.Use(optionalX402(cfg, "0.001"))
-func BazaarMiddleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			bw := &bazaarWriter{ResponseWriter: w}
-			next.ServeHTTP(bw, r)
+// RouteMeta returns the description and mimeType for a route pattern, with a fallback.
+func RouteMeta(pattern string) (description, mimeType string) {
+	if m, ok := routeMeta[pattern]; ok {
+		return m.description, m.mimeType
+	}
+	return "DataBR — dados públicos brasileiros", "application/json"
+}
 
-			var pattern string
-			if rc := chi.RouteContext(r.Context()); rc != nil {
-				pattern = rc.RoutePattern()
+// matchRouteMeta finds the routeMetaEntry for a concrete URL path by matching
+// against parameterized patterns (e.g. /v1/bcb/cambio/USD matches /v1/bcb/cambio/{moeda}).
+func matchRouteMeta(path string) (routeMetaEntry, bool) {
+	// Fast path: exact match (non-parameterized routes like /v1/bcb/selic).
+	if m, ok := routeMeta[path]; ok {
+		return m, true
+	}
+	pathParts := strings.Split(path, "/")
+	for pattern, meta := range routeMeta {
+		patParts := strings.Split(pattern, "/")
+		if len(patParts) != len(pathParts) {
+			continue
+		}
+		match := true
+		for i, pp := range patParts {
+			if strings.HasPrefix(pp, "{") && strings.HasSuffix(pp, "}") {
+				continue // wildcard segment
 			}
-			bw.finalize(pattern)
-		})
-	}
-}
-
-// bazaarWriter wraps http.ResponseWriter to buffer 402 responses for extension injection.
-// Non-402 responses are written through immediately without buffering.
-type bazaarWriter struct {
-	http.ResponseWriter
-	status int
-	buf    bytes.Buffer
-}
-
-// WriteHeader delays writing 402 status so we can modify the body first.
-// All other status codes pass through immediately.
-func (bw *bazaarWriter) WriteHeader(code int) {
-	bw.status = code
-	if code != http.StatusPaymentRequired {
-		bw.ResponseWriter.WriteHeader(code)
-	}
-}
-
-// Write buffers the body when a 402 has been signalled; otherwise passes through.
-func (bw *bazaarWriter) Write(b []byte) (int, error) {
-	if bw.status == http.StatusPaymentRequired {
-		return bw.buf.Write(b)
-	}
-	return bw.ResponseWriter.Write(b)
-}
-
-// finalize writes the (possibly modified) buffered response.
-// For 402 responses it injects the bazaar discovery extension into the JSON body.
-// For all other responses it is a no-op (already written through).
-func (bw *bazaarWriter) finalize(pattern string) {
-	if bw.status != http.StatusPaymentRequired {
-		return
-	}
-
-	var body map[string]interface{}
-	if err := json.Unmarshal(bw.buf.Bytes(), &body); err != nil {
-		// Body is not valid JSON — write original response unchanged.
-		bw.ResponseWriter.WriteHeader(http.StatusPaymentRequired)
-		bw.ResponseWriter.Write(bw.buf.Bytes()) //nolint:errcheck
-		return
-	}
-
-	meta, ok := routeMeta[pattern]
-	if !ok {
-		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
-	}
-
-	// Inject discovery fields into each accepts item matching the format
-	// expected by the CDP facilitator's Bazaar index. The facilitator reads
-	// description and mimeType directly from the accepts entry, and reads
-	// discoverable/method from outputSchema.input (matching the official
-	// @coinbase/x402 extensions/bazaar format).
-	if accepts, ok := body["accepts"].([]interface{}); ok {
-		for i, item := range accepts {
-			if m, ok := item.(map[string]interface{}); ok {
-				m["description"] = meta.description
-				m["mimeType"] = meta.mimeType
-				m["outputSchema"] = map[string]interface{}{
-					"input": map[string]interface{}{
-						"discoverable": true,
-						"method":       "GET",
-						"type":         "http",
-					},
-					"output": map[string]interface{}{
-						"type": "object",
-					},
-				}
-				accepts[i] = m
+			if pp != pathParts[i] {
+				match = false
+				break
 			}
 		}
+		if match {
+			return meta, true
+		}
 	}
-
-	modified, err := json.Marshal(body)
-	if err != nil {
-		bw.ResponseWriter.WriteHeader(http.StatusPaymentRequired)
-		bw.ResponseWriter.Write(bw.buf.Bytes()) //nolint:errcheck
-		return
-	}
-
-	bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(modified)))
-	bw.ResponseWriter.WriteHeader(http.StatusPaymentRequired)
-	bw.ResponseWriter.Write(modified) //nolint:errcheck
+	return routeMetaEntry{}, false
 }

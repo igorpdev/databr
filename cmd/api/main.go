@@ -321,7 +321,6 @@ func main() {
 		// $0.001 — company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.001"))
 			r.Get("/empresas/{cnpj}", empHandler.GetEmpresa)
 			r.Get("/empresas/{cnpj}/socios", empHandler.GetSocios)
@@ -430,7 +429,6 @@ func main() {
 		// $0.002 — B3 stock quotes, CVM fatos relevantes, INPE deforestation data, budget documents
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.002"))
 			r.Get("/orcamento/documentos", orcamentoHandler.GetDocumentos)
 			r.Get("/orcamento/favorecidos", orcamentoHandler.GetFavorecidos)
@@ -454,7 +452,6 @@ func main() {
 		// $0.003 — compliance via empresa sub-route, DOU/diários search, premium cross-references
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
 			r.Get("/dou/busca", douHandler.GetBusca)
@@ -476,7 +473,6 @@ func main() {
 		// $0.005 — full compliance check, CVM fund data, fund analysis, credit score
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
 			if mercHandler != nil {
@@ -493,7 +489,6 @@ func main() {
 		// $0.010 — judicial process search, economic panorama, labor market
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
 			if panoramaHandler != nil {
@@ -507,7 +502,6 @@ func main() {
 		// $0.015 — perfil completo, sector regulation
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.015"))
 			if perfilCompletoHandler != nil {
 				r.Get("/empresas/{cnpj}/perfil-completo", perfilCompletoHandler.GetPerfilCompleto)
@@ -520,7 +514,6 @@ func main() {
 		// $0.020 — competition analysis, ESG scoring, litigation risk
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.020"))
 			if competicaoHandler != nil {
 				r.Get("/mercado/{cnae}/competicao", competicaoHandler.GetCompeticao)
@@ -536,7 +529,6 @@ func main() {
 		// $0.030 — influence network
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.030"))
 			if redeInfluenciaHandler != nil {
 				r.Get("/rede/{cnpj}/influencia", redeInfluenciaHandler.GetRedeInfluencia)
@@ -546,7 +538,6 @@ func main() {
 		// $0.050 — due diligence
 		r.Group(func(r chi.Router) {
 			r.Use(cache.NewCacheMiddleware(cacher, 1*time.Hour))
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.050"))
 			if dueDiligenceHandler != nil {
 				r.Get("/empresas/{cnpj}/duediligence", dueDiligenceHandler.GetDueDiligence)
@@ -555,7 +546,6 @@ func main() {
 
 		// $0.100 — portfolio risk (batch, POST — no cache)
 		r.Group(func(r chi.Router) {
-			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.100"))
 			if carteiraRiscoHandler != nil {
 				r.Post("/carteira/risco", carteiraRiscoHandler.PostCarteiraRisco)
@@ -565,7 +555,6 @@ func main() {
 
 	// MCP server (SSE transport) — protected by x402
 	r.Group(func(r chi.Router) {
-		r.Use(x402pkg.BazaarMiddleware())
 		r.Use(optionalX402(x402Cfg, "0.001"))
 		r.Mount("/mcp", sseServer)
 	})
@@ -615,16 +604,18 @@ func serverPort() string {
 	return "8080"
 }
 
-// networkName converts an EIP-155 chain ID string or short name to the x402-go network name.
-// Accepts both "base" / "base-sepolia" directly and EIP-155 IDs like "eip155:8453".
-// Defaults to base-sepolia (testnet) when no network is configured.
+// networkName converts a short name or EIP-155 chain ID to CAIP-2 format.
+// Accepts "base", "base-sepolia", "eip155:8453", "eip155:84532".
+// Defaults to "eip155:84532" (Base Sepolia testnet) when no network is configured.
 func networkName(eipNetwork string) string {
 	switch {
+	case eipNetwork == "eip155:8453":
+		return "eip155:8453"
 	case eipNetwork == "base",
 		strings.Contains(eipNetwork, "8453") && !strings.Contains(eipNetwork, "84532"):
-		return "base"
+		return "eip155:8453"
 	default:
-		return "base-sepolia"
+		return "eip155:84532"
 	}
 }
 

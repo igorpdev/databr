@@ -1,5 +1,6 @@
 // Package x402 provides payment middleware and pricing for the DataBR API.
-// It wraps the mark3labs/x402-go library with per-route dynamic pricing.
+// It uses the official Coinbase x402 SDK for facilitator communication and
+// V2 payment types with Bazaar discovery extensions.
 package x402
 
 import (
