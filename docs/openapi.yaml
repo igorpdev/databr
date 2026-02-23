@@ -2205,9 +2205,11 @@ paths:
             example: 2025
         - name: orgao
           in: query
-          description: "Código SIAFI do órgão (ex: 26000 para MEC)"
+          required: true
+          description: "Código SIAFI do órgão superior (ex: 26000 para MEC)"
           schema:
             type: string
+            example: "26000"
         - name: pagina
           in: query
           description: Número da página
@@ -2225,7 +2227,7 @@ paths:
         "402":
           $ref: "#/components/responses/PaymentRequired"
         "400":
-          description: Parâmetro 'ano' ausente
+          description: Parâmetro 'ano' ou 'orgao' ausente
 
   /v1/orcamento/funcional-programatica:
     get:
@@ -2240,6 +2242,11 @@ paths:
           schema:
             type: integer
             example: 2025
+        - name: funcao
+          in: query
+          description: "Código da função (ex: 12 para Educação)"
+          schema:
+            type: string
         - name: pagina
           in: query
           description: Número da página

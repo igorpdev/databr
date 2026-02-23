@@ -20,7 +20,7 @@ func TestOrcamento_GetDespesas_OK(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/v1/orcamento/despesas", h.GetDespesas)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas?ano=2025", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas?ano=2025&orgao=26000", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -39,7 +39,21 @@ func TestOrcamento_GetDespesas_MissingAno(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/v1/orcamento/despesas", h.GetDespesas)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != 400 {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestOrcamento_GetDespesas_MissingOrgao(t *testing.T) {
+	h := handlers.NewOrcamentoHandler()
+	r := chi.NewRouter()
+	r.Get("/v1/orcamento/despesas", h.GetDespesas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas?ano=2025", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -199,7 +213,7 @@ func TestOrcamento_GetDespesas_BadGateway(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/v1/orcamento/despesas", h.GetDespesas)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas?ano=2025", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/orcamento/despesas?ano=2025&orgao=26000", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 

@@ -36,21 +36,24 @@ func (h *OrcamentoHandler) headers() map[string]string {
 	return map[string]string{"chave-api-dados": h.apiKey}
 }
 
-// GetDespesas handles GET /v1/orcamento/despesas?ano=YYYY[&orgao=CODE&pagina=1]
+// GetDespesas handles GET /v1/orcamento/despesas?ano=YYYY&orgao=CODE[&pagina=1]
+// The upstream CGU API requires at least one filter beyond ano+pagina.
 func (h *OrcamentoHandler) GetDespesas(w http.ResponseWriter, r *http.Request) {
 	ano := r.URL.Query().Get("ano")
 	if ano == "" {
 		jsonError(w, http.StatusBadRequest, "parâmetro 'ano' é obrigatório")
 		return
 	}
+	orgao := r.URL.Query().Get("orgao")
+	if orgao == "" {
+		jsonError(w, http.StatusBadRequest, "parâmetro 'orgao' é obrigatório (código SIAFI do órgão superior, ex: 26000 para MEC)")
+		return
+	}
 	pagina := r.URL.Query().Get("pagina")
 	if pagina == "" {
 		pagina = "1"
 	}
-	upURL := fmt.Sprintf("%s/despesas/por-orgao?ano=%s&pagina=%s", orcamentoBase, ano, pagina)
-	if orgao := r.URL.Query().Get("orgao"); orgao != "" {
-		upURL += "&codigoOrgao=" + orgao
-	}
+	upURL := fmt.Sprintf("%s/despesas/por-orgao?ano=%s&pagina=%s&orgaoSuperior=%s", orcamentoBase, ano, pagina, orgao)
 
 	var dados any
 	if _, err := fetchJSON(r.Context(), h.httpClient, upURL, h.headers(), &dados); err != nil {
@@ -77,6 +80,9 @@ func (h *OrcamentoHandler) GetFuncionalProgramatica(w http.ResponseWriter, r *ht
 		pagina = "1"
 	}
 	upURL := fmt.Sprintf("%s/despesas/por-funcional-programatica?ano=%s&pagina=%s", orcamentoBase, ano, pagina)
+	if funcao := r.URL.Query().Get("funcao"); funcao != "" {
+		upURL += "&funcao=" + funcao
+	}
 
 	var dados any
 	if _, err := fetchJSON(r.Context(), h.httpClient, upURL, h.headers(), &dados); err != nil {
