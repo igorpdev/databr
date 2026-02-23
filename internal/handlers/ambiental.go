@@ -61,3 +61,15 @@ func (h *AmbientalHandler) GetProdes(w http.ResponseWriter, r *http.Request) {
 		Data:      rec.Data,
 	})
 }
+
+// GetUsoSolo handles GET /v1/ambiental/uso-solo.
+// Returns MapBiomas land use/cover classification data.
+func (h *AmbientalHandler) GetUsoSolo(w http.ResponseWriter, r *http.Request) {
+	serveLatestAll(w, r, h.store, "mapbiomas_cobertura", "coberturas")
+}
+
+// GetEmbargos handles GET /v1/ambiental/embargos.
+// Returns IBAMA embargo records.
+func (h *AmbientalHandler) GetEmbargos(w http.ResponseWriter, r *http.Request) {
+	serveLatestAll(w, r, h.store, "ibama_embargos", "embargos")
+}

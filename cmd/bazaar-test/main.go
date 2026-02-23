@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	x402sdk "github.com/coinbase/x402/go"
@@ -45,7 +46,7 @@ func main() {
 	// Each unique URL that goes through CDP facilitator settlement gets indexed.
 	// Parameterized routes use example values to trigger unique URLs.
 	endpoints := []string{
-		// === $0.001 tier ===
+		// === $0.003 tier (basic) ===
 		// BCB
 		"/v1/bcb/selic",
 		"/v1/bcb/cambio/USD",
@@ -158,7 +159,7 @@ func main() {
 		"/v1/orcamento/funcional-programatica",
 		"/v1/orcamento/documento/1",
 
-		// === $0.002 tier ===
+		// === $0.005 tier (standard) ===
 		"/v1/mercado/acoes/PETR4",
 		"/v1/mercado/acoes/VALE3",
 		"/v1/mercado/fatos-relevantes",
@@ -181,43 +182,61 @@ func main() {
 		"/v1/ambiental/uso-solo",
 		"/v1/ambiental/embargos",
 
-		// === $0.003 tier ===
+		// === $0.007 tier (enhanced) ===
 		"/v1/empresas/00000000000191/compliance",
 		"/v1/empresas/33000167000101/compliance",
 		"/v1/dou/busca?termo=licitacao",
 		"/v1/diarios/busca?termo=prefeitura",
 		"/v1/empresas/00000000000191/setor",
 		"/v1/ambiental/risco/3550308",
+		"/v1/eleicoes/compliance/00000000000191",
 		"/v1/municipios/3550308/perfil",
 
-		// === $0.005 tier ===
+		// === $0.010 tier (premium) ===
 		"/v1/compliance/00000000000191",
 		"/v1/mercado/fundos/97929213000107",
 		"/v1/mercado/fundos/97929213000107/analise",
 		"/v1/credito/score/00000000000191",
 
-		// === $0.010 tier ===
+		// === $0.015 tier (advanced) ===
 		"/v1/judicial/processos/00000000000191",
 		"/v1/economia/panorama",
 		"/v1/mercado-trabalho/SP/analise",
 
-		// === $0.015 tier ===
+		// === $0.020 tier (composite) ===
 		"/v1/empresas/00000000000191/perfil-completo",
 		"/v1/setor/6110803/regulacao",
 
-		// === $0.020 tier ===
+		// === $0.030 tier (deep analysis) ===
 		"/v1/mercado/6110803/competicao",
 		"/v1/ambiental/empresa/00000000000191/esg",
 		"/v1/litigio/00000000000191/risco",
 
-		// === $0.030 tier ===
+		// === $0.050 tier (network) ===
 		"/v1/rede/00000000000191/influencia",
 
-		// === $0.050 tier ===
+		// === $0.075 tier (due diligence) ===
 		"/v1/empresas/00000000000191/duediligence",
 	}
 
-	// Note: skipping /v1/carteira/risco ($0.100, POST with body)
+	// Note: skipping /v1/carteira/risco ($0.150, POST with body)
+
+	// If CLI args provided, filter to only those endpoints (substring match).
+	// Usage: go run . /v1/bcb/selic /v1/economia/ipca
+	if len(os.Args) > 1 {
+		filters := os.Args[1:]
+		var filtered []string
+		for _, ep := range endpoints {
+			for _, f := range filters {
+				if strings.Contains(ep, f) {
+					filtered = append(filtered, ep)
+					break
+				}
+			}
+		}
+		endpoints = filtered
+		fmt.Printf("Filtered to %d endpoints matching %v\n", len(endpoints), filters)
+	}
 
 	fmt.Printf("\nBootstrapping %d endpoints for Bazaar indexing\n", len(endpoints))
 	fmt.Printf("Estimated cost: see pricing tiers above\n\n")

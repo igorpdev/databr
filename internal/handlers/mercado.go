@@ -182,3 +182,9 @@ func (h *MercadoHandler) GetFatosById(w http.ResponseWriter, r *http.Request) {
 		Data:      rec.Data,
 	})
 }
+
+// GetIndicesIbovespa handles GET /v1/mercado/indices/ibovespa.
+// Returns the latest IBOVESPA index composition from B3.
+func (h *MercadoHandler) GetIndicesIbovespa(w http.ResponseWriter, r *http.Request) {
+	serveLatest(w, r, h.store, "b3_ibovespa")
+}

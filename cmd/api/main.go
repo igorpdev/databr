@@ -118,6 +118,9 @@ func main() {
 		transporteHandler      *handlers.TransporteHandler
 		transportadoresHandler *handlers.TransportadoresHandler
 		titulosHandler         *handlers.TitulosHandler
+		comercioHandler        *handlers.ComercioHandler
+		educacaoHandler        *handlers.EducacaoHandler
+		empregoHandler         *handlers.EmpregoHandler
 		// Premium cross-referencing handlers (Phase 10)
 		dueDiligenceHandler        *handlers.DueDiligenceHandler
 		panoramaHandler            *handlers.PanoramaHandler
@@ -148,6 +151,9 @@ func main() {
 		transporteHandler = handlers.NewTransporteHandler(store)
 		transportadoresHandler = handlers.NewTransportadoresHandler(store)
 		titulosHandler = handlers.NewTitulosHandler(store)
+		comercioHandler = handlers.NewComercioHandler(store)
+		educacaoHandler = handlers.NewEducacaoHandler(store)
+		empregoHandler = handlers.NewEmpregoHandler(store)
 		// Premium handlers
 		dueDiligenceHandler = handlers.NewDueDiligenceHandler(cnpjCollector, cguCollector, djCollector, store)
 		panoramaHandler = handlers.NewPanoramaHandler(store)
@@ -446,6 +452,31 @@ func main() {
 			}
 			if transportadoresHandler != nil {
 				r.Get("/transporte/transportadores", transportadoresHandler.GetTransportadoresByCNPJ)
+			}
+			if transporteHandler != nil {
+				r.Get("/transporte/acidentes", transporteHandler.GetAcidentes)
+			}
+			if comercioHandler != nil {
+				r.Get("/comercio/exportacoes", comercioHandler.GetExportacoes)
+				r.Get("/comercio/importacoes", comercioHandler.GetImportacoes)
+			}
+			if mercHandler != nil {
+				r.Get("/mercado/indices/ibovespa", mercHandler.GetIndicesIbovespa)
+			}
+			if educacaoHandler != nil {
+				r.Get("/educacao/censo-escolar", educacaoHandler.GetCensoEscolar)
+			}
+			if empregoHandler != nil {
+				r.Get("/emprego/rais", empregoHandler.GetRAIS)
+				r.Get("/emprego/caged", empregoHandler.GetCAGED)
+			}
+			if energiaHandler != nil {
+				r.Get("/energia/geracao", energiaHandler.GetGeracao)
+				r.Get("/energia/carga", energiaHandler.GetCarga)
+			}
+			if ambientalHandler != nil {
+				r.Get("/ambiental/uso-solo", ambientalHandler.GetUsoSolo)
+				r.Get("/ambiental/embargos", ambientalHandler.GetEmbargos)
 			}
 		})
 

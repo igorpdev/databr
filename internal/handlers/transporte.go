@@ -107,3 +107,9 @@ func (h *TransporteHandler) GetAeronaves(w http.ResponseWriter, r *http.Request)
 		},
 	})
 }
+
+// GetAcidentes handles GET /v1/transporte/acidentes.
+// Returns PRF road accident data.
+func (h *TransporteHandler) GetAcidentes(w http.ResponseWriter, r *http.Request) {
+	serveLatestAll(w, r, h.store, "prf_acidentes", "acidentes")
+}

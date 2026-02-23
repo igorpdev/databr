@@ -115,8 +115,10 @@ func main() {
 
 		// Phase 8: Trade, population, energy, indices
 		comex.NewComexStatCollector(""),
+		comex.NewComexImportCollector(""),
 		ibge.NewPopulacaoCollector(""),
 		energia.NewONSCollector(""),
+		energia.NewONSCargaCollector(""),
 		b3.NewIndicesCollector(""),
 
 		// Phase 9: Education, employment, judicial, environmental

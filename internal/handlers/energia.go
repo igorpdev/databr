@@ -72,3 +72,15 @@ func (h *EnergiaHandler) GetTarifas(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+// GetGeracao handles GET /v1/energia/geracao.
+// Returns ONS electricity generation data.
+func (h *EnergiaHandler) GetGeracao(w http.ResponseWriter, r *http.Request) {
+	serveLatestAll(w, r, h.store, "ons_geracao", "registros")
+}
+
+// GetCarga handles GET /v1/energia/carga.
+// Returns ONS electricity load/demand data.
+func (h *EnergiaHandler) GetCarga(w http.ResponseWriter, r *http.Request) {
+	serveLatestAll(w, r, h.store, "ons_carga", "registros")
+}
