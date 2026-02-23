@@ -31,6 +31,10 @@ func (h *JudicialHandler) GetProcessos(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "documento (CPF ou CNPJ) is required")
 		return
 	}
+	if !isValidCPFOrCNPJ(doc) {
+		jsonError(w, http.StatusBadRequest, "documento inválido — deve ser CPF (11 dígitos) ou CNPJ (14 dígitos)")
+		return
+	}
 
 	records, err := h.searcher.Search(r.Context(), doc)
 	if err != nil {

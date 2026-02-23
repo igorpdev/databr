@@ -95,8 +95,14 @@ func (r *SourceRecordRepository) upsertChunk(ctx context.Context, records []doma
 	return br.Close()
 }
 
+// queryTimeout is the maximum duration for a single query.
+const queryTimeout = 5 * time.Second
+
 // FindLatest returns the 100 most-recent records for the given source, ordered by fetched_at DESC.
 func (r *SourceRecordRepository) FindLatest(ctx context.Context, source string) ([]domain.SourceRecord, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT source, record_key, data, raw_data, fetched_at, valid_until
 		FROM source_records
@@ -135,6 +141,9 @@ func (r *SourceRecordRepository) FindLatest(ctx context.Context, source string) 
 // This is intended for large datasets like ANEEL where in-memory filtering
 // on the 100-row FindLatest result would miss most records.
 func (r *SourceRecordRepository) FindLatestFiltered(ctx context.Context, source, jsonbKey, jsonbValue string) ([]domain.SourceRecord, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT source, record_key, data, raw_data, fetched_at, valid_until
 		FROM source_records
@@ -170,6 +179,9 @@ func (r *SourceRecordRepository) FindLatestFiltered(ctx context.Context, source,
 // FindOne retrieves a single source record by (source, record_key).
 // Returns (nil, nil) if not found.
 func (r *SourceRecordRepository) FindOne(ctx context.Context, source, key string) (*domain.SourceRecord, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
 	var rec domain.SourceRecord
 	var dataJSON, rawJSON []byte
 	var fetchedAt time.Time

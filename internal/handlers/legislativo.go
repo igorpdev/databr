@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"regexp"
 	"time"
 
@@ -41,15 +42,19 @@ func (h *LegislativoHandler) GetDeputados(w http.ResponseWriter, r *http.Request
 		pagina = "1"
 	}
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/deputados?formato=json&itens=100&pagina=%s", pagina)
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "100")
+	params.Set("pagina", pagina)
 	if uf != "" {
-		url += "&siglaUf=" + uf
+		params.Set("siglaUf", uf)
 	}
 	if partido != "" {
-		url += "&siglaPartido=" + partido
+		params.Set("siglaPartido", partido)
 	}
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/deputados?" + params.Encode()
 
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar Câmara dos Deputados: "+err.Error())
 		return
@@ -90,8 +95,10 @@ func (h *LegislativoHandler) GetDeputado(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/deputados/%s?formato=json", id)
-	resp, err := h.httpClient.Get(url)
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	apiURL := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/deputados/%s?%s", id, params.Encode())
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar Câmara dos Deputados: "+err.Error())
 		return
@@ -133,18 +140,22 @@ func (h *LegislativoHandler) GetProposicoes(w http.ResponseWriter, r *http.Reque
 		pagina = "1"
 	}
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/proposicoes?formato=json&itens=50&pagina=%s", pagina)
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "50")
+	params.Set("pagina", pagina)
 	if tipo != "" {
-		url += "&siglaTipo=" + tipo
+		params.Set("siglaTipo", tipo)
 	}
 	if ano != "" {
-		url += "&ano=" + ano
+		params.Set("ano", ano)
 	}
 	if numero != "" {
-		url += "&numero=" + numero
+		params.Set("numero", numero)
 	}
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/proposicoes?" + params.Encode()
 
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar proposições da Câmara: "+err.Error())
 		return
@@ -187,18 +198,22 @@ func (h *LegislativoHandler) GetVotacoes(w http.ResponseWriter, r *http.Request)
 	dataFim := r.URL.Query().Get("dataFim")
 	orgao := r.URL.Query().Get("orgao")
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/votacoes?formato=json&itens=50&pagina=%s", pagina)
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "50")
+	params.Set("pagina", pagina)
 	if dataInicio != "" {
-		url += "&dataInicio=" + dataInicio
+		params.Set("dataInicio", dataInicio)
 	}
 	if dataFim != "" {
-		url += "&dataFim=" + dataFim
+		params.Set("dataFim", dataFim)
 	}
 	if orgao != "" {
-		url += "&siglaOrgao=" + orgao
+		params.Set("siglaOrgao", orgao)
 	}
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/votacoes?" + params.Encode()
 
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar votações da Câmara: "+err.Error())
 		return
@@ -238,9 +253,13 @@ func (h *LegislativoHandler) GetPartidos(w http.ResponseWriter, r *http.Request)
 		pagina = "1"
 	}
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/partidos?formato=json&itens=100&pagina=%s", pagina)
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "100")
+	params.Set("pagina", pagina)
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/partidos?" + params.Encode()
 
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar partidos da Câmara: "+err.Error())
 		return
@@ -332,18 +351,22 @@ func (h *LegislativoHandler) GetEventos(w http.ResponseWriter, r *http.Request) 
 	dataFim := r.URL.Query().Get("dataFim")
 	orgao := r.URL.Query().Get("orgao")
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/eventos?formato=json&itens=50&pagina=%s", pagina)
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "50")
+	params.Set("pagina", pagina)
 	if dataInicio != "" {
-		url += "&dataInicio=" + dataInicio
+		params.Set("dataInicio", dataInicio)
 	}
 	if dataFim != "" {
-		url += "&dataFim=" + dataFim
+		params.Set("dataFim", dataFim)
 	}
 	if orgao != "" {
-		url += "&siglaOrgao=" + orgao
+		params.Set("siglaOrgao", orgao)
 	}
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/eventos?" + params.Encode()
 
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar eventos da Câmara: "+err.Error())
 		return
@@ -388,9 +411,14 @@ func (h *LegislativoHandler) GetComissoes(w http.ResponseWriter, r *http.Request
 		tipo = "2"
 	}
 
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/orgaos?codTipoOrgao=%s&formato=json&itens=100&pagina=%s", tipo, pagina)
+	params := neturl.Values{}
+	params.Set("codTipoOrgao", tipo)
+	params.Set("formato", "json")
+	params.Set("itens", "100")
+	params.Set("pagina", pagina)
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/orgaos?" + params.Encode()
 
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar comissões da Câmara: "+err.Error())
 		return
@@ -431,8 +459,14 @@ func (h *LegislativoHandler) GetFrentes(w http.ResponseWriter, r *http.Request) 
 	if pagina == "" {
 		pagina = "1"
 	}
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/frentes?formato=json&itens=100&pagina=%s", pagina)
-	resp, err := h.httpClient.Get(url)
+
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "100")
+	params.Set("pagina", pagina)
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/frentes?" + params.Encode()
+
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar frentes parlamentares: "+err.Error())
 		return
@@ -468,8 +502,14 @@ func (h *LegislativoHandler) GetBlocos(w http.ResponseWriter, r *http.Request) {
 	if pagina == "" {
 		pagina = "1"
 	}
-	url := fmt.Sprintf("https://dadosabertos.camara.leg.br/api/v2/blocos?formato=json&itens=100&pagina=%s", pagina)
-	resp, err := h.httpClient.Get(url)
+
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "100")
+	params.Set("pagina", pagina)
+	apiURL := "https://dadosabertos.camara.leg.br/api/v2/blocos?" + params.Encode()
+
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar blocos partidários: "+err.Error())
 		return
@@ -515,11 +555,16 @@ func (h *LegislativoHandler) GetDespesas(w http.ResponseWriter, r *http.Request)
 		ano = fmt.Sprintf("%d", time.Now().Year())
 	}
 
-	url := fmt.Sprintf(
-		"https://dadosabertos.camara.leg.br/api/v2/deputados/%s/despesas?formato=json&itens=50&pagina=%s&ano=%s",
-		id, pagina, ano,
+	params := neturl.Values{}
+	params.Set("formato", "json")
+	params.Set("itens", "50")
+	params.Set("pagina", pagina)
+	params.Set("ano", ano)
+	apiURL := fmt.Sprintf(
+		"https://dadosabertos.camara.leg.br/api/v2/deputados/%s/despesas?%s",
+		id, params.Encode(),
 	)
-	resp, err := h.httpClient.Get(url)
+	resp, err := h.httpClient.Get(apiURL)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao consultar despesas do deputado: "+err.Error())
 		return
@@ -564,12 +609,15 @@ func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Re
 		pagina = "1"
 	}
 
-	url := fmt.Sprintf("https://legis.senado.leg.br/dadosabertos/processo?ano=%s&pagina=%s", ano, pagina)
+	params := neturl.Values{}
+	params.Set("ano", ano)
+	params.Set("pagina", pagina)
 	if sigla != "" {
-		url += "&sigla=" + sigla
+		params.Set("sigla", sigla)
 	}
+	apiURL := "https://legis.senado.leg.br/dadosabertos/processo?" + params.Encode()
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, apiURL, nil)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "Erro ao criar requisição para o Senado: "+err.Error())
 		return
@@ -593,12 +641,8 @@ func (h *LegislativoHandler) GetMateriasSenado(w http.ResponseWriter, r *http.Re
 	// Try to decode as plain array first.
 	var rawBody any
 	if err := json.NewDecoder(resp.Body).Decode(&rawBody); err != nil {
-		// Can't decode at all — return empty list.
-		respond(w, r, domain.APIResponse{
-			Source:   "senado_materias",
-			CostUSDC: "0.001",
-			Data:     map[string]any{"materias": []any{}, "total": 0},
-		})
+		// Can't decode at all — return 502 instead of empty 200.
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta do Senado")
 		return
 	}
 

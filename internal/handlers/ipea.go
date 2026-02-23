@@ -71,7 +71,7 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 	// The filter expression must be percent-encoded so that the space between
 	// the operator and the date literal is transmitted as %20 — Go's net/http
 	// server (and some strict clients) reject URLs with raw spaces in the query.
-	filterExpr := fmt.Sprintf("VALDATA gt %s", desde)
+	filterExpr := fmt.Sprintf("VALDATA gt %s", sanitizeOData(desde))
 	q := url.Values{}
 	q.Set("$filter", filterExpr)
 	upstreamURL := fmt.Sprintf(
@@ -148,7 +148,7 @@ func (h *IPEAHandler) GetBusca(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	filterExpr := fmt.Sprintf("startswith(SERNOME,'%s')", q)
+	filterExpr := fmt.Sprintf("startswith(SERNOME,'%s')", sanitizeOData(q))
 	params := url.Values{}
 	params.Set("$filter", filterExpr)
 	params.Set("$top", strconv.Itoa(n))

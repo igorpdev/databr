@@ -196,16 +196,37 @@ func (h *IbgeHandler) GetCNAE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var raw map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE CNAE: "+err.Error())
+	body, err := limitedReadAll(resp.Body)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao ler resposta IBGE CNAE")
 		return
 	}
 
+	// IBGE CNAE API returns an array of objects (or a single object for 7-digit codes)
+	var arr []map[string]any
+	if err := json.Unmarshal(body, &arr); err == nil {
+		if len(arr) == 0 {
+			jsonError(w, http.StatusNotFound, fmt.Sprintf("CNAE não encontrado: %s", codigo))
+			return
+		}
+		respond(w, r, domain.APIResponse{
+			Source:   "ibge_cnae",
+			CostUSDC: "0.001",
+			Data:     arr[0],
+		})
+		return
+	}
+
+	// Fallback: single object (some CNAE endpoints return a direct object)
+	var single map[string]any
+	if err := json.Unmarshal(body, &single); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta IBGE CNAE")
+		return
+	}
 	respond(w, r, domain.APIResponse{
 		Source:   "ibge_cnae",
 		CostUSDC: "0.001",
-		Data:     raw,
+		Data:     single,
 	})
 }
 

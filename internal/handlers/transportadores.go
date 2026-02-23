@@ -116,6 +116,9 @@ func normaliseRNTRC(rntrc string) string {
 	if rntrc == "" {
 		return ""
 	}
+	if len(rntrc) > 9 {
+		return ""
+	}
 	for _, ch := range rntrc {
 		if !unicode.IsDigit(ch) {
 			return ""

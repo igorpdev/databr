@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,7 +58,7 @@ func (h *TSEExtrasHandler) downloadZip(r *http.Request, url string) ([]byte, err
 		return nil, fmt.Errorf("upstream returned %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := limitedReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
@@ -107,6 +108,7 @@ func parseZipCSV(zipData []byte, maxRecords int) ([]map[string]any, error) {
 				break
 			}
 			if err != nil {
+				log.Printf("WARN: TSE CSV malformed row in %s: %v", f.Name, err)
 				continue
 			}
 			m := make(map[string]any, len(headers))
@@ -140,9 +142,19 @@ func parseLimitN(r *http.Request, defaultN, maxN int) int {
 	return n
 }
 
-// parseAno parses the ?ano= query param, defaulting to 2024.
+// latestElectionYear returns the most recent election year (even year <= current year).
+// Brazilian elections are held every 2 years on even years.
+func latestElectionYear() int {
+	y := time.Now().Year()
+	if y%2 != 0 {
+		y--
+	}
+	return y
+}
+
+// parseAno parses the ?ano= query param, defaulting to the latest election year.
 func parseAno(r *http.Request) int {
-	ano := 2024
+	ano := latestElectionYear()
 	if raw := r.URL.Query().Get("ano"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v >= 2000 && v <= 2100 {
 			ano = v
@@ -317,8 +329,9 @@ func (h *TSEExtrasHandler) fetchIPEASeries(r *http.Request, serCodigo string, n 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("upstream returned %d: %s", resp.StatusCode, string(body))
+		body, _ := limitedReadAll(resp.Body)
+		log.Printf("WARN: IPEADATA upstream error (HTTP %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("upstream service temporarily unavailable")
 	}
 
 	var result ipeataResponse

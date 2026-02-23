@@ -13,9 +13,14 @@ import (
 	"github.com/databr/api/internal/collectors/ambiental"
 	"github.com/databr/api/internal/collectors/b3"
 	"github.com/databr/api/internal/collectors/bcb"
+	"github.com/databr/api/internal/collectors/comex"
 	"github.com/databr/api/internal/collectors/cvm"
+	"github.com/databr/api/internal/collectors/educacao"
+	"github.com/databr/api/internal/collectors/emprego"
 	"github.com/databr/api/internal/collectors/energia"
 	"github.com/databr/api/internal/collectors/ibge"
+	"github.com/databr/api/internal/collectors/juridico"
+	"github.com/databr/api/internal/collectors/legislativo"
 	"github.com/databr/api/internal/collectors/saude"
 	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transporte"
@@ -88,11 +93,31 @@ func main() {
 		// Phase 5: Transport
 		transporte.NewANACCollector(""),
 		transporte.NewANTTCollector("", ""),
+		transporte.NewPRFCollector(""),
 
 		// Phase 6: Financial rates & market data
 		bcb.NewTaxasCreditoCollector(""),
 		tesouro.NewTesouroDiretoCollector(""),
 		cvm.NewCotasCollector(""),
+
+		// Phase 7: Legislative
+		legislativo.NewCamaraCollector(""),
+		legislativo.NewSenadoCollector(""),
+
+		// Phase 8: Trade, population, energy, indices
+		comex.NewComexStatCollector(""),
+		ibge.NewPopulacaoCollector(""),
+		energia.NewONSCollector(""),
+		b3.NewIndicesCollector(""),
+
+		// Phase 9: Education, employment, judicial, environmental
+		educacao.NewINEPCollector(""),
+		emprego.NewRAISCollector(""),
+		emprego.NewCAGEDCollector(""),
+		juridico.NewSTFCollector(""),
+		juridico.NewSTJCollector(""),
+		ambiental.NewMapBiomasCollector(""),
+		ambiental.NewIBAMACollector(""),
 	}
 
 	// Run all collectors on startup to populate the DB.

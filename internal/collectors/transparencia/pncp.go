@@ -108,9 +108,10 @@ func (c *PNCPCollector) Collect(ctx context.Context) ([]domain.SourceRecord, err
 			Source:    "pncp_licitacoes",
 			RecordKey: recordKey,
 			Data: map[string]any{
-				"numero_compra":   numCompra,
-				"orgao":           orgao,
-				"objeto":          objeto,
+				"numero_compra":    numCompra,
+				"orgao":            orgao,
+				"cnpj_orgao":       cnpjOrgao,
+				"objeto":           objeto,
 				"data_atualizacao": dataAtu,
 			},
 			RawData:   entry,

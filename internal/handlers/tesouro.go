@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -42,6 +42,10 @@ func (h *TesouroHandler) GetRREO(w http.ResponseWriter, r *http.Request) {
 	uf := r.URL.Query().Get("uf")
 	if uf == "" {
 		jsonError(w, http.StatusBadRequest, "query param 'uf' is required (ex: SP, RJ, BA)")
+		return
+	}
+	if !isValidUF(uf) {
+		jsonError(w, http.StatusBadRequest, "UF inválida: "+uf)
 		return
 	}
 
@@ -90,8 +94,9 @@ func (h *TesouroHandler) siconfiItems(ctx context.Context, endpoint string) ([]a
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("SICONFI returned %d: %s", resp.StatusCode, string(body))
+		body, _ := limitedReadAll(resp.Body)
+		log.Printf("WARN: SICONFI upstream error (HTTP %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("upstream service temporarily unavailable")
 	}
 	var envelope struct {
 		Items []any `json:"items"`
@@ -140,6 +145,10 @@ func (h *TesouroHandler) GetRGF(w http.ResponseWriter, r *http.Request) {
 	uf := r.URL.Query().Get("uf")
 	if uf == "" {
 		jsonError(w, http.StatusBadRequest, "query param 'uf' is required (ex: SP, RJ, BA)")
+		return
+	}
+	if !isValidUF(uf) {
+		jsonError(w, http.StatusBadRequest, "UF inválida: "+uf)
 		return
 	}
 	ano := time.Now().Year()

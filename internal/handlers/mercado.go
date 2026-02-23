@@ -23,6 +23,10 @@ func NewMercadoHandler(store SourceStore) *MercadoHandler {
 // Returns the last available B3 closing price for the given ticker.
 func (h *MercadoHandler) GetAcoes(w http.ResponseWriter, r *http.Request) {
 	ticker := chi.URLParam(r, "ticker")
+	if !isValidTicker(ticker) {
+		jsonError(w, http.StatusBadRequest, "Ticker inválido: "+ticker)
+		return
+	}
 	rec, err := h.store.FindOne(r.Context(), "b3_cotacoes", ticker)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())

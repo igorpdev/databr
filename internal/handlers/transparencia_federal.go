@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"log"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -35,10 +34,14 @@ type TransparenciaFederalHandler struct {
 
 // NewTransparenciaFederalHandler creates a TransparenciaFederalHandler.
 func NewTransparenciaFederalHandler(f TransparenciaFetcher) *TransparenciaFederalHandler {
+	apiKey := os.Getenv("TRANSPARENCIA_API_KEY")
+	if apiKey == "" {
+		log.Println("WARN: TRANSPARENCIA_API_KEY not set — transparencia endpoints will fail")
+	}
 	return &TransparenciaFederalHandler{
 		fetcher:    f,
 		httpClient: &http.Client{Timeout: 15 * time.Second},
-		apiKey:     os.Getenv("TRANSPARENCIA_API_KEY"),
+		apiKey:     apiKey,
 	}
 }
 
@@ -47,7 +50,7 @@ func NewTransparenciaFederalHandlerWithClient(f TransparenciaFetcher, client *ht
 	return &TransparenciaFederalHandler{fetcher: f, httpClient: client, apiKey: apiKey}
 }
 
-var reDigits = regexp.MustCompile(`\D`)
+// reDigits is defined in helpers.go
 
 // normalizeCNPJdigits strips all non-digit characters.
 func normalizeCNPJdigits(s string) string {
@@ -229,8 +232,8 @@ func (h *TransparenciaFederalHandler) GetCEAF(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência CEAF", resp.StatusCode, body))
 		return
 	}
 
@@ -286,8 +289,8 @@ func (h *TransparenciaFederalHandler) GetEmendas(w http.ResponseWriter, r *http.
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Emendas", resp.StatusCode, body))
 		return
 	}
 
@@ -340,8 +343,8 @@ func (h *TransparenciaFederalHandler) GetObras(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Obras", resp.StatusCode, body))
 		return
 	}
 
@@ -404,8 +407,8 @@ func (h *TransparenciaFederalHandler) GetTransferencias(w http.ResponseWriter, r
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Transferencias", resp.StatusCode, body))
 		return
 	}
 
@@ -464,8 +467,8 @@ func (h *TransparenciaFederalHandler) GetPensionistas(w http.ResponseWriter, r *
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Pensionistas", resp.StatusCode, body))
 		return
 	}
 
@@ -531,8 +534,8 @@ func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Viagens", resp.StatusCode, body))
 		return
 	}
 

@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"math"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -246,8 +245,8 @@ func (h *BCBHandler) GetIndicadores(w http.ResponseWriter, r *http.Request) {
 	defer upResp.Body.Close()
 
 	if upResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(upResp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("BCB SGS returned %d: %s", upResp.StatusCode, string(body)))
+		body, _ := limitedReadAll(upResp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("BCB SGS", upResp.StatusCode, body))
 		return
 	}
 
@@ -298,8 +297,8 @@ func (h *BCBHandler) GetCapitais(w http.ResponseWriter, r *http.Request) {
 	defer upResp.Body.Close()
 
 	if upResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(upResp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("BCB OLINDA returned %d: %s", upResp.StatusCode, string(body)))
+		body, _ := limitedReadAll(upResp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("BCB OLINDA RDE", upResp.StatusCode, body))
 		return
 	}
 
@@ -452,8 +451,8 @@ func (h *BCBHandler) GetIFData(w http.ResponseWriter, r *http.Request) {
 	defer upResp.Body.Close()
 
 	if upResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(upResp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("BCB OLINDA IFDATA returned %d: %s", upResp.StatusCode, string(body)))
+		body, _ := limitedReadAll(upResp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("BCB OLINDA IFDATA", upResp.StatusCode, body))
 		return
 	}
 
@@ -507,8 +506,9 @@ func (h *BCBHandler) GetBaseMonetaria(w http.ResponseWriter, r *http.Request) {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return nil, fmt.Errorf("BCB SGS %d returned %d: %s", code, resp.StatusCode, string(body))
+			body, _ := limitedReadAll(resp.Body)
+			log.Printf("WARN: BCB SGS %d upstream error (HTTP %d): %s", code, resp.StatusCode, string(body))
+			return nil, fmt.Errorf("upstream service temporarily unavailable")
 		}
 		var valores []map[string]any
 		if err := json.NewDecoder(resp.Body).Decode(&valores); err != nil {
@@ -542,29 +542,4 @@ func (h *BCBHandler) GetBaseMonetaria(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// jsonError writes a JSON error response.
-func jsonError(w http.ResponseWriter, code int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
-}
-
-// respond writes the API response, applying ?format=context if requested.
-func respond(w http.ResponseWriter, r *http.Request, resp domain.APIResponse) {
-	if r.URL.Query().Get("format") == "context" {
-		b, err := json.Marshal(resp.Data)
-		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to serialize context")
-			return
-		}
-		resp.Context = fmt.Sprintf("[%s] %s", resp.Source, string(b))
-		resp.Data = nil
-		// Add $0.001 using integer milliUSDC to avoid float rounding
-		if f, err := strconv.ParseFloat(resp.CostUSDC, 64); err == nil {
-			millis := int64(math.Round(f * 1000))
-			resp.CostUSDC = fmt.Sprintf("%.3f", float64(millis+1)/1000.0)
-		}
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
-}
+// jsonError and respond are defined in helpers.go

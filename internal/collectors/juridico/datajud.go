@@ -17,14 +17,18 @@ import (
 
 const datajudBase = "https://api-publica.datajud.cnj.jus.br"
 
-// tribunais to search across — top 5 major courts by case volume.
+// tribunais to search across — 23 major courts by case volume.
 // Each is a separate Elasticsearch index in DataJud.
 var tribunais = []string{
-	"api_publica_tjsp",
-	"api_publica_tjrj",
-	"api_publica_tjmg",
-	"api_publica_trf1",
-	"api_publica_trf2",
+	"api_publica_tjsp", "api_publica_tjrj", "api_publica_tjmg",
+	"api_publica_tjrs", "api_publica_tjpr", "api_publica_tjba",
+	"api_publica_tjsc", "api_publica_tjpe", "api_publica_tjgo",
+	"api_publica_tjce",
+	"api_publica_trf1", "api_publica_trf2", "api_publica_trf3",
+	"api_publica_trf4", "api_publica_trf5", "api_publica_trf6",
+	"api_publica_trt1", "api_publica_trt2", "api_publica_trt3",
+	"api_publica_trt4", "api_publica_trt15",
+	"api_publica_stj", "api_publica_tst",
 }
 
 // DataJudCollector fetches judicial process data from DataJud CNJ.
@@ -56,7 +60,7 @@ func (c *DataJudCollector) Collect(ctx context.Context) ([]domain.SourceRecord, 
 }
 
 // Search queries DataJud for processes linked to the given CPF (11 digits) or CNPJ (14 digits).
-// Searches across the configured list of major tribunals, stopping at 20 results.
+// Searches across the configured list of major tribunals, stopping at 50 results.
 func (c *DataJudCollector) Search(ctx context.Context, documento string) ([]domain.SourceRecord, error) {
 	// Normalize: keep digits only
 	normalized := strings.Map(func(r rune) rune {
@@ -79,7 +83,7 @@ func (c *DataJudCollector) Search(ctx context.Context, documento string) ([]doma
 			continue
 		}
 		allRecords = append(allRecords, records...)
-		if len(allRecords) >= 20 {
+		if len(allRecords) >= 50 {
 			break
 		}
 	}

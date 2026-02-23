@@ -51,7 +51,7 @@ func (h *TransparenciaHandler) GetCandidatos(w http.ResponseWriter, r *http.Requ
 
 	// Optional filter by UF
 	if uf := r.URL.Query().Get("uf"); uf != "" {
-		filtered := records[:0]
+		var filtered []domain.SourceRecord
 		for _, rec := range records {
 			if sgUF, _ := rec.Data["sg_uf"].(string); sgUF == uf {
 				filtered = append(filtered, rec)

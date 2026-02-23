@@ -3,8 +3,8 @@ package handlers
 import (
 	"bufio"
 	"encoding/csv"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -63,8 +63,8 @@ func (h *ANSHandler) GetPlanos(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		jsonError(w, http.StatusBadGateway, fmt.Sprintf("ANS retornou %d: %s", resp.StatusCode, string(body)))
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("ANS", resp.StatusCode, body))
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *ANSHandler) GetPlanos(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			// skip malformed rows
+			log.Printf("WARN: ANS CSV malformed row: %v", err)
 			continue
 		}
 

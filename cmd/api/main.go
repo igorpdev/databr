@@ -6,7 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	cnpjcol "github.com/databr/api/internal/collectors/cnpj"
 	"github.com/databr/api/internal/collectors/dou"
@@ -20,6 +23,8 @@ import (
 	migpkg "github.com/databr/api/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	"github.com/joho/godotenv"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
@@ -33,14 +38,16 @@ func main() {
 
 	// Database (optional — store-backed handlers degrade gracefully when nil)
 	var store handlers.SourceStore
-	if pool, err := repositories.NewPool(ctx); err != nil {
+	var pool interface{ Ping(context.Context) error }
+	if p, err := repositories.NewPool(ctx); err != nil {
 		log.Printf("DB unavailable (%v) — store-backed endpoints disabled", err)
 	} else {
-		if err := repositories.RunMigrations(ctx, pool, migpkg.FS); err != nil {
+		if err := repositories.RunMigrations(ctx, p, migpkg.FS); err != nil {
 			log.Printf("WARNING: migrations failed: %v", err)
 		}
-		store = repositories.NewSourceRecordRepository(pool)
-		defer pool.Close()
+		store = repositories.NewSourceRecordRepository(p)
+		pool = p
+		defer p.Close()
 	}
 
 	// x402 payment config (wallet required; set to empty string in dev = no-op middleware)
@@ -93,6 +100,15 @@ func main() {
 		transporteHandler      *handlers.TransporteHandler
 		transportadoresHandler *handlers.TransportadoresHandler
 		titulosHandler         *handlers.TitulosHandler
+		// Premium cross-referencing handlers
+		dueDiligenceHandler        *handlers.DueDiligenceHandler
+		panoramaHandler            *handlers.PanoramaHandler
+		setorHandler               *handlers.SetorHandler
+		riscoAmbientalHandler      *handlers.RiscoAmbientalHandler
+		complianceEleitoralHandler *handlers.ComplianceEleitoralHandler
+		creditoScoreHandler        *handlers.CreditoScoreHandler
+		municipioHandler           *handlers.MunicipioHandler
+		fundoAnaliseHandler        *handlers.FundoAnaliseHandler
 	)
 	if store != nil {
 		bcbHandler = handlers.NewBCBHandler(store)
@@ -105,6 +121,15 @@ func main() {
 		transporteHandler = handlers.NewTransporteHandler(store)
 		transportadoresHandler = handlers.NewTransportadoresHandler(store)
 		titulosHandler = handlers.NewTitulosHandler(store)
+		// Premium handlers
+		dueDiligenceHandler = handlers.NewDueDiligenceHandler(cnpjCollector, cguCollector, djCollector, store)
+		panoramaHandler = handlers.NewPanoramaHandler(store)
+		setorHandler = handlers.NewSetorHandler(cnpjCollector, store)
+		riscoAmbientalHandler = handlers.NewRiscoAmbientalHandler(store)
+		complianceEleitoralHandler = handlers.NewComplianceEleitoralHandler(cguCollector, djCollector, store)
+		creditoScoreHandler = handlers.NewCreditoScoreHandler(cnpjCollector, cguCollector, djCollector, store)
+		municipioHandler = handlers.NewMunicipioHandler(store)
+		fundoAnaliseHandler = handlers.NewFundoAnaliseHandler(store)
 	}
 
 	// MCP server (proxies to this REST API via SSE transport)
@@ -124,9 +149,64 @@ func main() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
+	// Security headers
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	// CORS
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "X-PAYMENT", "X-Request-ID"},
+		ExposedHeaders:   []string{"X-Payment-Required", "Content-Length", "X-Request-ID"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
+
+	// Rate limiting (100 req/min per IP)
+	r.Use(httprate.Limit(
+		100,
+		1*time.Minute,
+		httprate.WithKeyFuncs(httprate.KeyByIP),
+		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":"rate limit exceeded, max 100 req/min"}`)) //nolint:errcheck
+		}),
+	))
+
+	// Query logging middleware
+	r.Use(handlers.QueryLogMiddleware)
+
+	// Health check with DB verification
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		healthCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		status := map[string]string{"api": "ok"}
+		httpCode := http.StatusOK
+
+		if pool != nil {
+			if err := pool.Ping(healthCtx); err != nil {
+				status["db"] = "error: " + err.Error()
+				httpCode = http.StatusServiceUnavailable
+			} else {
+				status["db"] = "ok"
+			}
+		} else {
+			status["db"] = "not configured"
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		w.WriteHeader(httpCode)
+		json.NewEncoder(w).Encode(status)
 	})
 
 	// /v1 API routes, grouped by x402 price tier
@@ -252,16 +332,28 @@ func main() {
 			}
 		})
 
-		// $0.003 — compliance via empresa sub-route, DOU/diários search
+		// $0.003 — compliance via empresa sub-route, DOU/diários search, premium cross-references
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.003"))
 			r.Get("/empresas/{cnpj}/compliance", compHandler.GetCompliance)
 			r.Get("/dou/busca", douHandler.GetBusca)
 			r.Get("/diarios/busca", douHandler.GetDiarios)
+			if setorHandler != nil {
+				r.Get("/empresas/{cnpj}/setor", setorHandler.GetSetor)
+			}
+			if riscoAmbientalHandler != nil {
+				r.Get("/ambiental/risco/{municipio}", riscoAmbientalHandler.GetRiscoAmbiental)
+			}
+			if complianceEleitoralHandler != nil {
+				r.Get("/eleicoes/compliance/{cpf_cnpj}", complianceEleitoralHandler.GetComplianceEleitoral)
+			}
+			if municipioHandler != nil {
+				r.Get("/municipios/{codigo}/perfil", municipioHandler.GetMunicipioPerfil)
+			}
 		})
 
-		// $0.005 — full compliance check, CVM fund data
+		// $0.005 — full compliance check, CVM fund data, fund analysis, credit score
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.005"))
@@ -269,28 +361,75 @@ func main() {
 			if mercHandler != nil {
 				r.Get("/mercado/fundos/{cnpj}", mercHandler.GetFundos)
 			}
+			if fundoAnaliseHandler != nil {
+				r.Get("/mercado/fundos/{cnpj}/analise", fundoAnaliseHandler.GetFundoAnalise)
+			}
+			if creditoScoreHandler != nil {
+				r.Get("/credito/score/{cnpj}", creditoScoreHandler.GetCreditoScore)
+			}
 		})
 
-		// $0.010 — judicial process search (DataJud CNJ)
+		// $0.010 — judicial process search, economic panorama
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Get("/judicial/processos/{doc}", judicialHand.GetProcessos)
+			if panoramaHandler != nil {
+				r.Get("/economia/panorama", panoramaHandler.GetPanorama)
+			}
+		})
+
+		// $0.050 — due diligence
+		r.Group(func(r chi.Router) {
+			r.Use(x402pkg.BazaarMiddleware())
+			r.Use(optionalX402(x402Cfg, "0.050"))
+			if dueDiligenceHandler != nil {
+				r.Get("/empresas/{cnpj}/duediligence", dueDiligenceHandler.GetDueDiligence)
+			}
 		})
 	})
 
-	// MCP server (SSE transport) — mounted after /v1 to avoid path conflicts
-	r.Mount("/mcp", sseServer)
+	// MCP server (SSE transport) — protected by x402
+	r.Group(func(r chi.Router) {
+		r.Use(x402pkg.BazaarMiddleware())
+		r.Use(optionalX402(x402Cfg, "0.001"))
+		r.Mount("/mcp", sseServer)
+	})
 
+	// Server with timeouts and graceful shutdown
 	addr := ":" + serverPort()
-	log.Printf("databr API listening on %s (wallet=%s, network=%s)",
-		addr,
-		maskWallet(x402Cfg.WalletAddress),
-		x402Cfg.Network,
-	)
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatal(err)
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	go func() {
+		log.Printf("databr API listening on %s (wallet=%s, network=%s)",
+			addr,
+			maskWallet(x402Cfg.WalletAddress),
+			x402Cfg.Network,
+		)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s", err)
+		}
+	}()
+
+	// Graceful shutdown on SIGTERM/SIGINT
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutdown signal received, draining connections...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Server forced shutdown: %v", err)
+	}
+	log.Println("Server stopped gracefully")
 }
 
 // serverPort returns the HTTP port from PORT env var, defaulting to 8080.
@@ -316,8 +455,13 @@ func networkName(eipNetwork string) string {
 
 // optionalX402 returns a pass-through middleware when wallet address is not set (dev mode).
 // When wallet is set, creates a real x402 payment gate for the given USDC price.
+// In production (Railway/Fly.io), panics if WALLET_ADDRESS is not set.
 func optionalX402(cfg x402pkg.MiddlewareConfig, priceUSDC string) func(http.Handler) http.Handler {
 	if cfg.WalletAddress == "" {
+		if os.Getenv("RAILWAY_ENVIRONMENT") != "" || os.Getenv("FLY_APP_NAME") != "" {
+			log.Fatal("FATAL: WALLET_ADDRESS must be set in production — x402 payment disabled")
+		}
+		log.Println("WARN: WALLET_ADDRESS not set — x402 payment disabled (dev mode)")
 		return func(next http.Handler) http.Handler { return next }
 	}
 	return x402pkg.NewPricedMiddleware(cfg, priceUSDC)

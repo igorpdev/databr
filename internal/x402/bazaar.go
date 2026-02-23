@@ -115,6 +115,29 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/bcb/taxas-credito":                     {"Taxas de juros do mercado de crédito (BCB OLINDA)", "application/json"},
 	"/v1/tesouro/titulos":                       {"Preços e taxas dos títulos do Tesouro Direto", "application/json"},
 	"/v1/mercado/fundos/{cnpj}/cotas":           {"Histórico de cotas de fundos de investimento (CVM)", "application/json"},
+	// Phase 11: Premium cross-referencing endpoints
+	"/v1/empresas/{cnpj}/duediligence":          {"Due diligence completa de empresa (CNPJ + compliance + judicial + licitações)", "application/json"},
+	"/v1/economia/panorama":                     {"Panorama econômico consolidado (Selic, IPCA, PIB, câmbio, Focus, reservas)", "application/json"},
+	"/v1/empresas/{cnpj}/setor":                 {"Análise setorial de empresa por CNAE (IBGE + B3)", "application/json"},
+	"/v1/ambiental/risco/{municipio}":           {"Risco ambiental por município (DETER + PRODES)", "application/json"},
+	"/v1/eleicoes/compliance/{cpf_cnpj}":        {"Compliance eleitoral (TSE doações + CEIS/CNEP + processos)", "application/json"},
+	"/v1/credito/score/{cnpj}":                  {"Score de crédito público de empresa (dados públicos)", "application/json"},
+	"/v1/municipios/{codigo}/perfil":             {"Perfil completo de município (IBGE + SICONFI + ambiental + licitações)", "application/json"},
+	"/v1/mercado/fundos/{cnpj}/analise":         {"Análise de fundo de investimento (CVM + performance vs CDI/IPCA)", "application/json"},
+	// Phase 11: New data sources
+	"/v1/comercio/exportacoes":                  {"Dados de exportação brasileira (ComexStat MDIC)", "application/json"},
+	"/v1/comercio/importacoes":                  {"Dados de importação brasileira (ComexStat MDIC)", "application/json"},
+	"/v1/mercado/indices/ibovespa":              {"Composição do índice IBOVESPA (B3)", "application/json"},
+	"/v1/educacao/censo-escolar":                {"Indicadores educacionais do censo escolar (INEP)", "application/json"},
+	"/v1/transporte/acidentes":                  {"Acidentes de trânsito em rodovias federais (PRF)", "application/json"},
+	"/v1/emprego/rais":                          {"Dados de emprego formal por setor (RAIS)", "application/json"},
+	"/v1/emprego/caged":                         {"Criação e destruição de empregos mensais (CAGED)", "application/json"},
+	"/v1/judicial/stf":                          {"Jurisprudência do Supremo Tribunal Federal", "application/json"},
+	"/v1/judicial/stj":                          {"Jurisprudência do Superior Tribunal de Justiça", "application/json"},
+	"/v1/ambiental/uso-solo":                    {"Classificação de uso e cobertura do solo (MapBiomas)", "application/json"},
+	"/v1/ambiental/embargos":                    {"Áreas embargadas pelo IBAMA", "application/json"},
+	"/v1/energia/geracao":                       {"Geração de energia elétrica por fonte (ONS)", "application/json"},
+	"/v1/energia/carga":                         {"Carga de energia elétrica por subsistema (ONS)", "application/json"},
 }
 
 // BazaarMiddleware intercepts HTTP 402 responses and injects an `extensions.bazaar`
