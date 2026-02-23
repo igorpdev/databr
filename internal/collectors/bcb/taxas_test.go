@@ -13,20 +13,22 @@ import (
 var fakeTaxasResponse = map[string]any{
 	"value": []map[string]any{
 		{
-			"Segmento":        "Pessoa Física",
-			"Modalidade":      "Crédito pessoal não consignado",
-			"Posicao":         "A vista",
-			"DataReferencia":  "2025-01",
-			"TaxaJurosMensal": 7.23,
-			"TaxaJurosAnual":  130.45,
+			"Mes":                  "2025-01",
+			"anoMes":               "202501",
+			"Modalidade":           "Crédito pessoal não consignado",
+			"InstituicaoFinanceira": "Banco Itaú",
+			"cnpj8":                "60872504",
+			"TaxaJurosAoMes":       7.23,
+			"TaxaJurosAoAno":       130.45,
 		},
 		{
-			"Segmento":        "Pessoa Física",
-			"Modalidade":      "Cartão de crédito total",
-			"Posicao":         "A vista",
-			"DataReferencia":  "2025-01",
-			"TaxaJurosMensal": 15.12,
-			"TaxaJurosAnual":  432.18,
+			"Mes":                  "2025-01",
+			"anoMes":               "202501",
+			"Modalidade":           "Cartão de crédito total",
+			"InstituicaoFinanceira": "Banco Bradesco",
+			"cnpj8":                "60746948",
+			"TaxaJurosAoMes":       15.12,
+			"TaxaJurosAoAno":       432.18,
 		},
 	},
 }
@@ -77,7 +79,7 @@ func TestTaxasCreditoCollector_Collect(t *testing.T) {
 	if r.RecordKey == "" {
 		t.Error("RecordKey must not be empty")
 	}
-	for _, field := range []string{"segmento", "modalidade", "posicao", "data_referencia", "taxa_mensal", "taxa_anual"} {
+	for _, field := range []string{"mes", "ano_mes", "modalidade", "instituicao", "cnpj8", "taxa_mensal", "taxa_anual"} {
 		if _, ok := r.Data[field]; !ok {
 			t.Errorf("Data missing field %q", field)
 		}
@@ -105,8 +107,8 @@ func TestTaxasCreditoCollector_RecordKey(t *testing.T) {
 		t.Fatalf("Collect() error: %v", err)
 	}
 
-	// RecordKey should contain both modalidade and data_referencia
-	expected := "Crédito pessoal não consignado_2025-01"
+	// RecordKey: "{cnpj8}_{anoMes}_{modalidade}"
+	expected := "60872504_202501_Crédito pessoal não consignado"
 	if records[0].RecordKey != expected {
 		t.Errorf("RecordKey = %q, want %q", records[0].RecordKey, expected)
 	}

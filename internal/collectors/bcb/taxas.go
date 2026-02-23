@@ -11,7 +11,7 @@ import (
 	"github.com/databr/api/internal/domain"
 )
 
-const taxaJurosBase = "https://olinda.bcb.gov.br/olinda/servico/TaxaJuros/versao/v2/odata"
+const taxaJurosBase = "https://olinda.bcb.gov.br/olinda/servico/taxaJuros/versao/v2/odata"
 
 // TaxasCreditoCollector fetches credit interest rates from BCB OLINDA (TaxaJuros service v2).
 type TaxasCreditoCollector struct {
@@ -38,10 +38,8 @@ func (c *TaxasCreditoCollector) Schedule() string { return "@daily" }
 func (c *TaxasCreditoCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
 	var url string
 	if strings.Contains(c.baseURL, "olinda.bcb.gov.br") {
-		url = fmt.Sprintf(
-			"%s/TaxasJurosMercadoCredito?$format=json&$top=50&$orderby=DataReferencia%%20desc",
-			c.baseURL,
-		)
+		// TaxasJurosMensalPorMes: monthly average rates by modality and financial institution
+		url = fmt.Sprintf("%s/TaxasJurosMensalPorMes?$format=json&$top=200&$orderby=anoMes%%20desc", c.baseURL)
 	} else {
 		// Test server: use base URL directly
 		url = c.baseURL
@@ -73,34 +71,37 @@ func (c *TaxasCreditoCollector) Collect(ctx context.Context) ([]domain.SourceRec
 		return nil, fmt.Errorf("bcb_taxas_credito: no records returned")
 	}
 
+	now := time.Now().UTC()
 	records := make([]domain.SourceRecord, 0, len(raw.Value))
 	for _, entry := range raw.Value {
-		segmento, _ := entry["Segmento"].(string)
+		mes, _ := entry["Mes"].(string)
 		modalidade, _ := entry["Modalidade"].(string)
-		posicao, _ := entry["Posicao"].(string)
-		dataRef, _ := entry["DataReferencia"].(string)
-		taxaMensal, _ := entry["TaxaJurosMensal"].(float64)
-		taxaAnual, _ := entry["TaxaJurosAnual"].(float64)
+		instituicao, _ := entry["InstituicaoFinanceira"].(string)
+		cnpj8, _ := entry["cnpj8"].(string)
+		anoMes, _ := entry["anoMes"].(string)
+		taxaMensal, _ := entry["TaxaJurosAoMes"].(float64)
+		taxaAnual, _ := entry["TaxaJurosAoAno"].(float64)
 
-		if modalidade == "" || dataRef == "" {
+		if modalidade == "" || anoMes == "" {
 			continue
 		}
 
-		// RecordKey: "{Modalidade}_{DataReferencia}" — uniquely identifies a rate entry
-		key := fmt.Sprintf("%s_%s", modalidade, dataRef)
+		// RecordKey: "{cnpj8}_{anoMes}_{modalidade}" — uniquely identifies a rate entry per institution
+		key := fmt.Sprintf("%s_%s_%s", cnpj8, anoMes, modalidade)
 
 		records = append(records, domain.SourceRecord{
 			Source:    "bcb_taxas_credito",
 			RecordKey: key,
 			Data: map[string]any{
-				"segmento":       segmento,
-				"modalidade":     modalidade,
-				"posicao":        posicao,
-				"data_referencia": dataRef,
-				"taxa_mensal":    taxaMensal,
-				"taxa_anual":     taxaAnual,
+				"mes":          mes,
+				"ano_mes":      anoMes,
+				"modalidade":   modalidade,
+				"instituicao":  instituicao,
+				"cnpj8":        cnpj8,
+				"taxa_mensal":  taxaMensal,
+				"taxa_anual":   taxaAnual,
 			},
-			FetchedAt: time.Now().UTC(),
+			FetchedAt: now,
 		})
 	}
 	return records, nil

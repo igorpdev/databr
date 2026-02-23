@@ -94,10 +94,19 @@ func (h *EmpresasHandler) GetSimples(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rec := records[0]
-	simples := rec.Data["simples"]
-	mei := rec.Data["mei"]
 
-	if simples == nil && mei == nil {
+	// minhareceita.org returns flat fields: opcao_pelo_simples, opcao_pelo_mei,
+	// data_opcao_pelo_simples, data_exclusao_do_simples, etc.
+	optSimples := rec.Data["opcao_pelo_simples"]
+	optMEI := rec.Data["opcao_pelo_mei"]
+
+	// Fallback: some integrations may store a nested "simples"/"mei" object
+	if optSimples == nil && optMEI == nil {
+		optSimples = rec.Data["simples"]
+		optMEI = rec.Data["mei"]
+	}
+
+	if optSimples == nil && optMEI == nil {
 		jsonError(w, http.StatusNotFound, "Dados do Simples Nacional não disponíveis para este CNPJ")
 		return
 	}
@@ -106,7 +115,15 @@ func (h *EmpresasHandler) GetSimples(w http.ResponseWriter, r *http.Request) {
 		Source:    "cnpj_simples",
 		UpdatedAt: rec.FetchedAt,
 		CostUSDC:  "0.001",
-		Data:      map[string]any{"cnpj": normalized, "simples": simples, "mei": mei},
+		Data: map[string]any{
+			"cnpj":                        normalized,
+			"opcao_pelo_simples":          optSimples,
+			"opcao_pelo_mei":              optMEI,
+			"data_opcao_pelo_simples":     rec.Data["data_opcao_pelo_simples"],
+			"data_exclusao_do_simples":    rec.Data["data_exclusao_do_simples"],
+			"data_opcao_pelo_mei":         rec.Data["data_opcao_pelo_mei"],
+			"data_exclusao_do_mei":        rec.Data["data_exclusao_do_mei"],
+		},
 	})
 }
 

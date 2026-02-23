@@ -1,6 +1,8 @@
 package cvm
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"fmt"
@@ -44,15 +46,16 @@ func (c *CotasCollector) Collect(ctx context.Context) ([]domain.SourceRecord, er
 	now := time.Now()
 	var allRecords []domain.SourceRecord
 
-	// Fetch current month and previous month (current may not be complete yet)
+	// Fetch current month and previous month (current may not be complete yet).
+	// CVM publishes ZIP files (e.g. inf_diario_fi_202602.zip) containing a single CSV inside.
 	for _, monthOffset := range []int{0, -1} {
 		month := now.AddDate(0, monthOffset, 0)
-		filename := fmt.Sprintf("inf_diario_fi_%s.csv", month.Format("200601"))
+		filename := fmt.Sprintf("inf_diario_fi_%s.zip", month.Format("200601"))
 		url := fmt.Sprintf("%s/FI/DOC/INF_DIARIO/DADOS/%s", c.baseURL, filename)
 
-		records, err := c.fetchCSV(ctx, url)
+		records, err := c.fetchZIP(ctx, url)
 		if err != nil {
-			// Skip months that are not yet available (e.g. future or too old)
+			// Skip months that are not yet available
 			continue
 		}
 		allRecords = append(allRecords, records...)
@@ -82,6 +85,46 @@ func (c *CotasCollector) fetchCSV(ctx context.Context, url string) ([]domain.Sou
 	}
 
 	return parseCotasCSV(resp.Body)
+}
+
+// fetchZIP downloads a CVM ZIP file and extracts the CSV inside it.
+func (c *CotasCollector) fetchZIP(ctx context.Context, url string) ([]domain.SourceRecord, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cvm_cotas: build request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cvm_cotas: fetch: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("cvm_cotas: upstream returned %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("cvm_cotas: read body: %w", err)
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("cvm_cotas: unzip: %w", err)
+	}
+
+	for _, f := range zr.File {
+		if strings.HasSuffix(strings.ToLower(f.Name), ".csv") {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("cvm_cotas: open zip entry: %w", err)
+			}
+			defer rc.Close()
+			return parseCotasCSV(rc)
+		}
+	}
+	return nil, fmt.Errorf("cvm_cotas: no CSV found in ZIP")
 }
 
 // parseCotasCSV parses a semicolon-delimited inf_diario_fi CSV.
@@ -116,7 +159,11 @@ func parseCotasCSV(r io.Reader) ([]domain.SourceRecord, error) {
 			}
 		}
 
+		// CVM renamed the column in 2026: CNPJ_FUNDO → CNPJ_FUNDO_CLASSE
 		cnpjFundo, _ := data["cnpj_fundo"].(string)
+		if cnpjFundo == "" {
+			cnpjFundo, _ = data["cnpj_fundo_classe"].(string)
+		}
 		dtComptc, _ := data["dt_comptc"].(string)
 		if cnpjFundo == "" || dtComptc == "" {
 			continue

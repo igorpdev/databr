@@ -257,16 +257,14 @@ func TestGetSimples_OK(t *testing.T) {
 			Source:    "cnpj",
 			RecordKey: "12345678000195",
 			Data: map[string]any{
-				"cnpj":         "12345678000195",
-				"razao_social": "EMPRESA XPTO LTDA",
-				"simples": map[string]any{
-					"optante":        true,
-					"data_opcao":     "2010-07-01",
-					"data_exclusao":  nil,
-				},
-				"mei": map[string]any{
-					"optante": false,
-				},
+				"cnpj":                     "12345678000195",
+				"razao_social":             "EMPRESA XPTO LTDA",
+				"opcao_pelo_simples":       true,
+				"data_opcao_pelo_simples":  "2010-07-01",
+				"data_exclusao_do_simples": nil,
+				"opcao_pelo_mei":           false,
+				"data_opcao_pelo_mei":      nil,
+				"data_exclusao_do_mei":     nil,
 			},
 			FetchedAt: time.Now(),
 		}},
@@ -296,11 +294,11 @@ func TestGetSimples_OK(t *testing.T) {
 	if resp.Data == nil {
 		t.Fatal("Data must not be nil")
 	}
-	if _, ok := resp.Data["simples"]; !ok {
-		t.Error("Data must contain key 'simples'")
+	if _, ok := resp.Data["opcao_pelo_simples"]; !ok {
+		t.Error("Data must contain key 'opcao_pelo_simples'")
 	}
-	if _, ok := resp.Data["mei"]; !ok {
-		t.Error("Data must contain key 'mei'")
+	if _, ok := resp.Data["opcao_pelo_mei"]; !ok {
+		t.Error("Data must contain key 'opcao_pelo_mei'")
 	}
 	if cnpjVal, _ := resp.Data["cnpj"].(string); cnpjVal != "12345678000195" {
 		t.Errorf("Data[cnpj] = %q, want 12345678000195", cnpjVal)
