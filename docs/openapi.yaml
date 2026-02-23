@@ -85,6 +85,10 @@ tags:
     description: DataJud (CNJ) — processos judiciais
   - name: DOU
     description: Diário Oficial da União e diários municipais
+  - name: TCU
+    description: Tribunal de Contas da União — acordãos, certidões, inabilitados, contratos
+  - name: Orçamento
+    description: Orçamento Federal (SIAFI/SIOP via Portal da Transparência)
   - name: PNCP
     description: Portal Nacional de Contratações Públicas
   - name: Crédito
@@ -2074,6 +2078,285 @@ paths:
                 $ref: "#/components/schemas/APIResponse"
         "402":
           $ref: "#/components/responses/PaymentRequired"
+
+  # ── TCU ($0.001) ────────────────────────────────────────
+  /v1/tcu/acordaos:
+    get:
+      tags: [TCU]
+      summary: Acordãos do TCU
+      description: "Fonte: dados-abertos.apps.tcu.gov.br. Custo: $0.001 USDC"
+      parameters:
+        - name: inicio
+          in: query
+          description: Índice inicial para paginação
+          schema:
+            type: integer
+            default: 0
+        - name: quantidade
+          in: query
+          description: Quantidade de registros por página
+          schema:
+            type: integer
+            default: 20
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de acordãos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/tcu/certidao/{cnpj}:
+    get:
+      tags: [TCU]
+      summary: Certidão de regularidade no TCU
+      description: "Verifica situação de empresa perante o TCU. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Certidão do TCU
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "404":
+          description: CNPJ não encontrado no TCU
+
+  /v1/tcu/inabilitados:
+    get:
+      tags: [TCU]
+      summary: Lista de inabilitados pelo TCU
+      description: "Pessoas declaradas inidôneas ou inabilitadas pelo TCU. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de inabilitados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/tcu/inabilitados/{cpf}:
+    get:
+      tags: [TCU]
+      summary: Verificar inabilitação por CPF
+      description: "Verifica se CPF consta na lista de inabilitados do TCU. Custo: $0.001 USDC"
+      parameters:
+        - name: cpf
+          in: path
+          required: true
+          description: CPF (11 dígitos, com ou sem formatação)
+          schema:
+            type: string
+            example: "12345678901"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Status de inabilitação
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "400":
+          description: CPF inválido
+
+  /v1/tcu/contratos:
+    get:
+      tags: [TCU]
+      summary: Contratos do TCU
+      description: "Termos contratuais do TCU. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de contratos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Orçamento ($0.001–$0.002) ──────────────────────────
+  /v1/orcamento/despesas:
+    get:
+      tags: [Orçamento]
+      summary: Despesas do orçamento federal por órgão
+      description: "Fonte: Portal da Transparência (SIAFI). Custo: $0.001 USDC"
+      parameters:
+        - name: ano
+          in: query
+          required: true
+          description: Ano do orçamento
+          schema:
+            type: integer
+            example: 2025
+        - name: orgao
+          in: query
+          description: "Código SIAFI do órgão (ex: 26000 para MEC)"
+          schema:
+            type: string
+        - name: pagina
+          in: query
+          description: Número da página
+          schema:
+            type: integer
+            default: 1
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Despesas por órgão
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "400":
+          description: Parâmetro 'ano' ausente
+
+  /v1/orcamento/funcional-programatica:
+    get:
+      tags: [Orçamento]
+      summary: Classificação funcional-programática de despesas
+      description: "Fonte: Portal da Transparência (SIAFI). Custo: $0.001 USDC"
+      parameters:
+        - name: ano
+          in: query
+          required: true
+          description: Ano do orçamento
+          schema:
+            type: integer
+            example: 2025
+        - name: pagina
+          in: query
+          description: Número da página
+          schema:
+            type: integer
+            default: 1
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Classificação funcional-programática
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/orcamento/documentos:
+    get:
+      tags: [Orçamento]
+      summary: Documentos de despesa (empenho/liquidação/pagamento)
+      description: "Fonte: Portal da Transparência (SIAFI). Custo: $0.002 USDC"
+      parameters:
+        - name: fase
+          in: query
+          description: "Fase da despesa (1=empenho, 2=liquidação, 3=pagamento)"
+          schema:
+            type: integer
+        - name: dataEmissao
+          in: query
+          description: Data de emissão (DD/MM/AAAA)
+          schema:
+            type: string
+        - name: pagina
+          in: query
+          description: Número da página
+          schema:
+            type: integer
+            default: 1
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Documentos de despesa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/orcamento/documento/{codigo}:
+    get:
+      tags: [Orçamento]
+      summary: Documento de despesa por código
+      description: "Fonte: Portal da Transparência (SIAFI). Custo: $0.001 USDC"
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          description: Código do documento de despesa
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Documento de despesa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "404":
+          description: Documento não encontrado
+
+  /v1/orcamento/favorecidos:
+    get:
+      tags: [Orçamento]
+      summary: Documentos de despesa por favorecido
+      description: "Fonte: Portal da Transparência (SIAFI). Custo: $0.002 USDC"
+      parameters:
+        - name: documento
+          in: query
+          required: true
+          description: CPF ou CNPJ do favorecido
+          schema:
+            type: string
+        - name: ano
+          in: query
+          required: true
+          description: Ano do orçamento
+          schema:
+            type: integer
+        - name: fase
+          in: query
+          required: true
+          description: "Fase da despesa (1=empenho, 2=liquidação, 3=pagamento)"
+          schema:
+            type: integer
+        - name: pagina
+          in: query
+          description: Número da página
+          schema:
+            type: integer
+            default: 1
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Documentos por favorecido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "400":
+          description: Parâmetros obrigatórios ausentes
 
   # ── Crédito ($0.005) ────────────────────────────────────
   /v1/credito/score/{cnpj}:
