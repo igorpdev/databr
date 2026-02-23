@@ -30,6 +30,24 @@ info:
 
     Use `?format=context` para obter o campo `context` (string otimizada para LLMs) em vez de `data`, custo adicional +$0.001.
 
+    ## Query Parameters Globais
+
+    Todos os endpoints `/v1/*` suportam os seguintes query parameters opcionais:
+
+    | Parâmetro | Exemplo | Descrição |
+    |-----------|---------|-----------|
+    | `format` | `?format=context` | Retorna campo `context` (LLM-ready) em vez de `data` (+$0.002) |
+    | `fields` | `?fields=valor,data` | Retorna apenas os campos especificados no `data` |
+    | `since` | `?since=2026-01-01` | Filtra registros atualizados a partir desta data (YYYY-MM-DD) |
+    | `until` | `?until=2026-02-01` | Filtra registros atualizados até esta data (YYYY-MM-DD) |
+
+    `fields`, `since` e `until` podem ser combinados: `?fields=valor&since=2026-01-01&until=2026-02-01`
+
+    ## Rate Limiting
+
+    - **Sem pagamento (por IP):** 100 req/min
+    - **Com pagamento x402 (por wallet):** 500 req/min
+
     ## Cache
 
     Respostas são cacheadas em Redis com TTL por faixa de preço:
@@ -162,10 +180,33 @@ components:
     FormatParam:
       name: format
       in: query
-      description: "Use `context` para resposta otimizada para LLMs (+$0.001)"
+      description: "Use `context` para resposta otimizada para LLMs (+$0.002)"
       schema:
         type: string
         enum: [context]
+    FieldsParam:
+      name: fields
+      in: query
+      description: "Campos do `data` a retornar (separados por vírgula). Ex: `?fields=valor,data`"
+      schema:
+        type: string
+        example: "valor,data"
+    SinceParam:
+      name: since
+      in: query
+      description: "Filtrar registros atualizados a partir desta data (YYYY-MM-DD)"
+      schema:
+        type: string
+        format: date
+        example: "2026-01-01"
+    UntilParam:
+      name: until
+      in: query
+      description: "Filtrar registros atualizados até esta data (YYYY-MM-DD)"
+      schema:
+        type: string
+        format: date
+        example: "2026-02-01"
     CNPJParam:
       name: cnpj
       in: path
@@ -196,7 +237,7 @@ components:
           schema:
             $ref: "#/components/schemas/PaymentRequired"
     RateLimited:
-      description: Rate limit excedido (100 req/min por IP)
+      description: Rate limit excedido (100 req/min por IP, 500 req/min por wallet x402)
       content:
         application/json:
           schema:
