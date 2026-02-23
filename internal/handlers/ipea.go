@@ -39,6 +39,10 @@ func NewIPEAHandlerWithClient(client *http.Client) *IPEAHandler {
 //   - desde: ISO date to filter from (e.g. "2024-01-01"); defaults to 2 years ago
 func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 	codigo := chi.URLParam(r, "codigo")
+	if !isValidSeriesCodigo(codigo) {
+		jsonError(w, http.StatusBadRequest, "código de série inválido — use apenas letras, números e underscores (2-50 chars)")
+		return
+	}
 
 	// Parse n (default 24, clamp 1..120).
 	n := 24
@@ -76,7 +80,7 @@ func (h *IPEAHandler) GetSerie(w http.ResponseWriter, r *http.Request) {
 	q.Set("$filter", filterExpr)
 	upstreamURL := fmt.Sprintf(
 		"http://ipeadata.gov.br/api/odata4/ValoresSerie(SERCODIGO='%s')?%s",
-		codigo, q.Encode(),
+		sanitizeOData(codigo), q.Encode(),
 	)
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)

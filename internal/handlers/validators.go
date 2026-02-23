@@ -126,6 +126,13 @@ func isValidCNAE(code string) bool {
 	return reCNAE.MatchString(code)
 }
 
+var reSeriesCodigo = regexp.MustCompile(`^[A-Za-z0-9_]{2,50}$`)
+
+// isValidSeriesCodigo validates an IPEAData series code (alphanumeric + underscores, 2-50 chars).
+func isValidSeriesCodigo(s string) bool {
+	return reSeriesCodigo.MatchString(s)
+}
+
 // sanitizeOData escapes user input for safe inclusion in OData $filter expressions.
 // Prevents OData injection by: escaping single quotes, removing semicolons,
 // stripping SQL-like keywords, and URL-encoding the result.

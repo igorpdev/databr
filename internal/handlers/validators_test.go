@@ -1,6 +1,9 @@
 package handlers
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsValidCNPJ(t *testing.T) {
 	tests := []struct {
@@ -160,6 +163,30 @@ func TestIsValidCNAE(t *testing.T) {
 	for _, tt := range tests {
 		if got := isValidCNAE(tt.code); got != tt.valid {
 			t.Errorf("isValidCNAE(%q) = %v, want %v", tt.code, got, tt.valid)
+		}
+	}
+}
+
+func TestIsValidSeriesCodigo(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"BM12_TJOVER12", true},
+		{"PRECOS12_IPCA12", true},
+		{"SCN10_TRIBFBCF10", true},
+		{"AB", true},
+		{"a", false},
+		{"", false},
+		{"ABC'DEF", false},
+		{"A;DROP", false},
+		{"AB CD", false},
+		{"foo/bar", false},
+		{strings.Repeat("A", 51), false},
+	}
+	for _, tt := range tests {
+		if got := isValidSeriesCodigo(tt.input); got != tt.want {
+			t.Errorf("isValidSeriesCodigo(%q) = %v, want %v", tt.input, got, tt.want)
 		}
 	}
 }

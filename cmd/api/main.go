@@ -100,6 +100,7 @@ func main() {
 	pncpHandler := handlers.NewPNCPHandler()
 	tseExtrasHandler := handlers.NewTSEExtrasHandler()
 	ansHandler := handlers.NewANSHandler()
+	tcuHandler := handlers.NewTCUHandler()
 	// Proxy BCB handler for routes that call external APIs directly (no DB needed).
 	proxyBCBHandler := handlers.NewBCBHandler(nil)
 
@@ -366,6 +367,11 @@ func main() {
 			r.Get("/eleicoes/resultados", tseExtrasHandler.GetResultados)
 			r.Get("/energia/combustiveis", tseExtrasHandler.GetCombustiveis)
 			r.Get("/saude/planos", ansHandler.GetPlanos)
+			r.Get("/tcu/acordaos", tcuHandler.GetAcordaos)
+			r.Get("/tcu/certidao/{cnpj}", tcuHandler.GetCertidao)
+			r.Get("/tcu/inabilitados", tcuHandler.GetInabilitados)
+			r.Get("/tcu/inabilitados/{cpf}", tcuHandler.GetInabilitadoByCPF)
+			r.Get("/tcu/contratos", tcuHandler.GetContratos)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)

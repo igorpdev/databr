@@ -25,6 +25,7 @@ import (
 	"github.com/databr/api/internal/collectors/saude"
 	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transporte"
+	"github.com/databr/api/internal/collectors/tcu"
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/collectors/tse"
 	"github.com/databr/api/internal/domain"
@@ -68,6 +69,7 @@ func main() {
 	}
 	defer pool.Close()
 	repo := repositories.NewSourceRecordRepository(pool)
+	runs := repositories.NewCollectorRunRepository(pool)
 
 	// All scheduled collectors (Phases 1–9)
 	collectors := []domain.Collector{
@@ -125,6 +127,9 @@ func main() {
 		juridico.NewSTJCollector(""),
 		ambiental.NewMapBiomasCollector(""),
 		ambiental.NewIBAMACollector(""),
+
+		// Phase 12+: TCU
+		tcu.NewAcordaosCollector(""),
 	}
 
 	// Run all collectors on startup to populate the DB.
@@ -135,7 +140,7 @@ func main() {
 			if col.Schedule() == "@yearly" {
 				continue
 			}
-			runCollector(ctx, col, repo)
+			runCollector(ctx, col, repo, runs)
 		}
 		slog.Info("initial collection complete (fast sources)")
 	}()
@@ -146,7 +151,7 @@ func main() {
 		col := col
 		go func() {
 			slog.Info("running collector in background (large dataset)", "source", col.Source())
-			runCollector(ctx, col, repo)
+			runCollector(ctx, col, repo, runs)
 		}()
 	}
 
@@ -154,7 +159,7 @@ func main() {
 	for _, col := range collectors {
 		col := col // capture for closure
 		if _, err := c.AddFunc(col.Schedule(), func() {
-			runCollector(ctx, col, repo)
+			runCollector(ctx, col, repo, runs)
 		}); err != nil {
 			slog.Warn("failed to schedule collector", "source", col.Source(), "error", err)
 		} else {
@@ -181,21 +186,36 @@ func main() {
 }
 
 // runCollector executes a single collector and upserts results into the database.
-func runCollector(ctx context.Context, col domain.Collector, repo *repositories.SourceRecordRepository) {
+func runCollector(ctx context.Context, col domain.Collector, repo *repositories.SourceRecordRepository, runs *repositories.CollectorRunRepository) {
 	slog.Info("collecting", "source", col.Source())
+	if runs != nil {
+		_ = runs.RecordStart(ctx, col.Source())
+	}
 	records, err := col.Collect(ctx)
 	if err != nil {
 		slog.Error("collect failed", "source", col.Source(), "error", err)
+		if runs != nil {
+			_ = runs.RecordError(ctx, col.Source(), err.Error())
+		}
 		return
 	}
 	if len(records) == 0 {
 		slog.Info("no records returned", "source", col.Source())
+		if runs != nil {
+			_ = runs.RecordSuccess(ctx, col.Source(), time.Time{})
+		}
 		return
 	}
 	slog.Info("collected records, starting upsert", "source", col.Source(), "count", len(records))
 	if err := repo.Upsert(ctx, records); err != nil {
 		slog.Error("upsert failed", "source", col.Source(), "error", err)
+		if runs != nil {
+			_ = runs.RecordError(ctx, col.Source(), err.Error())
+		}
 		return
 	}
 	slog.Info("upsert complete", "source", col.Source(), "count", len(records))
+	if runs != nil {
+		_ = runs.RecordSuccess(ctx, col.Source(), time.Time{})
+	}
 }
