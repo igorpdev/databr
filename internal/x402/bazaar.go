@@ -218,16 +218,26 @@ func (bw *bazaarWriter) finalize(pattern string) {
 		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
 	}
 
-	// Inject discovery fields into each accepts item so the CDP facilitator
-	// can index them in the Bazaar. The facilitator reads discoverable,
-	// method, description, and mimeType from inside each accepts entry.
+	// Inject discovery fields into each accepts item matching the format
+	// expected by the CDP facilitator's Bazaar index. The facilitator reads
+	// description and mimeType directly from the accepts entry, and reads
+	// discoverable/method from outputSchema.input (matching the official
+	// @coinbase/x402 extensions/bazaar format).
 	if accepts, ok := body["accepts"].([]interface{}); ok {
 		for i, item := range accepts {
 			if m, ok := item.(map[string]interface{}); ok {
-				m["discoverable"] = true
-				m["method"] = "GET"
 				m["description"] = meta.description
 				m["mimeType"] = meta.mimeType
+				m["outputSchema"] = map[string]interface{}{
+					"input": map[string]interface{}{
+						"discoverable": true,
+						"method":       "GET",
+						"type":         "http",
+					},
+					"output": map[string]interface{}{
+						"type": "object",
+					},
+				}
 				accepts[i] = m
 			}
 		}

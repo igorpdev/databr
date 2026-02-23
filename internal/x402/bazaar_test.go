@@ -45,17 +45,27 @@ func TestBazaarMiddleware_InjectsIntoAccepts(t *testing.T) {
 
 	item := accepts[0].(map[string]interface{})
 
-	if item["discoverable"] != true {
-		t.Errorf("discoverable: want true, got %v", item["discoverable"])
-	}
-	if item["method"] != "GET" {
-		t.Errorf("method: want GET, got %v", item["method"])
-	}
 	if item["description"] != "Taxa Selic do Banco Central" {
 		t.Errorf("description: want 'Taxa Selic do Banco Central', got %v", item["description"])
 	}
 	if item["mimeType"] != "application/json" {
 		t.Errorf("mimeType: want application/json, got %v", item["mimeType"])
+	}
+
+	// discoverable and method live inside outputSchema.input
+	schema, ok := item["outputSchema"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected outputSchema, got %v", item["outputSchema"])
+	}
+	input, ok := schema["input"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected outputSchema.input, got %v", schema["input"])
+	}
+	if input["discoverable"] != true {
+		t.Errorf("discoverable: want true, got %v", input["discoverable"])
+	}
+	if input["method"] != "GET" {
+		t.Errorf("method: want GET, got %v", input["method"])
 	}
 
 	// Original 402 fields must still be present.
@@ -119,11 +129,13 @@ func TestBazaarMiddleware_UnknownRoute(t *testing.T) {
 	accepts := body["accepts"].([]interface{})
 	item := accepts[0].(map[string]interface{})
 
-	if item["discoverable"] != true {
-		t.Error("unknown route should still be discoverable")
-	}
 	// Fallback description
 	if item["description"] != "DataBR — dados públicos brasileiros" {
 		t.Errorf("expected fallback description, got %v", item["description"])
+	}
+	schema := item["outputSchema"].(map[string]interface{})
+	input := schema["input"].(map[string]interface{})
+	if input["discoverable"] != true {
+		t.Error("unknown route should still be discoverable")
 	}
 }
