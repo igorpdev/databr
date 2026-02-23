@@ -474,6 +474,119 @@ func TestGetSML_PaisInvalido(t *testing.T) {
 	}
 }
 
+// --- GetIFData tests ---
+
+func TestGetIFData_OK(t *testing.T) {
+	body := `{"value":[{"CNPJ8":"00000000","NomeInstituicao":"Banco do Brasil S.A.","CodAtivo":1}]}`
+	h, srv := mockBCBOLINDA(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/ifdata", h.GetIFData)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/ifdata?n=5", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["source"] != "bcb_ifdata" {
+		t.Errorf("source = %q, want bcb_ifdata", resp["source"])
+	}
+	data, _ := resp["data"].(map[string]any)
+	if data == nil {
+		t.Fatal("data must not be nil")
+	}
+	insts, _ := data["instituicoes"].([]any)
+	if len(insts) == 0 {
+		t.Error("expected at least 1 instituicao")
+	}
+	if data["total"] == nil {
+		t.Error("expected total field in data")
+	}
+}
+
+func TestGetIFData_UpstreamError(t *testing.T) {
+	h, srv := mockBCBOLINDA(t, http.StatusInternalServerError, `{"error":"internal"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/ifdata", h.GetIFData)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/ifdata", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- GetBaseMonetaria tests ---
+
+func TestGetBaseMonetaria_OK(t *testing.T) {
+	// The handler fetches M0 and M2 sequentially from the same base URL.
+	// The mock server returns the same body for both requests.
+	body := `[{"data":"01/12/2025","valor":"303339501"}]`
+	h, srv := mockBCBSGS(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/base-monetaria", h.GetBaseMonetaria)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/base-monetaria?n=3", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["source"] != "bcb_base_monetaria" {
+		t.Errorf("source = %q, want bcb_base_monetaria", resp["source"])
+	}
+	data, _ := resp["data"].(map[string]any)
+	if data == nil {
+		t.Fatal("data must not be nil")
+	}
+	if data["m0"] == nil {
+		t.Error("expected m0 field in data")
+	}
+	if data["m2"] == nil {
+		t.Error("expected m2 field in data")
+	}
+	m0, _ := data["m0"].([]any)
+	if len(m0) == 0 {
+		t.Error("expected at least 1 m0 entry")
+	}
+}
+
+func TestGetBaseMonetaria_UpstreamError(t *testing.T) {
+	h, srv := mockBCBSGS(t, http.StatusInternalServerError, `{"error":"internal"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/bcb/base-monetaria", h.GetBaseMonetaria)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/base-monetaria", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestBCBHandler_GetSelic_FormatContext(t *testing.T) {
 	store := &stubBCBStore{
 		records: []domain.SourceRecord{{

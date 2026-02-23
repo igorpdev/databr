@@ -542,6 +542,256 @@ func TestTransparenciaFederal_GetViagens_BadGateway(t *testing.T) {
 	}
 }
 
+// --- GetEmendas ---
+
+func TestTransparenciaFederal_GetEmendas_OK(t *testing.T) {
+	body := `[{"codigoEmenda":"202471050005","ano":2024,"tipoEmenda":"Emenda de Bancada","autor":"BANCADA DO AMAPA"}]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/emendas", h.GetEmendas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/emendas?ano=2024", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["source"] != "cgu_emendas" {
+		t.Errorf("source = %q, want cgu_emendas", resp["source"])
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("data field missing or not a map")
+	}
+	if _, ok := data["emendas"]; !ok {
+		t.Error("data.emendas field missing")
+	}
+}
+
+func TestTransparenciaFederal_GetEmendas_DefaultYear(t *testing.T) {
+	body := `[]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/emendas", h.GetEmendas)
+
+	// No ano param — should default to current year without 400
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/emendas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusBadRequest {
+		t.Fatalf("expected non-400 when ano is omitted, got 400: %s", rec.Body.String())
+	}
+}
+
+func TestTransparenciaFederal_GetEmendas_BadGateway(t *testing.T) {
+	h, srv := mockTransparenciaHTTP(t, http.StatusInternalServerError, `{"error":"oops"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/emendas", h.GetEmendas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/emendas?ano=2024", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d", rec.Code)
+	}
+}
+
+// --- GetObras ---
+
+func TestTransparenciaFederal_GetObras_OK(t *testing.T) {
+	body := `[{"id":303718918,"endereco":"SQS 203, Bl. C, Ap. 601","cep":"70233030"}]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/obras", h.GetObras)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/obras?n=20", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["source"] != "cgu_obras" {
+		t.Errorf("source = %q, want cgu_obras", resp["source"])
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("data field missing or not a map")
+	}
+	if _, ok := data["obras"]; !ok {
+		t.Error("data.obras field missing")
+	}
+}
+
+func TestTransparenciaFederal_GetObras_BadGateway(t *testing.T) {
+	h, srv := mockTransparenciaHTTP(t, http.StatusInternalServerError, `{"error":"oops"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/obras", h.GetObras)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/obras", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d", rec.Code)
+	}
+}
+
+// --- GetTransferencias ---
+
+func TestTransparenciaFederal_GetTransferencias_OK(t *testing.T) {
+	body := `[{"id":336707282,"dimConvenio":{"objeto":"Projeto Teste"},"situacao":"EM EXECUÇÃO"}]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/transferencias", h.GetTransferencias)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/transferencias?orgao=26000&municipio_ibge=3550308", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["source"] != "cgu_transferencias" {
+		t.Errorf("source = %q, want cgu_transferencias", resp["source"])
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("data field missing or not a map")
+	}
+	if _, ok := data["transferencias"]; !ok {
+		t.Error("data.transferencias field missing")
+	}
+}
+
+func TestTransparenciaFederal_GetTransferencias_MissingOrgao(t *testing.T) {
+	// orgao is required — should return 400 when omitted
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, `[]`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/transferencias", h.GetTransferencias)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/transferencias", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when orgao omitted, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTransparenciaFederal_GetTransferencias_BadGateway(t *testing.T) {
+	h, srv := mockTransparenciaHTTP(t, http.StatusInternalServerError, `{"error":"oops"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/transferencias", h.GetTransferencias)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/transferencias?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d", rec.Code)
+	}
+}
+
+// --- GetPensionistas ---
+
+func TestTransparenciaFederal_GetPensionistas_OK(t *testing.T) {
+	body := `[{"id":1001,"nome":"JOAO DA SILVA","tipoServidor":"Civil"}]`
+	h, srv := mockTransparenciaHTTP(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/pensionistas", h.GetPensionistas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pensionistas?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["source"] != "cgu_pensionistas" {
+		t.Errorf("source = %q, want cgu_pensionistas", resp["source"])
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("data field missing or not a map")
+	}
+	if _, ok := data["pensionistas"]; !ok {
+		t.Error("data.pensionistas field missing")
+	}
+	if data["orgao"] != "26000" {
+		t.Errorf("data.orgao = %q, want 26000", data["orgao"])
+	}
+}
+
+func TestTransparenciaFederal_GetPensionistas_MissingOrgao(t *testing.T) {
+	h := handlers.NewTransparenciaFederalHandlerWithClient(&stubTransparenciaFetcher{}, &http.Client{}, "key")
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/pensionistas", h.GetPensionistas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pensionistas", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", rec.Code)
+	}
+}
+
+func TestTransparenciaFederal_GetPensionistas_BadGateway(t *testing.T) {
+	h, srv := mockTransparenciaHTTP(t, http.StatusInternalServerError, `{"error":"oops"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/transparencia/pensionistas", h.GetPensionistas)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pensionistas?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d", rec.Code)
+	}
+}
+
+// --- GetCartoes (existing tests below) ---
+
 func TestTransparenciaFederal_GetCartoes_DefaultDates(t *testing.T) {
 	// When de/ate omitted, defaults should apply and fetcher is called.
 	stub := &stubTransparenciaFetcher{

@@ -247,6 +247,241 @@ func (h *TransparenciaFederalHandler) GetCEAF(w http.ResponseWriter, r *http.Req
 	})
 }
 
+// GetEmendas handles GET /v1/transparencia/emendas?ano=2024&n=20.
+// Returns parliamentary budget amendments from Portal da Transparência.
+// Optional: ano (default current year), n (default 20, max 100).
+// Requires TRANSPARENCIA_API_KEY env variable.
+func (h *TransparenciaFederalHandler) GetEmendas(w http.ResponseWriter, r *http.Request) {
+	ano := r.URL.Query().Get("ano")
+	if ano == "" {
+		ano = strconv.Itoa(time.Now().UTC().Year())
+	}
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf(
+		"https://api.portaldatransparencia.gov.br/api-de-dados/emendas?pagina=1&quantidade=%d&ano=%s",
+		n, ano,
+	)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	var dados []any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_emendas",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"emendas": dados, "total": len(dados), "ano": ano},
+	})
+}
+
+// GetObras handles GET /v1/transparencia/obras?n=20.
+// Returns federal government functional real estate records from Portal da Transparência.
+// Uses the /imoveis endpoint (functional property registry) as the works/obras data source.
+// Optional: n (default 20, max 100).
+// Requires TRANSPARENCIA_API_KEY env variable.
+func (h *TransparenciaFederalHandler) GetObras(w http.ResponseWriter, r *http.Request) {
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf(
+		"https://api.portaldatransparencia.gov.br/api-de-dados/imoveis?pagina=1&quantidade=%d",
+		n,
+	)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	var dados []any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_obras",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"obras": dados, "total": len(dados)},
+	})
+}
+
+// GetTransferencias handles GET /v1/transparencia/transferencias?orgao=26000&n=20.
+// Returns federal government convenios/transfers for the given agency (SIAFI code).
+// Uses the /convenios endpoint — the API requires at least one filter (orgao is mandatory here).
+// Required: orgao (SIAFI agency code, e.g. "26000" for MEC).
+// Optional: municipio_ibge (IBGE municipality code), n (default 20, max 100).
+// Requires TRANSPARENCIA_API_KEY env variable.
+func (h *TransparenciaFederalHandler) GetTransferencias(w http.ResponseWriter, r *http.Request) {
+	orgao := r.URL.Query().Get("orgao")
+	if orgao == "" {
+		jsonError(w, http.StatusBadRequest, "query param 'orgao' é obrigatório (código SIAFI, ex: '26000' para MEC)")
+		return
+	}
+	municipio := r.URL.Query().Get("municipio_ibge")
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf(
+		"https://api.portaldatransparencia.gov.br/api-de-dados/convenios?pagina=1&quantidade=%d&codigoOrgao=%s",
+		n, orgao,
+	)
+	if municipio != "" {
+		upURL += "&codigoIBGE=" + municipio
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	var dados []any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_transferencias",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"transferencias": dados, "total": len(dados), "orgao": orgao, "municipio_ibge": municipio},
+	})
+}
+
+// GetPensionistas handles GET /v1/transparencia/pensionistas?orgao=26000&n=20.
+// Returns federal government civil servants (tipoServidor=1) by agency from Portal da Transparência.
+// Uses the /servidores endpoint filtered by orgaoServidorLotacao and tipoServidor=1 (civil).
+// Required: orgao (SIAPI agency code, e.g. "26000" for MEC).
+// Optional: n (default 20, max 100).
+// Requires TRANSPARENCIA_API_KEY env variable.
+func (h *TransparenciaFederalHandler) GetPensionistas(w http.ResponseWriter, r *http.Request) {
+	orgao := r.URL.Query().Get("orgao")
+	if orgao == "" {
+		jsonError(w, http.StatusBadRequest, "query param 'orgao' is required (SIAFI agency code, e.g. '26000')")
+		return
+	}
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf(
+		"https://api.portaldatransparencia.gov.br/api-de-dados/servidores?orgaoServidorLotacao=%s&tipoServidor=1&pagina=1&quantidade=%d",
+		orgao, n,
+	)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "Erro ao construir requisição: "+err.Error())
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao consultar Portal da Transparência: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("Portal Transparência retornou %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	var dados []any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		jsonError(w, http.StatusBadGateway, "Erro ao decodificar resposta: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_pensionistas",
+		CostUSDC: "0.001",
+		Data:     map[string]any{"pensionistas": dados, "total": len(dados), "orgao": orgao},
+	})
+}
+
 // GetViagens handles GET /v1/transparencia/viagens.
 // Returns government travel records from Portal da Transparência.
 // Required query param: orgao (SIAFI agency code, e.g. "26000" for MEC).

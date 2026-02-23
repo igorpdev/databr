@@ -404,6 +404,144 @@ func (h *BCBHandler) GetSML(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetIFData handles GET /v1/bcb/ifdata.
+// Returns financial institution data from BCB OLINDA IFDATA service.
+// Uses the IfDataCadastro function import (requires AnoMes=YYYYMM parameter).
+// Optional query params:
+//   - n: number of results to return (default 10, max 100)
+//   - data: reference date in format YYYYMM (e.g. "202412"); defaults to last completed quarter
+func (h *BCBHandler) GetIFData(w http.ResponseWriter, r *http.Request) {
+	n := 10
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	// Use provided date or calculate a safely-published quarter (YYYYMM).
+	// BCB IFDATA publishes quarterly data with ~3-4 month delay; going back 6 months
+	// guarantees the quarter has been published.
+	anoMes := r.URL.Query().Get("data")
+	if anoMes == "" {
+		t := time.Now().UTC().AddDate(0, -6, 0)
+		month := int(t.Month())
+		year := t.Year()
+		// Snap forward to the end of that month's quarter (Q1→3, Q2→6, Q3→9, Q4→12).
+		quarterEnd := ((month-1)/3 + 1) * 3
+		anoMes = fmt.Sprintf("%d%02d", year, quarterEnd)
+	}
+
+	// OLINDA IFDATA uses a FunctionImport (not EntitySet) — the correct form is
+	// IfDataCadastro(AnoMes=YYYYMM), not _IfDataCadastro.
+	upURL := fmt.Sprintf(
+		"https://olinda.bcb.gov.br/olinda/servico/IFDATA/versao/v1/odata/IfDataCadastro(AnoMes=%s)?$top=%d&$format=json&$orderby=NomeInstituicao",
+		anoMes, n,
+	)
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to build request: "+err.Error())
+		return
+	}
+
+	upResp, err := h.httpClient.Do(req)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "BCB OLINDA IFDATA unavailable: "+err.Error())
+		return
+	}
+	defer upResp.Body.Close()
+
+	if upResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(upResp.Body)
+		jsonError(w, http.StatusBadGateway, fmt.Sprintf("BCB OLINDA IFDATA returned %d: %s", upResp.StatusCode, string(body)))
+		return
+	}
+
+	var envelope struct {
+		Value []map[string]any `json:"value"`
+	}
+	if err := json.NewDecoder(upResp.Body).Decode(&envelope); err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to decode BCB OLINDA IFDATA response: "+err.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "bcb_ifdata",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"instituicoes": envelope.Value,
+			"total":        len(envelope.Value),
+		},
+	})
+}
+
+// GetBaseMonetaria handles GET /v1/bcb/base-monetaria.
+// Returns the last n observations of Brazilian monetary aggregates (M0, M2) from BCB SGS.
+// Optional query param: n (default 12, max 100).
+// Series used:
+//   - 27790: M0 – Base monetária restrita
+//   - 27791: M2 – M1 + depósitos especiais remunerados + depósitos de poupança + títulos emitidos por IF
+func (h *BCBHandler) GetBaseMonetaria(w http.ResponseWriter, r *http.Request) {
+	n := 12
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	type serieResult struct {
+		nome   string
+		series []map[string]any
+		err    error
+	}
+
+	fetchSGS := func(code int) ([]map[string]any, error) {
+		url := fmt.Sprintf("https://api.bcb.gov.br/dados/serie/bcdata.sgs.%d/dados/ultimos/%d?formato=json", code, n)
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := h.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("BCB SGS %d returned %d: %s", code, resp.StatusCode, string(body))
+		}
+		var valores []map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&valores); err != nil {
+			return nil, fmt.Errorf("failed to decode BCB SGS %d: %w", code, err)
+		}
+		return valores, nil
+	}
+
+	m0, errM0 := fetchSGS(27790)
+	if errM0 != nil {
+		jsonError(w, http.StatusBadGateway, "BCB SGS M0 unavailable: "+errM0.Error())
+		return
+	}
+
+	m2, errM2 := fetchSGS(27791)
+	if errM2 != nil {
+		jsonError(w, http.StatusBadGateway, "BCB SGS M2 unavailable: "+errM2.Error())
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "bcb_base_monetaria",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"m0":          m0,
+			"m2":          m2,
+			"n":           n,
+			"descricao_m0": "M0 - Base monetária restrita (R$ milhares)",
+			"descricao_m2": "M2 - M1 + depósitos de poupança + títulos emitidos por IF (R$ milhares)",
+		},
+	})
+}
+
 // jsonError writes a JSON error response.
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")

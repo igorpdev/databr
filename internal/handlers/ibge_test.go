@@ -313,3 +313,121 @@ func TestGetPIM_OK(t *testing.T) {
 		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// --- GetPMC tests ---
+
+func TestGetPMC_OK(t *testing.T) {
+	body := `[{"D1N":"Brasil","V":"115.2","D3N":"202501"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/ibge/pmc", h.GetPMC)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/pmc?n=3", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "ibge_pmc" {
+		t.Errorf("Source = %q, want ibge_pmc", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+	if resp.Data == nil {
+		t.Fatal("Data must not be nil")
+	}
+	pmc, ok := resp.Data["pmc"].([]any)
+	if !ok {
+		t.Fatalf("data.pmc is not a slice, got %T", resp.Data["pmc"])
+	}
+	if len(pmc) == 0 {
+		t.Error("expected at least 1 pmc entry")
+	}
+	if resp.Data["descricao"] == nil {
+		t.Error("expected descricao field in data")
+	}
+}
+
+func TestGetPMC_UpstreamError(t *testing.T) {
+	h, srv := mockIBGE(t, http.StatusInternalServerError, `{"error":"internal"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/ibge/pmc", h.GetPMC)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/pmc", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- GetPMS tests ---
+
+func TestGetPMS_OK(t *testing.T) {
+	body := `[{"D1N":"Brasil","V":"198.7","D3N":"202501"}]`
+	h, srv := mockIBGE(t, http.StatusOK, body)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/ibge/pms", h.GetPMS)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/pms?n=3", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "ibge_pms" {
+		t.Errorf("Source = %q, want ibge_pms", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+	if resp.Data == nil {
+		t.Fatal("Data must not be nil")
+	}
+	pms, ok := resp.Data["pms"].([]any)
+	if !ok {
+		t.Fatalf("data.pms is not a slice, got %T", resp.Data["pms"])
+	}
+	if len(pms) == 0 {
+		t.Error("expected at least 1 pms entry")
+	}
+	if resp.Data["descricao"] == nil {
+		t.Error("expected descricao field in data")
+	}
+}
+
+func TestGetPMS_UpstreamError(t *testing.T) {
+	h, srv := mockIBGE(t, http.StatusInternalServerError, `{"error":"internal"}`)
+	defer srv.Close()
+
+	r := chi.NewRouter()
+	r.Get("/v1/ibge/pms", h.GetPMS)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/ibge/pms", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502 got %d: %s", rec.Code, rec.Body.String())
+	}
+}

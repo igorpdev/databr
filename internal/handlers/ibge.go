@@ -344,3 +344,57 @@ func (h *IbgeHandler) GetIPCA15(w http.ResponseWriter, r *http.Request) {
 		Data:     map[string]any{"dados": dados, "total": len(dados), "descricao": "IPCA-15 - Variação mensal (%)"},
 	})
 }
+
+// GetPMC handles GET /v1/ibge/pmc.
+// Returns recent PMC (Pesquisa Mensal de Comércio) retail sales volume index.
+// SIDRA table 8881, variable 11709 (índice de volume de vendas do comércio varejista) — Brasil.
+// Optional query param: n (periods, default 3, max 20).
+func (h *IbgeHandler) GetPMC(w http.ResponseWriter, r *http.Request) {
+	n := 3
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 20 {
+			n = v
+		}
+	}
+	items, err := h.sidraFetch(r.Context(), "8881", "11709", "N1%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_pmc",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"pmc":       items,
+			"total":     len(items),
+			"descricao": "PMC - Índice de volume de vendas do comércio varejista (2022=100)",
+		},
+	})
+}
+
+// GetPMS handles GET /v1/ibge/pms.
+// Returns recent PMS (Pesquisa Mensal de Serviços) services nominal revenue index.
+// SIDRA table 8162, variable 11622 (receita nominal de serviços) — Brasil.
+// Optional query param: n (periods, default 3, max 20).
+func (h *IbgeHandler) GetPMS(w http.ResponseWriter, r *http.Request) {
+	n := 3
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 20 {
+			n = v
+		}
+	}
+	items, err := h.sidraFetch(r.Context(), "8162", "11622", "N1%5Ball%5D", n)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, r, domain.APIResponse{
+		Source:   "ibge_pms",
+		CostUSDC: "0.001",
+		Data: map[string]any{
+			"pms":       items,
+			"total":     len(items),
+			"descricao": "PMS - Receita nominal de serviços (índice base 2014=100)",
+		},
+	})
+}
