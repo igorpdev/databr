@@ -75,6 +75,8 @@ func main() {
 	ibgeHandler := handlers.NewIbgeHandler()
 	legislativoHandler := handlers.NewLegislativoHandler()
 	ipeaHandler := handlers.NewIPEAHandler()
+	// Proxy BCB handler for routes that call external APIs directly (no DB needed).
+	proxyBCBHandler := handlers.NewBCBHandler(nil)
 
 	// Store-backed handlers (only available when DB is connected)
 	var (
@@ -157,8 +159,8 @@ func main() {
 			r.Get("/legislativo/eventos", legislativoHandler.GetEventos)
 			r.Get("/legislativo/comissoes", legislativoHandler.GetComissoes)
 			r.Get("/ipea/serie/{codigo}", ipeaHandler.GetSerie)
+			r.Get("/bcb/indicadores/{serie}", proxyBCBHandler.GetIndicadores)
 			if bcbHandler != nil {
-				r.Get("/bcb/indicadores/{serie}", bcbHandler.GetIndicadores)
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
 				r.Get("/bcb/pix/estatisticas", bcbHandler.GetPIX)
