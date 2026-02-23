@@ -30,6 +30,7 @@ func PriceFromRequest(r *http.Request) string {
 	if v, ok := r.Context().Value(priceCtxKey{}).(string); ok {
 		return v
 	}
+	log.Printf("x402: WARNING no price in context for %s, using default %s", r.URL.Path, DefaultPrice)
 	return DefaultPrice
 }
 

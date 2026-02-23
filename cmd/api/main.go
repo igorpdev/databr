@@ -176,12 +176,41 @@ func main() {
 		esgHandler = handlers.NewESGHandler(cnpjCollector, cguCollector, store)
 	}
 
-	// MCP server (proxies to this REST API via SSE transport)
+	// MCP server (invokes handlers directly, no HTTP loopback)
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:" + serverPort()
 	}
-	mcpSrv := mcp.NewServer(baseURL)
+	mcpDeps := &mcp.HandlerDeps{
+		// On-demand handlers (always available)
+		Empresas:    empHandler.GetEmpresa,
+		Compliance:  compHandler.GetCompliance,
+		ProxyBCB:    proxyBCBHandler.GetCambio,
+		Judicial:    judicialHand.GetProcessos,
+		DOU:         douHandler.GetBusca,
+		Orcamento:   orcamentoHandler.GetDespesas,
+		TCU:         tcuHandler.GetCertidao,
+		Legislativo: legislativoHandler.GetDeputados,
+		PNCP:        pncpHandler.GetOrgaos,
+	}
+	// Store-backed handlers (only when DB is connected)
+	if bcbHandler != nil {
+		mcpDeps.BCBSelic = bcbHandler.GetSelic
+	}
+	if ecoHandler != nil {
+		mcpDeps.EconomiaIPCA = ecoHandler.GetIPCA
+		mcpDeps.EconomiaPIB = ecoHandler.GetPIB
+	}
+	if mercHandler != nil {
+		mcpDeps.MercadoAcoes = mercHandler.GetAcoes
+	}
+	if energiaHandler != nil {
+		mcpDeps.Energia = energiaHandler.GetTarifas
+	}
+	if saudeHandler != nil {
+		mcpDeps.Saude = saudeHandler.GetMedicamento
+	}
+	mcpSrv := mcp.NewServer(mcpDeps)
 	sseServer := mcpserver.NewSSEServer(mcpSrv.MCPServer(),
 		mcpserver.WithBaseURL(baseURL+"/mcp"),
 	)
@@ -324,6 +353,11 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})
+	})
+
+	// Favicon — return 204 No Content to prevent 402 from x402 middleware.
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	// SEO: robots.txt and sitemap.xml
@@ -626,9 +660,10 @@ func main() {
 		})
 	})
 
-	// MCP server (SSE transport) — protected by x402
+	// MCP server (SSE transport) — protected by x402.
+	// Price set to $0.015 (max of any tool proxied through MCP: judicial/processos).
 	r.Group(func(r chi.Router) {
-		r.Use(optionalX402(x402Cfg, "0.003"))
+		r.Use(optionalX402(x402Cfg, "0.015"))
 		r.Mount("/mcp", sseServer)
 	})
 

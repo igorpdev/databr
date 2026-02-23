@@ -1,33 +1,56 @@
 // Package mcp implements the DataBR MCP Server.
-// Tools here are thin proxies over the DataBR REST API, enabling
-// Claude and other MCP-compatible AI agents to access Brazilian public data.
+// Tools invoke REST handlers directly (in-process), avoiding HTTP loopback
+// and the x402 payment middleware that would reject unauthenticated requests.
 package mcp
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
+	"net/http/httptest"
 
+	"github.com/go-chi/chi/v5"
 	mcpgosdk "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// HandlerDeps holds references to HTTP handlers that MCP tools invoke directly.
+// On-demand handlers (always available) are non-nil; store-backed handlers may be nil
+// when the database is unavailable.
+type HandlerDeps struct {
+	// On-demand handlers (always available — call external APIs directly)
+	Empresas      http.HandlerFunc // GET /v1/empresas/{cnpj}
+	Compliance    http.HandlerFunc // GET /v1/compliance/{cnpj}
+	ProxyBCB      http.HandlerFunc // GET /v1/bcb/cambio/{moeda}
+	Judicial      http.HandlerFunc // GET /v1/judicial/processos/{doc}
+	DOU           http.HandlerFunc // GET /v1/dou/busca
+	Orcamento     http.HandlerFunc // GET /v1/orcamento/despesas
+	TCU           http.HandlerFunc // GET /v1/tcu/certidao/{cnpj}
+	Legislativo   http.HandlerFunc // GET /v1/legislativo/deputados
+	PNCP          http.HandlerFunc // GET /v1/pncp/orgaos
+
+	// Store-backed handlers (nil when DB is unavailable)
+	BCBSelic      http.HandlerFunc // GET /v1/bcb/selic
+	EconomiaIPCA  http.HandlerFunc // GET /v1/economia/ipca
+	EconomiaPIB   http.HandlerFunc // GET /v1/economia/pib
+	MercadoAcoes  http.HandlerFunc // GET /v1/mercado/acoes/{ticker}
+	Energia       http.HandlerFunc // GET /v1/energia/tarifas
+	Saude         http.HandlerFunc // GET /v1/saude/medicamentos/{registro}
+}
+
 // Server wraps the mcp-go server with DataBR tool registrations.
 type Server struct {
 	mcpServer *server.MCPServer
-	baseURL   string
+	deps      *HandlerDeps
 	tools     []string
 }
 
-// NewServer creates a DataBR MCP Server that proxies to the REST API at baseURL.
-func NewServer(baseURL string) *Server {
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+// NewServer creates a DataBR MCP Server that invokes handlers directly (in-process).
+func NewServer(deps *HandlerDeps) *Server {
+	if deps == nil {
+		deps = &HandlerDeps{}
 	}
-	baseURL = strings.TrimRight(baseURL, "/")
 
 	s := &Server{
 		mcpServer: server.NewMCPServer(
@@ -35,7 +58,7 @@ func NewServer(baseURL string) *Server {
 			"1.0.0",
 			server.WithToolCapabilities(true),
 		),
-		baseURL: baseURL,
+		deps: deps,
 	}
 
 	s.registerTools()
@@ -52,6 +75,48 @@ func (s *Server) MCPServer() *server.MCPServer {
 	return s.mcpServer
 }
 
+// maxResponseBytes limits handler response body size to prevent OOM (10 MB).
+const maxResponseBytes = 10 << 20
+
+// invokeHandler calls a handler function directly, injecting Chi URL params and query params.
+// Returns the response body as a tool result, or an error if the handler is nil or returns >= 400.
+func invokeHandler(ctx context.Context, handler http.HandlerFunc, path string, chiParams map[string]string, query string) (*mcpgosdk.CallToolResult, error) {
+	if handler == nil {
+		return nil, fmt.Errorf("handler not available (database may be disconnected)")
+	}
+
+	url := path
+	if query != "" {
+		url = path + "?" + query
+	}
+
+	req := httptest.NewRequest(http.MethodGet, url, nil)
+	req = req.WithContext(ctx)
+
+	// Inject Chi URL params so handlers can use chi.URLParam(r, "key").
+	if len(chiParams) > 0 {
+		rctx := chi.NewRouteContext()
+		for k, v := range chiParams {
+			rctx.URLParams.Add(k, v)
+		}
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	body := rec.Body.Bytes()
+	if len(body) > maxResponseBytes {
+		body = body[:maxResponseBytes]
+	}
+
+	if rec.Code >= 400 {
+		return nil, fmt.Errorf("handler returned %d: %s", rec.Code, string(body))
+	}
+
+	return mcpgosdk.NewToolResultText(string(body)), nil
+}
+
 func (s *Server) registerTools() {
 	s.addTool("consultar_empresa",
 		"Consulta dados completos de empresa brasileira por CNPJ. Retorna razão social, situação cadastral, endereço, atividade econômica (CNAE) e sócios.",
@@ -63,7 +128,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			cnpj := req.GetString("cnpj", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/empresas/%s", cnpj))
+			return invokeHandler(ctx, s.deps.Empresas, "/v1/empresas/"+cnpj, map[string]string{"cnpj": cnpj}, "")
 		},
 	)
 
@@ -77,7 +142,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			cnpj := req.GetString("cnpj", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/compliance/%s", cnpj))
+			return invokeHandler(ctx, s.deps.Compliance, "/v1/compliance/"+cnpj, map[string]string{"cnpj": cnpj}, "")
 		},
 	)
 
@@ -91,7 +156,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			moeda := req.GetString("moeda", "USD")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/bcb/cambio/%s", moeda))
+			return invokeHandler(ctx, s.deps.ProxyBCB, "/v1/bcb/cambio/"+moeda, map[string]string{"moeda": moeda}, "")
 		},
 	)
 
@@ -99,20 +164,25 @@ func (s *Server) registerTools() {
 		"Retorna indicadores macroeconômicos do Brasil: IPCA (inflação), Selic (juros), PIB e câmbio USD.",
 		[]mcpgosdk.ToolOption{},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
-			selic, err := s.callAPI(ctx, "/v1/bcb/selic")
-			if err != nil {
-				return nil, err
-			}
-			ipca, _ := s.callAPI(ctx, "/v1/economia/ipca")
-			pib, _ := s.callAPI(ctx, "/v1/economia/pib")
-			cambio, _ := s.callAPI(ctx, "/v1/bcb/cambio/USD")
+			result := map[string]any{}
 
-			result := map[string]any{
-				"selic":  extractData(selic),
-				"ipca":   extractData(ipca),
-				"pib":    extractData(pib),
-				"cambio": extractData(cambio),
+			if r, err := invokeHandler(ctx, s.deps.BCBSelic, "/v1/bcb/selic", nil, ""); err == nil {
+				result["selic"] = extractJSON(r)
 			}
+			if r, err := invokeHandler(ctx, s.deps.EconomiaIPCA, "/v1/economia/ipca", nil, ""); err == nil {
+				result["ipca"] = extractJSON(r)
+			}
+			if r, err := invokeHandler(ctx, s.deps.EconomiaPIB, "/v1/economia/pib", nil, ""); err == nil {
+				result["pib"] = extractJSON(r)
+			}
+			if r, err := invokeHandler(ctx, s.deps.ProxyBCB, "/v1/bcb/cambio/USD", map[string]string{"moeda": "USD"}, ""); err == nil {
+				result["cambio"] = extractJSON(r)
+			}
+
+			if len(result) == 0 {
+				return nil, fmt.Errorf("no macro indicators available (database may be disconnected)")
+			}
+
 			b, _ := json.Marshal(result)
 			return mcpgosdk.NewToolResultText(string(b)), nil
 		},
@@ -128,7 +198,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			doc := req.GetString("documento", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/judicial/processos/%s", doc))
+			return invokeHandler(ctx, s.deps.Judicial, "/v1/judicial/processos/"+doc, map[string]string{"doc": doc}, "")
 		},
 	)
 
@@ -146,11 +216,11 @@ func (s *Server) registerTools() {
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			q := req.GetString("query", "")
 			uf := req.GetString("uf", "")
-			path := fmt.Sprintf("/v1/dou/busca?q=%s", q)
+			query := "q=" + q
 			if uf != "" {
-				path += "&uf=" + uf
+				query += "&uf=" + uf
 			}
-			return s.callAPI(ctx, path)
+			return invokeHandler(ctx, s.deps.DOU, "/v1/dou/busca", nil, query)
 		},
 	)
 
@@ -163,11 +233,11 @@ func (s *Server) registerTools() {
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			ano := req.GetString("ano", "")
 			orgao := req.GetString("orgao", "")
-			path := "/v1/orcamento/despesas?ano=" + ano
+			query := "ano=" + ano
 			if orgao != "" {
-				path += "&orgao=" + orgao
+				query += "&orgao=" + orgao
 			}
-			return s.callAPI(ctx, path)
+			return invokeHandler(ctx, s.deps.Orcamento, "/v1/orcamento/despesas", nil, query)
 		},
 	)
 
@@ -178,7 +248,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			cnpj := req.GetString("cnpj", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/tcu/certidao/%s", cnpj))
+			return invokeHandler(ctx, s.deps.TCU, "/v1/tcu/certidao/"+cnpj, map[string]string{"cnpj": cnpj}, "")
 		},
 	)
 
@@ -189,7 +259,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			ticker := req.GetString("ticker", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/mercado/acoes/%s", ticker))
+			return invokeHandler(ctx, s.deps.MercadoAcoes, "/v1/mercado/acoes/"+ticker, map[string]string{"ticker": ticker}, "")
 		},
 	)
 
@@ -202,14 +272,14 @@ func (s *Server) registerTools() {
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			uf := req.GetString("uf", "")
 			partido := req.GetString("partido", "")
-			path := "/v1/legislativo/deputados?"
+			var query string
 			if uf != "" {
-				path += "uf=" + uf + "&"
+				query += "uf=" + uf + "&"
 			}
 			if partido != "" {
-				path += "partido=" + partido
+				query += "partido=" + partido
 			}
-			return s.callAPI(ctx, path)
+			return invokeHandler(ctx, s.deps.Legislativo, "/v1/legislativo/deputados", nil, query)
 		},
 	)
 
@@ -220,7 +290,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			cnpj := req.GetString("cnpj", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/pncp/orgaos?cnpj=%s", cnpj))
+			return invokeHandler(ctx, s.deps.PNCP, "/v1/pncp/orgaos", nil, "cnpj="+cnpj)
 		},
 	)
 
@@ -231,11 +301,11 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			dist := req.GetString("distribuidora", "")
-			path := "/v1/energia/tarifas"
+			var query string
 			if dist != "" {
-				path += "?distribuidora=" + dist
+				query = "distribuidora=" + dist
 			}
-			return s.callAPI(ctx, path)
+			return invokeHandler(ctx, s.deps.Energia, "/v1/energia/tarifas", nil, query)
 		},
 	)
 
@@ -246,7 +316,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			registro := req.GetString("registro", "")
-			return s.callAPI(ctx, fmt.Sprintf("/v1/saude/medicamentos/%s", registro))
+			return invokeHandler(ctx, s.deps.Saude, "/v1/saude/medicamentos/"+registro, map[string]string{"registro": registro}, "")
 		},
 	)
 }
@@ -258,40 +328,16 @@ func (s *Server) addTool(name, desc string, opts []mcpgosdk.ToolOption, handler 
 	s.tools = append(s.tools, name)
 }
 
-// callAPI makes an HTTP GET to the DataBR REST API and returns a tool result.
-func (s *Server) callAPI(ctx context.Context, path string) (*mcpgosdk.CallToolResult, error) {
-	url := s.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("mcp: build request: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("mcp: call %s: %w", path, err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("mcp: read response: %w", err)
-	}
-
-	return mcpgosdk.NewToolResultText(string(body)), nil
-}
-
-// extractData extracts the "data" field from a tool result JSON, for aggregation.
-func extractData(result *mcpgosdk.CallToolResult) any {
+// extractJSON extracts parsed JSON from a tool result, for aggregation in composite tools.
+func extractJSON(result *mcpgosdk.CallToolResult) any {
 	if result == nil {
 		return nil
 	}
 	for _, c := range result.Content {
 		if tc, ok := c.(mcpgosdk.TextContent); ok {
-			var m map[string]any
+			var m any
 			if err := json.Unmarshal([]byte(tc.Text), &m); err == nil {
-				if d, ok := m["data"]; ok {
-					return d
-				}
+				return m
 			}
 		}
 	}
