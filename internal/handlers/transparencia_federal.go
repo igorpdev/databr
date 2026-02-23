@@ -16,6 +16,7 @@ type TransparenciaFetcher interface {
 	FetchContratos(ctx context.Context, orgao, cnpjFornecedor string) ([]domain.SourceRecord, error)
 	FetchServidores(ctx context.Context, orgao string) ([]domain.SourceRecord, error)
 	FetchBolsaFamilia(ctx context.Context, municipioIBGE, mesAno string) ([]domain.SourceRecord, error)
+	FetchCartoes(ctx context.Context, orgao, de, ate string) ([]domain.SourceRecord, error)
 }
 
 // TransparenciaFederalHandler handles /v1/transparencia/contratos,
@@ -123,6 +124,44 @@ func (h *TransparenciaFederalHandler) GetBolsaFamilia(w http.ResponseWriter, r *
 	}
 	if len(records) == 0 {
 		jsonError(w, http.StatusNotFound, "No Bolsa Família data found for municipio "+municipio+" mes "+mes)
+		return
+	}
+
+	rec := records[0]
+	respond(w, r, domain.APIResponse{
+		Source:    rec.Source,
+		UpdatedAt: rec.FetchedAt,
+		CostUSDC:  "0.001",
+		Data:      rec.Data,
+	})
+}
+
+// GetCartoes handles GET /v1/transparencia/cartoes?orgao=&de=&ate=
+// orgao is the mandatory SIAFI agency code (e.g. "26000" for MEC).
+// de and ate are optional dates in YYYY-MM-DD format (default: last 30 days).
+func (h *TransparenciaFederalHandler) GetCartoes(w http.ResponseWriter, r *http.Request) {
+	orgao := r.URL.Query().Get("orgao")
+	if orgao == "" {
+		jsonError(w, http.StatusBadRequest, "query param 'orgao' is required (SIAFI agency code, e.g. '26000')")
+		return
+	}
+
+	de := r.URL.Query().Get("de")
+	ate := r.URL.Query().Get("ate")
+	if de == "" {
+		de = time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02")
+	}
+	if ate == "" {
+		ate = time.Now().UTC().Format("2006-01-02")
+	}
+
+	records, err := h.fetcher.FetchCartoes(r.Context(), orgao, de, ate)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, "No cartões transactions found for orgao "+orgao)
 		return
 	}
 

@@ -22,6 +22,8 @@ type stubTransparenciaFetcher struct {
 	servidoresErr     error
 	beneficiosRecords []domain.SourceRecord
 	beneficiosErr     error
+	cartoesRecords    []domain.SourceRecord
+	cartoesErr        error
 }
 
 func (s *stubTransparenciaFetcher) FetchContratos(_ context.Context, _, _ string) ([]domain.SourceRecord, error) {
@@ -36,11 +38,16 @@ func (s *stubTransparenciaFetcher) FetchBolsaFamilia(_ context.Context, _, _ str
 	return s.beneficiosRecords, s.beneficiosErr
 }
 
+func (s *stubTransparenciaFetcher) FetchCartoes(_ context.Context, _, _, _ string) ([]domain.SourceRecord, error) {
+	return s.cartoesRecords, s.cartoesErr
+}
+
 func newTransparenciaFederalRouter(h *handlers.TransparenciaFederalHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/v1/transparencia/contratos", h.GetContratos)
 	r.Get("/v1/transparencia/servidores", h.GetServidores)
 	r.Get("/v1/transparencia/beneficios", h.GetBolsaFamilia)
+	r.Get("/v1/transparencia/cartoes", h.GetCartoes)
 	return r
 }
 
@@ -329,5 +336,109 @@ func TestTransparenciaFederal_GetBolsaFamilia_Empty(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+// --- GetCartoes ---
+
+func TestTransparenciaFederal_GetCartoes_OK(t *testing.T) {
+	stub := &stubTransparenciaFetcher{
+		cartoesRecords: []domain.SourceRecord{{
+			Source:    "cgu_cartoes",
+			RecordKey: "26000_2026-01-01_2026-01-31",
+			Data: map[string]any{
+				"orgao":      "26000",
+				"de":         "2026-01-01",
+				"ate":        "2026-01-31",
+				"transacoes": []any{map[string]any{"id": 1, "valorTransacao": 150.50}},
+				"total":      1,
+			},
+			FetchedAt: time.Now().UTC(),
+		}},
+	}
+	h := handlers.NewTransparenciaFederalHandler(stub)
+	r := newTransparenciaFederalRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/cartoes?orgao=26000&de=2026-01-01&ate=2026-01-31", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "cgu_cartoes" {
+		t.Errorf("Source = %q, want cgu_cartoes", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+}
+
+func TestTransparenciaFederal_GetCartoes_MissingOrgao(t *testing.T) {
+	h := handlers.NewTransparenciaFederalHandler(&stubTransparenciaFetcher{})
+	r := newTransparenciaFederalRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/cartoes", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestTransparenciaFederal_GetCartoes_FetcherError(t *testing.T) {
+	stub := &stubTransparenciaFetcher{cartoesErr: errors.New("api error")}
+	h := handlers.NewTransparenciaFederalHandler(stub)
+	r := newTransparenciaFederalRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/cartoes?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", rec.Code)
+	}
+}
+
+func TestTransparenciaFederal_GetCartoes_Empty(t *testing.T) {
+	stub := &stubTransparenciaFetcher{cartoesRecords: []domain.SourceRecord{}}
+	h := handlers.NewTransparenciaFederalHandler(stub)
+	r := newTransparenciaFederalRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/cartoes?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestTransparenciaFederal_GetCartoes_DefaultDates(t *testing.T) {
+	// When de/ate omitted, defaults should apply and fetcher is called.
+	stub := &stubTransparenciaFetcher{
+		cartoesRecords: []domain.SourceRecord{{
+			Source:    "cgu_cartoes",
+			RecordKey: "26000",
+			Data:      map[string]any{"orgao": "26000", "transacoes": []any{}, "total": 0},
+			FetchedAt: time.Now().UTC(),
+		}},
+	}
+	h := handlers.NewTransparenciaFederalHandler(stub)
+	r := newTransparenciaFederalRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/cartoes?orgao=26000", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	// Should reach the fetcher (not 400). stub returns 1 record → 200.
+	if rec.Code == http.StatusBadRequest {
+		t.Fatalf("expected non-400 when de/ate omitted (defaults should apply), got 400: %s", rec.Body.String())
 	}
 }

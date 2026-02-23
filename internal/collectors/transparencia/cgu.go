@@ -233,6 +233,36 @@ func (c *CGUCollector) fetchURL(ctx context.Context, url string) ([]any, error) 
 	return []any{}, nil
 }
 
+// FetchCartoes fetches government credit card spending for a given agency and date range.
+// orgao is the SIAFI agency code (e.g. "26000" for MEC).
+// de and ate are dates in YYYY-MM-DD format.
+func (c *CGUCollector) FetchCartoes(ctx context.Context, orgao, de, ate string) ([]domain.SourceRecord, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("cgu_cartoes: TRANSPARENCIA_API_KEY is not set")
+	}
+
+	url := fmt.Sprintf("%s/cartoes?codigoOrgao=%s&dataTransacaoDe=%s&dataTransacaoAte=%s&pagina=1",
+		c.baseURL, orgao, de, ate)
+	items, err := c.fetchURL(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("cgu_cartoes: fetch: %w", err)
+	}
+
+	record := domain.SourceRecord{
+		Source:    "cgu_cartoes",
+		RecordKey: orgao + "_" + de + "_" + ate,
+		Data: map[string]any{
+			"orgao":      orgao,
+			"de":         de,
+			"ate":        ate,
+			"transacoes": items,
+			"total":      len(items),
+		},
+		FetchedAt: time.Now().UTC(),
+	}
+	return []domain.SourceRecord{record}, nil
+}
+
 // fetchList fetches a list endpoint (e.g. /ceis) filtered by CNPJ.
 func (c *CGUCollector) fetchList(ctx context.Context, path, cnpjNum string) ([]any, error) {
 	url := fmt.Sprintf("%s%s?cnpjSancionado=%s&pagina=1", c.baseURL, path, cnpjNum)

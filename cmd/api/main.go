@@ -72,6 +72,8 @@ func main() {
 	tesouroHand := handlers.NewTesouroHandler(tesouroCol)
 	douHandler := handlers.NewDOUHandler(qdCollector)
 	judicialHand := handlers.NewJudicialHandler(djCollector)
+	ibgeHandler := handlers.NewIbgeHandler()
+	legislativoHandler := handlers.NewLegislativoHandler()
 
 	// Store-backed handlers (only available when DB is connected)
 	var (
@@ -138,6 +140,14 @@ func main() {
 			r.Get("/transparencia/contratos", transparenciaFedHandler.GetContratos)
 			r.Get("/transparencia/servidores", transparenciaFedHandler.GetServidores)
 			r.Get("/transparencia/beneficios", transparenciaFedHandler.GetBolsaFamilia)
+			r.Get("/transparencia/cartoes", transparenciaFedHandler.GetCartoes)
+			r.Get("/ibge/municipio/{ibge}", ibgeHandler.GetMunicipio)
+			r.Get("/ibge/estados", ibgeHandler.GetEstados)
+			r.Get("/ibge/cnae/{codigo}", ibgeHandler.GetCNAE)
+			r.Get("/legislativo/deputados", legislativoHandler.GetDeputados)
+			r.Get("/legislativo/deputados/{id}", legislativoHandler.GetDeputado)
+			r.Get("/legislativo/proposicoes", legislativoHandler.GetProposicoes)
+			r.Get("/legislativo/senado/materias", legislativoHandler.GetMateriasSenado)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)
