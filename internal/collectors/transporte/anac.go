@@ -103,17 +103,30 @@ func (c *ANACCollector) Collect(ctx context.Context) ([]domain.SourceRecord, err
 	r.Comma = ';'
 	r.LazyQuotes = true
 	r.TrimLeadingSpace = true
+	// The real ANAC CSV has a metadata comment line before the actual header:
+	//   Atualizado em: 2026-02-17\r\n
+	// We skip rows until we find the one containing "MARCA".
+	r.FieldsPerRecord = -1 // allow variable field counts while searching
 
-	// Read header row and build index map: column name → index.
-	header, err := r.Read()
-	if err != nil {
-		return nil, fmt.Errorf("anac_rab: read header: %w", err)
+	var header []string
+	for {
+		row, err := r.Read()
+		if err != nil {
+			return nil, fmt.Errorf("anac_rab: could not find header row: %w", err)
+		}
+		// The real header row contains "MARCA" as first field (possibly quoted).
+		if len(row) > 0 && strings.TrimSpace(strings.Trim(row[0], `"`)) == "MARCA" {
+			header = row
+			break
+		}
 	}
+	// Now enforce fixed field count for the rest of the file.
+	r.FieldsPerRecord = len(header)
 
 	colIdx := make(map[string]int, len(header))
 	for i, h := range header {
-		// Trim any residual whitespace from header names.
-		colIdx[strings.TrimSpace(h)] = i
+		// Trim any residual whitespace and surrounding quotes from header names.
+		colIdx[strings.TrimSpace(strings.Trim(h, `"`))] = i
 	}
 
 	marcaIdx, hasMarca := colIdx["MARCA"]
