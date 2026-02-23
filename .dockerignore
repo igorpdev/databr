@@ -4,6 +4,6 @@
 .git/
 databr-api
 /tmp/
-docs/
+docs/plans/
 tests/
 cmd/seed/
