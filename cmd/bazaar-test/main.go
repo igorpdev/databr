@@ -40,19 +40,28 @@ func main() {
 	// Wrap standard HTTP client with x402 payment handling
 	httpClient := x402http.WrapHTTPClientWithPayment(http.DefaultClient, x402http.NewClient(x402Client))
 
-	url := baseURL + "/v1/bcb/cambio/USD"
-	fmt.Printf("Requesting: %s\n", url)
-
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		log.Fatalf("request failed: %v", err)
+	// Test multiple endpoints to trigger Bazaar indexing via CDP facilitator
+	endpoints := []string{
+		"/v1/bcb/selic",
+		"/v1/economia/ipca",
+		"/v1/economia/pib",
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	for _, ep := range endpoints {
+		url := baseURL + ep
+		fmt.Printf("\n--- Requesting: %s ---\n", url)
 
-	fmt.Printf("Status: %d\n", resp.StatusCode)
-	fmt.Printf("X-PAYMENT-RESPONSE: %s\n", resp.Header.Get("X-PAYMENT-RESPONSE"))
-	fmt.Printf("Body: %s\n", string(body))
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			log.Printf("request failed: %v", err)
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		fmt.Printf("Status: %d\n", resp.StatusCode)
+		fmt.Printf("X-PAYMENT-RESPONSE: %s\n", resp.Header.Get("X-PAYMENT-RESPONSE"))
+		fmt.Printf("Body (first 200): %.200s\n", string(body))
+	}
 }

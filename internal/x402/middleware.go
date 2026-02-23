@@ -87,8 +87,6 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 		Timeout:      30 * time.Second,
 	})
 
-	reqBytes, _ := json.Marshal(baseReq)
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			payloadBytes := extractPaymentHeader(r)
@@ -96,6 +94,10 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 				write402Response(w, r, baseReq)
 				return
 			}
+
+			// Build reqBytes per-request with discovery metadata so the CDP
+			// facilitator can extract it for Bazaar indexing.
+			reqBytes := buildRequirementsBytes(r, baseReq)
 
 			verifyResp, err := facClient.Verify(r.Context(), payloadBytes, reqBytes)
 			if err != nil {
@@ -143,6 +145,53 @@ func extractPaymentHeader(r *http.Request) []byte {
 		return []byte(payment)
 	}
 	return nil
+}
+
+// buildRequirementsBytes creates the requirements JSON sent to the CDP facilitator for
+// verify/settle. It includes Bazaar discovery fields (description, mimeType, outputSchema)
+// so the facilitator can extract them for Bazaar indexing via ExtractDiscoveredResourceFromPaymentPayload.
+func buildRequirementsBytes(r *http.Request, base x402types.PaymentRequirements) []byte {
+	scheme := "https"
+	if r.TLS == nil {
+		scheme = "http"
+	}
+	resourceURL := scheme + "://" + r.Host + r.URL.Path
+
+	meta, ok := matchRouteMeta(r.URL.Path)
+	if !ok {
+		meta = routeMetaEntry{"DataBR — dados públicos brasileiros", "application/json"}
+	}
+
+	method := "GET"
+	if r.Method == http.MethodPost {
+		method = "POST"
+	}
+
+	req := map[string]interface{}{
+		"scheme":            base.Scheme,
+		"network":           base.Network,
+		"asset":             base.Asset,
+		"amount":            base.Amount,
+		"payTo":             base.PayTo,
+		"maxTimeoutSeconds": base.MaxTimeoutSeconds,
+		"maxAmountRequired": base.Amount,
+		"resource":          resourceURL,
+		"description":       meta.description,
+		"mimeType":          meta.mimeType,
+		"discoverable":      true,
+		"outputSchema": map[string]interface{}{
+			"input": map[string]interface{}{
+				"discoverable": true,
+				"method":       method,
+				"type":         "http",
+			},
+			"output": map[string]interface{}{
+				"type": "object",
+			},
+		},
+	}
+	b, _ := json.Marshal(req)
+	return b
 }
 
 // write402Response writes a V2 PaymentRequired JSON response with Bazaar discovery fields.
