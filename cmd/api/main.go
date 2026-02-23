@@ -193,6 +193,20 @@ func main() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
+	// HEAD → GET: rewrite HEAD requests so x402 middleware returns 402 (not 405).
+	// Per RFC 7231, HEAD must return the same headers as GET with no body.
+	// x402 agents use HEAD to probe payment requirements without downloading the body.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodHead {
+				r.Method = http.MethodGet
+				next.ServeHTTP(&headResponseWriter{ResponseWriter: w}, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// Proxy TLS detection: behind Railway/Cloudflare r.TLS is nil because
 	// TLS terminates at the proxy. The x402-go SDK checks r.TLS to decide
 	// the scheme for the resource URL. This middleware sets r.TLS from the
@@ -701,6 +715,14 @@ func maskWallet(addr string) string {
 	}
 	return addr[:6] + "…" + addr[len(addr)-4:]
 }
+
+// headResponseWriter wraps http.ResponseWriter to discard the response body for HEAD requests.
+// Headers (including 402 payment requirements) are forwarded normally.
+type headResponseWriter struct {
+	http.ResponseWriter
+}
+
+func (h *headResponseWriter) Write([]byte) (int, error) { return 0, nil }
 
 // serveEmbedded reads a file from an embed.FS and writes it to the response.
 func serveEmbedded(w http.ResponseWriter, fsys embed.FS, name, contentType string) {
