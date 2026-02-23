@@ -18,6 +18,7 @@ import (
 	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/cache"
+	docfs "github.com/databr/api/docs"
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
 	"github.com/databr/api/internal/logging"
@@ -314,7 +315,7 @@ func main() {
 				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "+
 				"font-src 'self' https://fonts.gstatic.com; "+
 				"img-src 'self' data: https:; connect-src 'self'")
-		http.ServeFile(w, r, "docs/landing.html")
+		http.ServeFileFS(w, r, docfs.Static, "landing.html")
 	})
 
 	// API Documentation (Scalar UI)
@@ -325,11 +326,11 @@ func main() {
 				"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
 				"font-src 'self' https://cdn.jsdelivr.net; "+
 				"img-src 'self' data: https:; connect-src 'self'")
-		http.ServeFile(w, r, "docs/scalar.html")
+		http.ServeFileFS(w, r, docfs.Static, "scalar.html")
 	})
 	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
-		http.ServeFile(w, r, "docs/openapi.yaml")
+		http.ServeFileFS(w, r, docfs.Static, "openapi.yaml")
 	})
 
 	// /v1 API routes, grouped by x402 price tier
