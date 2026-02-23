@@ -33,9 +33,14 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/compliance/{cnpj}":          {"Verificação completa de compliance por CNPJ", "application/json"},
 	"/v1/transparencia/licitacoes":   {"Licitações públicas (PNCP)", "application/json"},
 	"/v1/eleicoes/candidatos":        {"Dados de candidatos eleitorais (TSE)", "application/json"},
-	"/v1/tesouro/rreo":               {"Relatório de Execução Orçamentária (Tesouro Nacional)", "application/json"},
-	"/v1/dou/busca":                  {"Busca no Diário Oficial da União", "application/json"},
-	"/v1/judicial/processos/{doc}":   {"Processos judiciais por CPF/CNPJ (DataJud CNJ)", "application/json"},
+	"/v1/tesouro/rreo":                  {"Relatório de Execução Orçamentária (Tesouro Nacional)", "application/json"},
+	"/v1/dou/busca":                    {"Busca no Diário Oficial da União", "application/json"},
+	"/v1/judicial/processos/{doc}":     {"Processos judiciais por CPF/CNPJ (DataJud CNJ)", "application/json"},
+	"/v1/economia/focus":               {"Expectativas de mercado do Relatório Focus (BCB)", "application/json"},
+	"/v1/saude/medicamentos/{registro}": {"Medicamentos registrados na ANVISA", "application/json"},
+	"/v1/energia/tarifas":              {"Tarifas de energia elétrica homologadas pela ANEEL", "application/json"},
+	"/v1/ambiental/desmatamento":       {"Alertas de desmatamento em tempo real (INPE DETER)", "application/json"},
+	"/v1/ambiental/prodes":             {"Desmatamento anual consolidado (INPE PRODES)", "application/json"},
 }
 
 // BazaarMiddleware intercepts HTTP 402 responses and injects an `extensions.bazaar`

@@ -16,6 +16,7 @@ func newEconomiaRouter(h *handlers.EconomiaHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/v1/economia/ipca", h.GetIPCA)
 	r.Get("/v1/economia/pib", h.GetPIB)
+	r.Get("/v1/economia/focus", h.GetFocus)
 	return r
 }
 
@@ -86,6 +87,64 @@ func TestEconomiaHandler_GetIPCA_NoData(t *testing.T) {
 	r := newEconomiaRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/economia/ipca", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when no data, got %d", rec.Code)
+	}
+}
+
+func TestEconomiaHandler_GetFocus_OK(t *testing.T) {
+	store := &stubBCBStore{
+		records: []domain.SourceRecord{
+			{
+				Source:    "bcb_focus",
+				RecordKey: "IPCA_2026",
+				Data: map[string]any{
+					"indicador":           "IPCA",
+					"data_referencia":     "2026",
+					"data":                "2026-02-21",
+					"media":               4.80,
+					"mediana":             4.75,
+					"desvio_padrao":       0.30,
+					"minimo":              4.10,
+					"maximo":              5.50,
+					"numero_respondentes": 120,
+					"base_calculo":        0,
+				},
+				FetchedAt: time.Now(),
+			},
+		},
+	}
+
+	h := handlers.NewEconomiaHandler(store)
+	r := newEconomiaRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/economia/focus", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Source != "bcb_focus" {
+		t.Errorf("Source = %q, want bcb_focus", resp.Source)
+	}
+	if resp.CostUSDC != "0.001" {
+		t.Errorf("CostUSDC = %q, want 0.001", resp.CostUSDC)
+	}
+}
+
+func TestEconomiaHandler_GetFocus_NoData(t *testing.T) {
+	store := &stubBCBStore{records: nil}
+	h := handlers.NewEconomiaHandler(store)
+	r := newEconomiaRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/economia/focus", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 

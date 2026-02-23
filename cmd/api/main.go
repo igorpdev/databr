@@ -73,16 +73,22 @@ func main() {
 
 	// Store-backed handlers (only available when DB is connected)
 	var (
-		bcbHandler   *handlers.BCBHandler
-		ecoHandler   *handlers.EconomiaHandler
-		mercHandler  *handlers.MercadoHandler
-		transHandler *handlers.TransparenciaHandler
+		bcbHandler      *handlers.BCBHandler
+		ecoHandler      *handlers.EconomiaHandler
+		mercHandler     *handlers.MercadoHandler
+		transHandler    *handlers.TransparenciaHandler
+		saudeHandler    *handlers.SaudeHandler
+		energiaHandler  *handlers.EnergiaHandler
+		ambientalHandler *handlers.AmbientalHandler
 	)
 	if store != nil {
 		bcbHandler = handlers.NewBCBHandler(store)
 		ecoHandler = handlers.NewEconomiaHandler(store)
 		mercHandler = handlers.NewMercadoHandler(store)
 		transHandler = handlers.NewTransparenciaHandler(store)
+		saudeHandler = handlers.NewSaudeHandler(store)
+		energiaHandler = handlers.NewEnergiaHandler(store)
+		ambientalHandler = handlers.NewAmbientalHandler(store)
 	}
 
 	// MCP server (proxies to this REST API via SSE transport)
@@ -125,19 +131,30 @@ func main() {
 			if ecoHandler != nil {
 				r.Get("/economia/ipca", ecoHandler.GetIPCA)
 				r.Get("/economia/pib", ecoHandler.GetPIB)
+				r.Get("/economia/focus", ecoHandler.GetFocus)
 			}
 			if transHandler != nil {
 				r.Get("/transparencia/licitacoes", transHandler.GetLicitacoes)
 				r.Get("/eleicoes/candidatos", transHandler.GetCandidatos)
 			}
+			if saudeHandler != nil {
+				r.Get("/saude/medicamentos/{registro}", saudeHandler.GetMedicamento)
+			}
+			if energiaHandler != nil {
+				r.Get("/energia/tarifas", energiaHandler.GetTarifas)
+			}
 		})
 
-		// $0.002 — B3 stock quotes
+		// $0.002 — B3 stock quotes, INPE deforestation data
 		r.Group(func(r chi.Router) {
 			r.Use(x402pkg.BazaarMiddleware())
 			r.Use(optionalX402(x402Cfg, "0.002"))
 			if mercHandler != nil {
 				r.Get("/mercado/acoes/{ticker}", mercHandler.GetAcoes)
+			}
+			if ambientalHandler != nil {
+				r.Get("/ambiental/desmatamento", ambientalHandler.GetDesmatamento)
+				r.Get("/ambiental/prodes", ambientalHandler.GetProdes)
 			}
 		})
 

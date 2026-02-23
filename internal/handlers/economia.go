@@ -26,6 +26,12 @@ func (h *EconomiaHandler) GetPIB(w http.ResponseWriter, r *http.Request) {
 	h.serveLatest(w, r, "ibge_pib", "0.001")
 }
 
+// GetFocus handles GET /v1/economia/focus.
+// Retorna expectativas de mercado do Relatório Focus do BCB (expectativas anuais).
+func (h *EconomiaHandler) GetFocus(w http.ResponseWriter, r *http.Request) {
+	h.serveLatest(w, r, "bcb_focus", "0.001")
+}
+
 func (h *EconomiaHandler) serveLatest(w http.ResponseWriter, r *http.Request, source, price string) {
 	records, err := h.store.FindLatest(r.Context(), source)
 	if err != nil {

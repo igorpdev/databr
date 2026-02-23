@@ -10,10 +10,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/databr/api/internal/collectors/ambiental"
 	"github.com/databr/api/internal/collectors/b3"
 	"github.com/databr/api/internal/collectors/bcb"
 	"github.com/databr/api/internal/collectors/cvm"
+	"github.com/databr/api/internal/collectors/energia"
 	"github.com/databr/api/internal/collectors/ibge"
+	"github.com/databr/api/internal/collectors/saude"
 	"github.com/databr/api/internal/collectors/transparencia"
 	"github.com/databr/api/internal/collectors/tse"
 	"github.com/databr/api/internal/domain"
@@ -70,6 +73,13 @@ func main() {
 		// Phase 3: Transparency & elections
 		transparencia.NewPNCPCollector(""),
 		tse.NewCandidatosCollector(""),
+
+		// Phase 4: Expectativas, energy, health, environmental
+		bcb.NewFocusCollector(""),
+		energia.NewANEELCollector(""),
+		saude.NewAnvisaCollector(""),
+		ambiental.NewDETERCollector(""),
+		ambiental.NewPRODESCollector(""),
 	}
 
 	// Run all collectors on startup to populate the DB.
