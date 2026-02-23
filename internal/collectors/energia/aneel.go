@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 const (
@@ -95,7 +97,10 @@ func (c *ANEELCollector) Collect(ctx context.Context) ([]domain.SourceRecord, er
 		return nil, fmt.Errorf("aneel_tarifas: upstream returned %d", resp.StatusCode)
 	}
 
-	records, err := parseANEELCSV(resp.Body, c.Source())
+	// The ANEEL CSV is ISO-8859-1 encoded. Decode to UTF-8 before parsing
+	// to avoid PostgreSQL "invalid byte sequence for encoding UTF8" errors.
+	utf8Body := transform.NewReader(resp.Body, charmap.ISO8859_1.NewDecoder())
+	records, err := parseANEELCSV(utf8Body, c.Source())
 	if err != nil {
 		return nil, fmt.Errorf("aneel_tarifas: parse: %w", err)
 	}

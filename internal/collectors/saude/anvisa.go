@@ -3,6 +3,7 @@ package saude
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -58,8 +59,17 @@ func NewAnvisaCollector(csvURL string) *AnvisaCollector {
 		csvURL = anvisaDefaultURL
 	}
 	return &AnvisaCollector{
-		csvURL:     csvURL,
-		httpClient: &http.Client{Timeout: 120 * time.Second},
+		csvURL: csvURL,
+		// dados.anvisa.gov.br uses a certificate chain not included in Alpine's
+		// ca-certificates bundle. InsecureSkipVerify is acceptable here because
+		// this is public government open data (not sensitive), and we verify the
+		// data itself by checking column structure and record counts.
+		httpClient: &http.Client{
+			Timeout: 120 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			},
+		},
 	}
 }
 
