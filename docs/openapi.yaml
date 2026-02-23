@@ -1,0 +1,2227 @@
+openapi: 3.1.0
+info:
+  title: DataBR API
+  version: 1.0.0
+  description: |
+    API de dados públicos brasileiros para agentes de IA, com pagamento on-chain via protocolo x402 (USDC na rede Base).
+
+    ## Autenticação (x402)
+
+    Todos os endpoints `/v1/*` são protegidos pelo protocolo x402:
+    1. Faça GET no endpoint desejado
+    2. Receba **402 Payment Required** com detalhes de pagamento
+    3. Pague on-chain (USDC na Base network)
+    4. Repita o GET com header `X-PAYMENT: <proof>`
+    5. Receba **200 OK** com os dados
+
+    ## Formato de Resposta
+
+    Todas as respostas seguem o envelope padrão:
+    ```json
+    {
+      "source": "bcb_selic",
+      "updated_at": "2026-02-21T10:00:00Z",
+      "cached": true,
+      "cache_age_seconds": 3600,
+      "cost_usdc": "0.001",
+      "data": { ... }
+    }
+    ```
+
+    Use `?format=context` para obter o campo `context` (string otimizada para LLMs) em vez de `data`, custo adicional +$0.001.
+
+    ## Cache
+
+    Respostas são cacheadas em Redis com TTL por faixa de preço:
+    - $0.001: 1h | $0.002: 15min | $0.003–$0.005: 30min | $0.010+: 1h
+    - Header `X-Cache: HIT` ou `MISS` indica se a resposta veio do cache
+    - Campos `cached` e `cache_age_seconds` são preenchidos automaticamente
+  contact:
+    name: DataBR
+    url: https://databr.api.br
+  license:
+    name: MIT
+
+servers:
+  - url: https://databr.api.br
+    description: Produção
+  - url: http://localhost:8080
+    description: Desenvolvimento local
+
+tags:
+  - name: Operacional
+    description: Health checks e probes
+  - name: Empresas
+    description: Dados cadastrais de empresas (CNPJ via minhareceita.org)
+  - name: Compliance
+    description: Listas restritivas (CEIS, CNEP, CEPIM, CEAF)
+  - name: BCB
+    description: Banco Central do Brasil — taxas, câmbio, crédito, PIX, reservas
+  - name: Economia
+    description: Indicadores econômicos — IPCA, PIB, Focus, panorama
+  - name: Mercado
+    description: Mercado financeiro — B3 cotações, CVM fundos, fatos relevantes
+  - name: Transparência
+    description: Portal da Transparência — contratos, servidores, benefícios, emendas
+  - name: IBGE
+    description: Instituto Brasileiro de Geografia e Estatística
+  - name: Legislativo
+    description: Câmara dos Deputados e Senado Federal
+  - name: IPEA
+    description: Instituto de Pesquisa Econômica Aplicada (séries históricas)
+  - name: Tesouro
+    description: Tesouro Nacional — SICONFI, Tesouro Direto, RREO, RGF
+  - name: Eleições
+    description: TSE — candidatos, bens, doações, resultados
+  - name: Energia
+    description: ANEEL tarifas, ONS, ANP combustíveis
+  - name: Saúde
+    description: ANVISA medicamentos, ANS planos
+  - name: Ambiental
+    description: INPE DETER/PRODES, risco ambiental, ESG
+  - name: Transporte
+    description: ANAC aeronaves, ANTT transportadores, PRF
+  - name: Judicial
+    description: DataJud (CNJ) — processos judiciais
+  - name: DOU
+    description: Diário Oficial da União e diários municipais
+  - name: PNCP
+    description: Portal Nacional de Contratações Públicas
+  - name: Crédito
+    description: Score de crédito composit
+  - name: Premium
+    description: Endpoints compostos premium — due diligence, perfil completo, redes de influência
+
+components:
+  securitySchemes:
+    x402:
+      type: apiKey
+      in: header
+      name: X-PAYMENT
+      description: Prova de pagamento x402 (USDC on-chain na Base network)
+  schemas:
+    APIResponse:
+      type: object
+      properties:
+        source:
+          type: string
+          example: bcb_selic
+        updated_at:
+          type: string
+          format: date-time
+        cached:
+          type: boolean
+        cache_age_seconds:
+          type: integer
+        cost_usdc:
+          type: string
+          example: "0.001"
+        data:
+          type: object
+        context:
+          type: string
+          description: Campo retornado quando ?format=context (LLM-ready)
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        version:
+          type: string
+          example: "1.0.0"
+        uptime_seconds:
+          type: integer
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+            redis:
+              type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+    PaymentRequired:
+      type: object
+      properties:
+        x402Version:
+          type: integer
+          example: 1
+        accepts:
+          type: array
+          items:
+            type: object
+  parameters:
+    FormatParam:
+      name: format
+      in: query
+      description: "Use `context` para resposta otimizada para LLMs (+$0.001)"
+      schema:
+        type: string
+        enum: [context]
+    CNPJParam:
+      name: cnpj
+      in: path
+      required: true
+      description: CNPJ da empresa (14 dígitos, com ou sem formatação)
+      schema:
+        type: string
+        example: "33000167000101"
+    LimitN:
+      name: "n"
+      in: query
+      description: Número máximo de registros retornados
+      schema:
+        type: integer
+        default: 30
+    AnoParam:
+      name: ano
+      in: query
+      description: Ano de referência
+      schema:
+        type: integer
+        example: 2024
+  responses:
+    PaymentRequired:
+      description: Pagamento necessário (x402)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PaymentRequired"
+    RateLimited:
+      description: Rate limit excedido (100 req/min por IP)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+security:
+  - x402: []
+
+paths:
+  # ── Operacional ──────────────────────────────────────────
+  /health:
+    get:
+      tags: [Operacional]
+      summary: Health check com verificação de DB e Redis
+      security: []
+      responses:
+        "200":
+          description: Sistema operacional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Sistema degradado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /readyz:
+    get:
+      tags: [Operacional]
+      summary: Readiness probe para Railway/k8s
+      security: []
+      responses:
+        "200":
+          description: Pronto para receber tráfego
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+        "503":
+          description: Não está pronto
+
+  # ── Empresas ($0.001) ────────────────────────────────────
+  /v1/empresas/{cnpj}:
+    get:
+      tags: [Empresas]
+      summary: Dados cadastrais de empresa por CNPJ
+      description: "Fonte: minhareceita.org. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados cadastrais da empresa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "404":
+          description: CNPJ não encontrado
+
+  /v1/empresas/{cnpj}/socios:
+    get:
+      tags: [Empresas]
+      summary: Quadro societário da empresa
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de sócios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/empresas/{cnpj}/simples:
+    get:
+      tags: [Empresas]
+      summary: Situação no Simples Nacional e MEI
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do Simples Nacional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/empresas/{cnpj}/compliance:
+    get:
+      tags: [Empresas, Compliance]
+      summary: Verificação de compliance da empresa
+      description: "Consulta CEIS, CNEP, CEPIM combinados. Custo: $0.003 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Resultado da verificação de compliance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/empresas/{cnpj}/setor:
+    get:
+      tags: [Empresas, Premium]
+      summary: Análise setorial da empresa
+      description: "Análise com dados de concorrentes do mesmo CNAE. Custo: $0.003 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise setorial
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/empresas/{cnpj}/perfil-completo:
+    get:
+      tags: [Empresas, Premium]
+      summary: Perfil completo da empresa (CNPJ + compliance + judicial)
+      description: "Cruza dados cadastrais, compliance, judicial e mercado. Custo: $0.015 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Perfil completo multi-fonte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/empresas/{cnpj}/duediligence:
+    get:
+      tags: [Empresas, Premium]
+      summary: Due diligence completa da empresa
+      description: "Relatório completo com CNPJ, compliance, judicial e dados de mercado. Custo: $0.050 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Relatório de due diligence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/endereco/{cep}:
+    get:
+      tags: [Empresas]
+      summary: Consulta de endereço por CEP
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: cep
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "01001000"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do endereço
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Compliance ($0.001–$0.005) ───────────────────────────
+  /v1/compliance/ceis/{cnpj}:
+    get:
+      tags: [Compliance]
+      summary: Consulta CEIS (Cadastro de Empresas Inidôneas e Suspensas)
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Registros CEIS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/compliance/cnep/{cnpj}:
+    get:
+      tags: [Compliance]
+      summary: Consulta CNEP (Cadastro Nacional de Empresas Punidas)
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Registros CNEP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/compliance/cepim/{cnpj}:
+    get:
+      tags: [Compliance]
+      summary: Consulta CEPIM (Cadastro de Entidades sem fins lucrativos Impedidas)
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Registros CEPIM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/compliance/{cnpj}:
+    get:
+      tags: [Compliance]
+      summary: Compliance completo (CEIS + CNEP + CEPIM combinados)
+      description: "Consulta todas as listas restritivas de uma vez. Custo: $0.005 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Resultado consolidado de compliance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── BCB ($0.001) ─────────────────────────────────────────
+  /v1/bcb/selic:
+    get:
+      tags: [BCB]
+      summary: Taxa Selic atual e histórica
+      description: "Fonte: BCB SGS. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da taxa Selic
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/cambio/{moeda}:
+    get:
+      tags: [BCB]
+      summary: Cotação PTAX de moeda estrangeira
+      description: "Fonte: BCB OLINDA (PTAX). Custo: $0.001 USDC"
+      parameters:
+        - name: moeda
+          in: path
+          required: true
+          description: "Código da moeda (ex: USD, EUR, GBP)"
+          schema:
+            type: string
+            example: USD
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Cotação PTAX compra/venda
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/pix/estatisticas:
+    get:
+      tags: [BCB]
+      summary: Estatísticas do sistema PIX
+      description: "Fonte: BCB OLINDA (Pix_DadosAbertos). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Estatísticas do PIX
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/credito:
+    get:
+      tags: [BCB]
+      summary: Dados de crédito do sistema financeiro
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de crédito
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/reservas:
+    get:
+      tags: [BCB]
+      summary: Reservas internacionais do Brasil
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de reservas internacionais
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/taxas-credito:
+    get:
+      tags: [BCB]
+      summary: Taxas de crédito do sistema financeiro
+      description: "Fonte: BCB OLINDA. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Taxas de crédito
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/indicadores/{serie}:
+    get:
+      tags: [BCB]
+      summary: Indicadores BCB por código de série SGS
+      description: "Fonte: BCB SGS proxy. Custo: $0.001 USDC"
+      parameters:
+        - name: serie
+          in: path
+          required: true
+          description: Código da série SGS
+          schema:
+            type: string
+            example: "432"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da série SGS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/capitais:
+    get:
+      tags: [BCB]
+      summary: Capitais estrangeiros no Brasil
+      description: "Fonte: BCB OLINDA (RDE_Publicacao). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de capitais estrangeiros
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/sml:
+    get:
+      tags: [BCB]
+      summary: Sistema de Moeda Local (SML)
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do SML
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/ifdata:
+    get:
+      tags: [BCB]
+      summary: Dados de instituições financeiras (IF.data)
+      description: "Fonte: BCB OLINDA (IFDATA). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de instituições financeiras
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/bcb/base-monetaria:
+    get:
+      tags: [BCB]
+      summary: Base monetária
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de base monetária
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Economia ($0.001–$0.010) ─────────────────────────────
+  /v1/economia/ipca:
+    get:
+      tags: [Economia]
+      summary: IPCA — Índice de Preços ao Consumidor Amplo
+      description: "Fonte: IBGE SIDRA. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do IPCA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/economia/pib:
+    get:
+      tags: [Economia]
+      summary: PIB — Produto Interno Bruto
+      description: "Fonte: IBGE SIDRA. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do PIB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/economia/focus:
+    get:
+      tags: [Economia]
+      summary: Boletim Focus — expectativas de mercado
+      description: "Fonte: BCB Focus. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Expectativas do Boletim Focus
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/economia/panorama:
+    get:
+      tags: [Economia, Premium]
+      summary: Panorama econômico completo
+      description: "Cruza Selic, IPCA, PIB, câmbio e outros indicadores. Custo: $0.010 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Panorama econômico consolidado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Mercado ($0.001–$0.005) ──────────────────────────────
+  /v1/mercado/acoes/{ticker}:
+    get:
+      tags: [Mercado]
+      summary: Cotação de ações B3 por ticker
+      description: "Fonte: B3 COTAHIST. Custo: $0.002 USDC"
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          description: "Código da ação (ex: PETR4, VALE3)"
+          schema:
+            type: string
+            example: PETR4
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Cotação da ação
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado/fatos-relevantes:
+    get:
+      tags: [Mercado]
+      summary: Fatos relevantes (CVM)
+      description: "Lista últimos fatos relevantes de empresas listadas. Custo: $0.002 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de fatos relevantes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado/fatos-relevantes/{protocolo}:
+    get:
+      tags: [Mercado]
+      summary: Fato relevante por protocolo CVM
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: protocolo
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Fato relevante específico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado/fundos/{cnpj}:
+    get:
+      tags: [Mercado]
+      summary: Dados de fundo de investimento por CNPJ
+      description: "Fonte: CVM. Custo: $0.005 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do fundo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado/fundos/{cnpj}/cotas:
+    get:
+      tags: [Mercado]
+      summary: Cotas de fundo de investimento
+      description: "Fonte: CVM. Custo: $0.002 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Histórico de cotas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado/fundos/{cnpj}/analise:
+    get:
+      tags: [Mercado, Premium]
+      summary: Análise completa de fundo de investimento
+      description: "Cruza dados CVM com cotas e indicadores. Custo: $0.005 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise detalhada do fundo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado/{cnae}/competicao:
+    get:
+      tags: [Mercado, Premium]
+      summary: Análise de competição por setor CNAE
+      description: "Custo: $0.020 USDC"
+      parameters:
+        - name: cnae
+          in: path
+          required: true
+          description: Código CNAE do setor
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise competitiva do setor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Transparência ($0.001) ───────────────────────────────
+  /v1/transparencia/licitacoes:
+    get:
+      tags: [Transparência]
+      summary: Licitações públicas
+      description: "Fonte: DB local (coletado do PNCP). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de licitações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/contratos:
+    get:
+      tags: [Transparência]
+      summary: Contratos do governo federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de contratos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/servidores:
+    get:
+      tags: [Transparência]
+      summary: Servidores públicos federais
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de servidores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/beneficios:
+    get:
+      tags: [Transparência]
+      summary: Benefícios sociais (Bolsa Família)
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de benefícios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/cartoes:
+    get:
+      tags: [Transparência]
+      summary: Cartões de pagamento do governo federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de cartões
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/ceaf/{cnpj}:
+    get:
+      tags: [Transparência, Compliance]
+      summary: CEAF — Cadastro de Expulsões da Administração Federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Registros CEAF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/viagens:
+    get:
+      tags: [Transparência]
+      summary: Viagens a serviço do governo federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de viagens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/emendas:
+    get:
+      tags: [Transparência]
+      summary: Emendas parlamentares
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de emendas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/obras:
+    get:
+      tags: [Transparência]
+      summary: Obras do governo federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de obras
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/transferencias:
+    get:
+      tags: [Transparência]
+      summary: Transferências do governo federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de transferências
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/pensionistas:
+    get:
+      tags: [Transparência]
+      summary: Pensionistas do governo federal
+      description: "Fonte: Portal da Transparência (CGU). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de pensionistas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── IBGE ($0.001) ────────────────────────────────────────
+  /v1/ibge/municipio/{ibge}:
+    get:
+      tags: [IBGE]
+      summary: Dados de município por código IBGE
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: ibge
+          in: path
+          required: true
+          description: Código IBGE do município (7 dígitos)
+          schema:
+            type: string
+            example: "3550308"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do município
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/municipios/{uf}:
+    get:
+      tags: [IBGE]
+      summary: Municípios por UF
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: uf
+          in: path
+          required: true
+          description: "Sigla da UF (ex: SP, RJ, MG)"
+          schema:
+            type: string
+            example: SP
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de municípios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/estados:
+    get:
+      tags: [IBGE]
+      summary: Lista de estados brasileiros
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de estados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/regioes:
+    get:
+      tags: [IBGE]
+      summary: Regiões do Brasil
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de regiões
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/cnae/{codigo}:
+    get:
+      tags: [IBGE]
+      summary: Informações de CNAE por código
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Detalhes do CNAE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/pnad:
+    get:
+      tags: [IBGE]
+      summary: PNAD Contínua — Pesquisa Nacional por Amostra de Domicílios
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da PNAD
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/inpc:
+    get:
+      tags: [IBGE]
+      summary: INPC — Índice Nacional de Preços ao Consumidor
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do INPC
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/pim:
+    get:
+      tags: [IBGE]
+      summary: PIM — Pesquisa Industrial Mensal
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da PIM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/populacao:
+    get:
+      tags: [IBGE]
+      summary: Estimativa populacional
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados populacionais
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/ipca15:
+    get:
+      tags: [IBGE]
+      summary: IPCA-15 — prévia da inflação
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do IPCA-15
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/pmc:
+    get:
+      tags: [IBGE]
+      summary: PMC — Pesquisa Mensal de Comércio
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da PMC
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ibge/pms:
+    get:
+      tags: [IBGE]
+      summary: PMS — Pesquisa Mensal de Serviços
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da PMS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Legislativo ($0.001) ─────────────────────────────────
+  /v1/legislativo/deputados:
+    get:
+      tags: [Legislativo]
+      summary: Lista de deputados federais
+      description: "Fonte: API da Câmara dos Deputados. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de deputados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/deputados/{id}:
+    get:
+      tags: [Legislativo]
+      summary: Detalhes de um deputado federal
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do deputado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/deputados/{id}/despesas:
+    get:
+      tags: [Legislativo]
+      summary: Despesas de gabinete de deputado
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de despesas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/proposicoes:
+    get:
+      tags: [Legislativo]
+      summary: Proposições legislativas (PLs, PECs, etc.)
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de proposições
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/votacoes:
+    get:
+      tags: [Legislativo]
+      summary: Votações na Câmara dos Deputados
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de votações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/partidos:
+    get:
+      tags: [Legislativo]
+      summary: Partidos políticos registrados
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de partidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/senado/senadores:
+    get:
+      tags: [Legislativo]
+      summary: Lista de senadores
+      description: "Fonte: API do Senado Federal. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de senadores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/senado/materias:
+    get:
+      tags: [Legislativo]
+      summary: Matérias legislativas do Senado
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de matérias
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/eventos:
+    get:
+      tags: [Legislativo]
+      summary: Eventos da Câmara dos Deputados
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de eventos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/comissoes:
+    get:
+      tags: [Legislativo]
+      summary: Comissões parlamentares
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de comissões
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/frentes:
+    get:
+      tags: [Legislativo]
+      summary: Frentes parlamentares
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de frentes parlamentares
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/legislativo/blocos:
+    get:
+      tags: [Legislativo]
+      summary: Blocos parlamentares
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de blocos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── IPEA ($0.001) ────────────────────────────────────────
+  /v1/ipea/serie/{codigo}:
+    get:
+      tags: [IPEA]
+      summary: Série histórica IPEADATA por código
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          description: "Código da série IPEADATA (ex: BM12_TJOVER12)"
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LimitN"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da série
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ipea/busca:
+    get:
+      tags: [IPEA]
+      summary: Buscar séries IPEADATA por palavra-chave
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: q
+          in: query
+          description: Termo de busca
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Séries encontradas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ipea/temas:
+    get:
+      tags: [IPEA]
+      summary: Lista de temas IPEADATA
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de temas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Tesouro ($0.001) ────────────────────────────────────
+  /v1/tesouro/rreo:
+    get:
+      tags: [Tesouro]
+      summary: RREO — Relatório Resumido de Execução Orçamentária
+      description: "Fonte: SICONFI. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do RREO
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/tesouro/entes:
+    get:
+      tags: [Tesouro]
+      summary: Entes federativos (SICONFI)
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de entes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/tesouro/rgf:
+    get:
+      tags: [Tesouro]
+      summary: RGF — Relatório de Gestão Fiscal
+      description: "Fonte: SICONFI. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do RGF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/tesouro/dca:
+    get:
+      tags: [Tesouro]
+      summary: DCA — Declaração de Contas Anuais
+      description: "Fonte: SICONFI. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do DCA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/tesouro/titulos:
+    get:
+      tags: [Tesouro]
+      summary: Títulos do Tesouro Direto
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados dos títulos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Eleições ($0.001–$0.003) ─────────────────────────────
+  /v1/eleicoes/candidatos:
+    get:
+      tags: [Eleições]
+      summary: Candidatos por eleição
+      description: "Fonte: DB local (coletado do TSE). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de candidatos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/eleicoes/bens:
+    get:
+      tags: [Eleições]
+      summary: Bens declarados de candidatos
+      description: "Fonte: TSE CDN ZIP (consulta_bem_candidato). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/AnoParam"
+        - $ref: "#/components/parameters/LimitN"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de bens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/eleicoes/doacoes:
+    get:
+      tags: [Eleições]
+      summary: Doações a campanhas eleitorais
+      description: "Fonte: TSE CDN ZIP (receitas_candidatos). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/AnoParam"
+        - $ref: "#/components/parameters/LimitN"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de doações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/eleicoes/resultados:
+    get:
+      tags: [Eleições]
+      summary: Resultados eleitorais por município/zona
+      description: "Fonte: TSE CDN ZIP (votacao_candidato_munzona). Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/AnoParam"
+        - $ref: "#/components/parameters/LimitN"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Resultados eleitorais
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/eleicoes/compliance/{cpf_cnpj}:
+    get:
+      tags: [Eleições, Compliance, Premium]
+      summary: Compliance eleitoral de candidato
+      description: "Cruza dados eleitorais com listas restritivas e processos judiciais. Custo: $0.003 USDC"
+      parameters:
+        - name: cpf_cnpj
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Resultado de compliance eleitoral
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Energia ($0.001) ─────────────────────────────────────
+  /v1/energia/tarifas:
+    get:
+      tags: [Energia]
+      summary: Tarifas de energia elétrica (ANEEL)
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de tarifas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/energia/combustiveis:
+    get:
+      tags: [Energia]
+      summary: Preços de combustíveis ANP (via IPEADATA)
+      description: "Séries de preço médio de gasolina, álcool, diesel e GLP. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/LimitN"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de combustíveis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Saúde ($0.001) ──────────────────────────────────────
+  /v1/saude/medicamentos/{registro}:
+    get:
+      tags: [Saúde]
+      summary: Consulta medicamento ANVISA por registro
+      description: "Custo: $0.001 USDC"
+      parameters:
+        - name: registro
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do medicamento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/saude/planos:
+    get:
+      tags: [Saúde]
+      summary: Planos de saúde (ANS)
+      description: "Fonte: ANS TISS. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados de planos de saúde
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Ambiental ($0.002–$0.020) ────────────────────────────
+  /v1/ambiental/desmatamento:
+    get:
+      tags: [Ambiental]
+      summary: Alertas de desmatamento DETER (INPE)
+      description: "Fonte: INPE DETER-AMZ. Custo: $0.002 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Alertas de desmatamento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ambiental/prodes:
+    get:
+      tags: [Ambiental]
+      summary: Dados PRODES — desmatamento consolidado anual
+      description: "Fonte: INPE PRODES. Custo: $0.002 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados PRODES
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ambiental/risco/{municipio}:
+    get:
+      tags: [Ambiental, Premium]
+      summary: Risco ambiental por município
+      description: "Análise de risco ambiental com DETER + PRODES. Custo: $0.003 USDC"
+      parameters:
+        - name: municipio
+          in: path
+          required: true
+          description: Código IBGE do município
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise de risco ambiental
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/ambiental/empresa/{cnpj}/esg:
+    get:
+      tags: [Ambiental, Premium]
+      summary: Score ESG de empresa
+      description: "Análise ESG com dados ambientais, compliance e dados societários. Custo: $0.020 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Score ESG detalhado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Transporte ($0.001–$0.002) ───────────────────────────
+  /v1/transporte/aeronaves/{prefixo}:
+    get:
+      tags: [Transporte]
+      summary: Aeronave por prefixo
+      description: "Fonte: ANAC. Custo: $0.001 USDC"
+      parameters:
+        - name: prefixo
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "PT-MBV"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados da aeronave
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transporte/aeronaves:
+    get:
+      tags: [Transporte]
+      summary: Lista de aeronaves registradas
+      description: "Custo: $0.002 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de aeronaves
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transporte/transportadores/{rntrc}:
+    get:
+      tags: [Transporte]
+      summary: Transportador por RNTRC
+      description: "Fonte: ANTT. Custo: $0.001 USDC"
+      parameters:
+        - name: rntrc
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do transportador
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transporte/transportadores:
+    get:
+      tags: [Transporte]
+      summary: Busca transportadores por CNPJ
+      description: "Custo: $0.002 USDC"
+      parameters:
+        - name: cnpj
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Transportadores encontrados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Judicial ($0.010) ────────────────────────────────────
+  /v1/judicial/processos/{doc}:
+    get:
+      tags: [Judicial]
+      summary: Processos judiciais por CPF/CNPJ
+      description: "Fonte: DataJud (CNJ). Custo: $0.010 USDC"
+      parameters:
+        - name: doc
+          in: path
+          required: true
+          description: CPF ou CNPJ do envolvido
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Processos encontrados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── DOU / Diários ($0.003) ──────────────────────────────
+  /v1/dou/busca:
+    get:
+      tags: [DOU]
+      summary: Busca no Diário Oficial da União
+      description: "Fonte: Querido Diário. Custo: $0.003 USDC"
+      parameters:
+        - name: q
+          in: query
+          description: Termo de busca
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Resultados da busca
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/diarios/busca:
+    get:
+      tags: [DOU]
+      summary: Busca em diários oficiais municipais
+      description: "Fonte: Querido Diário (OK-BR). Custo: $0.003 USDC"
+      parameters:
+        - name: q
+          in: query
+          description: Termo de busca
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Resultados da busca
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── PNCP ($0.001) ───────────────────────────────────────
+  /v1/pncp/orgaos:
+    get:
+      tags: [PNCP]
+      summary: Órgãos registrados no PNCP
+      description: "Fonte: PNCP. Custo: $0.001 USDC"
+      parameters:
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de órgãos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Crédito ($0.005) ────────────────────────────────────
+  /v1/credito/score/{cnpj}:
+    get:
+      tags: [Crédito, Premium]
+      summary: Score de crédito composto de empresa
+      description: "Cruza dados de CNPJ, compliance e processos judiciais. Custo: $0.005 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Score de crédito
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── Premium Compostos ───────────────────────────────────
+  /v1/municipios/{codigo}/perfil:
+    get:
+      tags: [Premium, IBGE]
+      summary: Perfil completo de município
+      description: "Agrega dados IBGE, SICONFI, DETER e eleitorais. Custo: $0.003 USDC"
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          description: Código IBGE do município
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Perfil do município
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/mercado-trabalho/{uf}/analise:
+    get:
+      tags: [Premium, Economia]
+      summary: Análise do mercado de trabalho por UF
+      description: "Agrega RAIS, CAGED e indicadores IBGE. Custo: $0.010 USDC"
+      parameters:
+        - name: uf
+          in: path
+          required: true
+          schema:
+            type: string
+            example: SP
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise do mercado de trabalho
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/setor/{cnae}/regulacao:
+    get:
+      tags: [Premium]
+      summary: Análise regulatória por setor CNAE
+      description: "Agrega dados de agências reguladoras e legislação. Custo: $0.015 USDC"
+      parameters:
+        - name: cnae
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise regulatória
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/litigio/{cnpj}/risco:
+    get:
+      tags: [Premium, Judicial]
+      summary: Análise de risco litigioso da empresa
+      description: "Agrega processos judiciais e dados de sócios. Custo: $0.020 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Análise de risco litigioso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/rede/{cnpj}/influencia:
+    get:
+      tags: [Premium]
+      summary: Rede de influência societária
+      description: "Mapeia sócios, empresas coligadas e conexões. Custo: $0.030 USDC"
+      parameters:
+        - $ref: "#/components/parameters/CNPJParam"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Grafo de influência
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/carteira/risco:
+    post:
+      tags: [Premium]
+      summary: Análise de risco de carteira (batch)
+      description: "Envia lista de CNPJs e recebe análise de risco consolidada. Custo: $0.100 USDC"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cnpjs:
+                  type: array
+                  items:
+                    type: string
+                  example: ["33000167000101", "60746948000112"]
+      responses:
+        "200":
+          description: Análise de risco da carteira
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
