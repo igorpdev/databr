@@ -3,6 +3,6 @@
 *.env
 databr-api
 databr-collector
-collector
+/collector
 /api
 /tmp/
