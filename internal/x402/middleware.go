@@ -243,6 +243,19 @@ func write402Response(w http.ResponseWriter, r *http.Request, req x402types.Paym
 		},
 	}
 
+	// V2 extensions.bazaar with proper info/schema format.
+	// The x402 client copies Extensions into PaymentPayload.Extensions,
+	// and the CDP facilitator extracts from payloadBytes.extensions["bazaar"].info.
+	bazaarExtension := map[string]interface{}{
+		"info": map[string]interface{}{
+			"input": map[string]interface{}{
+				"type":   "http",
+				"method": method,
+			},
+		},
+		"schema": map[string]interface{}{},
+	}
+
 	resp := map[string]interface{}{
 		"x402Version": 2,
 		"resource": map[string]interface{}{
@@ -251,6 +264,9 @@ func write402Response(w http.ResponseWriter, r *http.Request, req x402types.Paym
 			"mimeType":    meta.mimeType,
 		},
 		"accepts": []interface{}{acceptsItem},
+		"extensions": map[string]interface{}{
+			"bazaar": bazaarExtension,
+		},
 	}
 
 	body, _ := json.Marshal(resp)
