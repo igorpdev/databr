@@ -145,7 +145,9 @@ func extractPaymentHeader(r *http.Request) []byte {
 	return nil
 }
 
-// write402Response writes a V2 PaymentRequired JSON response with Bazaar discovery extension.
+// write402Response writes a V2 PaymentRequired JSON response with Bazaar discovery fields.
+// The Bazaar indexer reads description, mimeType, discoverable, and outputSchema from
+// each accepts[] item (V1-style), so we include those alongside V2 fields for compatibility.
 func write402Response(w http.ResponseWriter, r *http.Request, req x402types.PaymentRequirements) {
 	scheme := "https"
 	if r.TLS == nil {
@@ -163,26 +165,43 @@ func write402Response(w http.ResponseWriter, r *http.Request, req x402types.Paym
 		method = "POST"
 	}
 
-	resp := x402types.PaymentRequired{
-		X402Version: 2,
-		Resource: &x402types.ResourceInfo{
-			URL:         resourceURL,
-			Description: meta.description,
-			MimeType:    meta.mimeType,
-		},
-		Accepts: []x402types.PaymentRequirements{req},
-		Extensions: map[string]interface{}{
-			"bazaar": map[string]interface{}{
-				"input": map[string]interface{}{
-					"type":   "http",
-					"method": method,
-				},
-				"output": map[string]interface{}{
-					"type":   "json",
-					"format": meta.mimeType,
-				},
+	// Build accepts item with V2 payment fields + V1-style discovery fields.
+	// The V2 client reads scheme/network/amount/payTo/asset; the Bazaar indexer
+	// reads description/mimeType/discoverable/outputSchema/resource/maxAmountRequired.
+	acceptsItem := map[string]interface{}{
+		// V2 payment fields
+		"scheme":            req.Scheme,
+		"network":           req.Network,
+		"asset":             req.Asset,
+		"amount":            req.Amount,
+		"payTo":             req.PayTo,
+		"maxTimeoutSeconds": req.MaxTimeoutSeconds,
+		// V1 compat for Bazaar indexer
+		"maxAmountRequired": req.Amount,
+		"resource":          resourceURL,
+		"description":       meta.description,
+		"mimeType":          meta.mimeType,
+		"discoverable":      true,
+		"outputSchema": map[string]interface{}{
+			"input": map[string]interface{}{
+				"discoverable": true,
+				"method":       method,
+				"type":         "http",
+			},
+			"output": map[string]interface{}{
+				"type": "object",
 			},
 		},
+	}
+
+	resp := map[string]interface{}{
+		"x402Version": 2,
+		"resource": map[string]interface{}{
+			"url":         resourceURL,
+			"description": meta.description,
+			"mimeType":    meta.mimeType,
+		},
+		"accepts": []interface{}{acceptsItem},
 	}
 
 	body, _ := json.Marshal(resp)

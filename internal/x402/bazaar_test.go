@@ -11,7 +11,7 @@ import (
 )
 
 // TestV2Response_KnownRoute verifies that a 402 response for a known route
-// includes proper V2 format with bazaar extension and resource metadata.
+// includes V2 format with resource metadata and Bazaar discovery fields in accepts.
 func TestV2Response_KnownRoute(t *testing.T) {
 	fac := mockFacilitator(t, true)
 	defer fac.Close()
@@ -44,7 +44,7 @@ func TestV2Response_KnownRoute(t *testing.T) {
 		t.Errorf("x402Version: want 2, got %v", body["x402Version"])
 	}
 
-	// Resource metadata
+	// Resource metadata (V2 top-level)
 	resource, ok := body["resource"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("expected resource object, got %v", body["resource"])
@@ -56,7 +56,7 @@ func TestV2Response_KnownRoute(t *testing.T) {
 		t.Errorf("resource.mimeType: want application/json, got %v", resource["mimeType"])
 	}
 
-	// Accepts array with payment requirements
+	// Accepts array with payment requirements + discovery fields
 	accepts, ok := body["accepts"].([]interface{})
 	if !ok || len(accepts) == 0 {
 		t.Fatalf("expected non-empty accepts array, body: %s", rr.Body.String())
@@ -69,31 +69,30 @@ func TestV2Response_KnownRoute(t *testing.T) {
 		t.Errorf("accepts[0].network: want eip155:84532, got %v", item["network"])
 	}
 
-	// Bazaar discovery extension
-	extensions, ok := body["extensions"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected extensions object, got %v", body["extensions"])
+	// Bazaar discovery fields inside accepts item (V1-style, read by indexer)
+	if item["description"] != "Taxa Selic do Banco Central" {
+		t.Errorf("accepts[0].description: want 'Taxa Selic do Banco Central', got %v", item["description"])
 	}
-	bazaar, ok := extensions["bazaar"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected extensions.bazaar object, got %v", extensions["bazaar"])
+	if item["mimeType"] != "application/json" {
+		t.Errorf("accepts[0].mimeType: want application/json, got %v", item["mimeType"])
 	}
-	input, ok := bazaar["input"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected bazaar.input, got %v", bazaar["input"])
+	if item["discoverable"] != true {
+		t.Errorf("accepts[0].discoverable: want true, got %v", item["discoverable"])
 	}
-	if input["type"] != "http" {
-		t.Errorf("bazaar.input.type: want http, got %v", input["type"])
+
+	schema, ok := item["outputSchema"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected outputSchema in accepts[0], got %v", item["outputSchema"])
+	}
+	input, ok := schema["input"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected outputSchema.input, got %v", schema["input"])
+	}
+	if input["discoverable"] != true {
+		t.Errorf("outputSchema.input.discoverable: want true, got %v", input["discoverable"])
 	}
 	if input["method"] != "GET" {
-		t.Errorf("bazaar.input.method: want GET, got %v", input["method"])
-	}
-	output, ok := bazaar["output"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected bazaar.output, got %v", bazaar["output"])
-	}
-	if output["format"] != "application/json" {
-		t.Errorf("bazaar.output.format: want application/json, got %v", output["format"])
+		t.Errorf("outputSchema.input.method: want GET, got %v", input["method"])
 	}
 }
 
@@ -130,10 +129,11 @@ func TestV2Response_UnknownRoute(t *testing.T) {
 		t.Errorf("expected fallback description, got %v", resource["description"])
 	}
 
-	// Bazaar extension should still be present
-	extensions := body["extensions"].(map[string]interface{})
-	if _, ok := extensions["bazaar"]; !ok {
-		t.Error("unknown route should still have bazaar extension")
+	// Discovery fields should still be present in accepts
+	accepts := body["accepts"].([]interface{})
+	item := accepts[0].(map[string]interface{})
+	if item["discoverable"] != true {
+		t.Error("unknown route should still have discoverable=true in accepts")
 	}
 }
 
