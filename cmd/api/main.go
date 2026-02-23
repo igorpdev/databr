@@ -177,10 +177,6 @@ func main() {
 	}
 
 	// MCP server (invokes handlers directly, no HTTP loopback)
-	baseURL := os.Getenv("BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:" + serverPort()
-	}
 	mcpDeps := &mcp.HandlerDeps{
 		// On-demand handlers (always available)
 		Empresas:    empHandler.GetEmpresa,
@@ -211,9 +207,7 @@ func main() {
 		mcpDeps.Saude = saudeHandler.GetMedicamento
 	}
 	mcpSrv := mcp.NewServer(mcpDeps)
-	sseServer := mcpserver.NewSSEServer(mcpSrv.MCPServer(),
-		mcpserver.WithBaseURL(baseURL+"/mcp"),
-	)
+	streamableServer := mcpserver.NewStreamableHTTPServer(mcpSrv.MCPServer())
 
 	// Router
 	r := chi.NewRouter()
@@ -271,8 +265,8 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type", "X-PAYMENT", "X-Request-ID"},
-		ExposedHeaders:   []string{"X-Payment-Required", "Content-Length", "X-Request-ID"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "X-PAYMENT", "Payment-Signature", "X-Request-ID"},
+		ExposedHeaders:   []string{"X-Payment-Required", "X-Payment-Response", "Content-Length", "X-Request-ID"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
@@ -660,11 +654,12 @@ func main() {
 		})
 	})
 
-	// MCP server (SSE transport) — protected by x402.
-	// Price set to $0.015 (max of any tool proxied through MCP: judicial/processos).
+	// MCP server (Streamable HTTP transport) — x402 applied per tool call.
+	// Each POST /mcp with method=tools/call is charged at the tool-specific price.
+	// Non-tool messages (initialize, tools/list) pass free.
 	r.Group(func(r chi.Router) {
-		r.Use(optionalX402(x402Cfg, "0.015"))
-		r.Mount("/mcp", sseServer)
+		r.Use(mcp.NewPerToolMiddleware(x402Cfg))
+		r.Mount("/mcp", streamableServer)
 	})
 
 	// Server with timeouts and graceful shutdown

@@ -39,6 +39,24 @@ type HandlerDeps struct {
 	Saude        http.HandlerFunc // GET /v1/saude/medicamentos/{registro}
 }
 
+// ToolPrices maps each MCP tool name to its USDC price string.
+// Used by NewPerToolMiddleware to apply per-call x402 payment gates.
+var ToolPrices = map[string]string{
+	"consultar_empresa":          "0.003",
+	"verificar_compliance":       "0.010",
+	"cotacao_cambio":             "0.003",
+	"indicadores_macro":          "0.003",
+	"buscar_processos_judiciais": "0.015",
+	"buscar_diario_oficial":      "0.007",
+	"consultar_orcamento":        "0.003",
+	"consultar_tcu_certidao":     "0.003",
+	"cotacao_acoes":              "0.005",
+	"consultar_deputados":        "0.003",
+	"buscar_licitacao":           "0.003",
+	"consultar_tarifas_energia":  "0.003",
+	"consultar_medicamento":      "0.003",
+}
+
 // Server wraps the mcp-go server with DataBR tool registrations.
 type Server struct {
 	mcpServer *server.MCPServer
