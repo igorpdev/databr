@@ -32,7 +32,7 @@ func TestMCPServer_ToolsRegistered(t *testing.T) {
 	srv := mcp.NewServer(&mcp.HandlerDeps{})
 	tools := srv.Tools()
 
-	expected := 70
+	expected := 80
 	if len(tools) != expected {
 		t.Errorf("expected %d tools, got %d", expected, len(tools))
 	}
@@ -82,6 +82,17 @@ func TestMCPServer_ToolsRegistered(t *testing.T) {
 		"analise_litigio",
 		"panorama_economico",
 		"perfil_municipio",
+		// Phase 4-5
+		"consultar_processo_judicial",
+		"consultar_mortalidade",
+		"consultar_nascimentos",
+		"consultar_hospitais",
+		"consultar_dengue",
+		"consultar_vacinacao",
+		"listar_municipios_diarios",
+		"listar_temas_diarios",
+		"buscar_diarios_por_tema",
+		"descobrir_casos_uso",
 	}
 	for _, name := range critical {
 		if !toolSet[name] {

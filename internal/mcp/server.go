@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	mcpgosdk "github.com/mark3labs/mcp-go/mcp"
@@ -117,6 +118,18 @@ type HandlerDeps struct {
 	EnergiaCarga     http.HandlerFunc // GET /v1/energia/carga
 	FundoAnalise     http.HandlerFunc // GET /v1/mercado/fundos/{cnpj}/analise
 
+	// Phase 4-5 handlers
+	JudicialProcesso    http.HandlerFunc // GET /v1/judicial/processo/{numero}
+	DATASUSMortalidade  http.HandlerFunc // GET /v1/saude/mortalidade
+	DATASUSNascimentos  http.HandlerFunc // GET /v1/saude/nascimentos
+	DATASUSHospitais    http.HandlerFunc // GET /v1/saude/hospitais
+	DATASUSDengue       http.HandlerFunc // GET /v1/saude/dengue
+	DATASUSVacinacao    http.HandlerFunc // GET /v1/saude/vacinacao/{ano}
+	DiariosMunicipios   http.HandlerFunc // GET /v1/diarios/municipios
+	DiariosTemas        http.HandlerFunc // GET /v1/diarios/temas
+	DiariosTema         http.HandlerFunc // GET /v1/diarios/tema/{tema}
+	DiscoverCases       http.HandlerFunc // GET /v1/discover/cases
+
 	// Premium/Composite handlers (new)
 	DueDiligence        http.HandlerFunc // GET /v1/empresas/{cnpj}/duediligence
 	PerfilCompleto      http.HandlerFunc // GET /v1/empresas/{cnpj}/perfil-completo
@@ -222,6 +235,17 @@ var ToolPrices = map[string]string{
 	"rede_influencia":          "0.050",
 	"consultar_jurisprudencia": "0.010",
 	"perfil_municipio":         "0.007",
+	// Phase 4-5 tools
+	"consultar_processo_judicial": "0.010",
+	"consultar_mortalidade":       "0.005",
+	"consultar_nascimentos":       "0.005",
+	"consultar_hospitais":         "0.005",
+	"consultar_dengue":            "0.005",
+	"consultar_vacinacao":         "0.005",
+	"listar_municipios_diarios":   "0.003",
+	"listar_temas_diarios":        "0.003",
+	"buscar_diarios_por_tema":     "0.005",
+	"descobrir_casos_uso":         "0",
 }
 
 // Server wraps the mcp-go server with DataBR tool registrations.
@@ -1221,6 +1245,152 @@ func (s *Server) registerTools() {
 				return nil, fmt.Errorf("informe 'cnes', 'municipio' ou 'uf'")
 			}
 			return invokeHandler(ctx, s.deps.DATASUSEstabelecimentos, "/v1/saude/estabelecimentos", nil, query)
+		},
+	)
+
+	// === Phase 4-5: Judicial, DATASUS health, Diários, Discover ===
+	s.addTool("consultar_processo_judicial",
+		"Consulta processo judicial pelo número unificado CNJ. Retorna dados do processo, partes, movimentações.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("numero", mcpgosdk.Required(),
+				mcpgosdk.Description("Número do processo CNJ (ex: 0000000-00.0000.0.00.0000)"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			numero := req.GetString("numero", "")
+			return invokeHandler(ctx, s.deps.JudicialProcesso, "/v1/judicial/processo/"+numero, map[string]string{"numero": numero}, "")
+		},
+	)
+
+	s.addTool("consultar_mortalidade",
+		"Consulta dados de mortalidade do SIM/DATASUS (Sistema de Informação sobre Mortalidade). Filtros por município, CID, sexo, idade.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("municipio", mcpgosdk.Description("Código IBGE do município")),
+			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			var parts []string
+			if m := req.GetString("municipio", ""); m != "" {
+				parts = append(parts, "municipio="+m)
+			}
+			if l := req.GetString("limit", ""); l != "" {
+				parts = append(parts, "limit="+l)
+			}
+			query := strings.Join(parts, "&")
+			return invokeHandler(ctx, s.deps.DATASUSMortalidade, "/v1/saude/mortalidade", nil, query)
+		},
+	)
+
+	s.addTool("consultar_nascimentos",
+		"Consulta dados de nascidos vivos do SINASC/DATASUS. Filtros por município, sexo, peso.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("municipio", mcpgosdk.Description("Código IBGE do município")),
+			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			var parts []string
+			if m := req.GetString("municipio", ""); m != "" {
+				parts = append(parts, "municipio="+m)
+			}
+			if l := req.GetString("limit", ""); l != "" {
+				parts = append(parts, "limit="+l)
+			}
+			query := strings.Join(parts, "&")
+			return invokeHandler(ctx, s.deps.DATASUSNascimentos, "/v1/saude/nascimentos", nil, query)
+		},
+	)
+
+	s.addTool("consultar_hospitais",
+		"Consulta hospitais e leitos do CNES/DATASUS. Lista hospitais com quantidade de leitos por tipo.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("municipio", mcpgosdk.Description("Código IBGE do município")),
+			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			var parts []string
+			if m := req.GetString("municipio", ""); m != "" {
+				parts = append(parts, "municipio="+m)
+			}
+			if l := req.GetString("limit", ""); l != "" {
+				parts = append(parts, "limit="+l)
+			}
+			query := strings.Join(parts, "&")
+			return invokeHandler(ctx, s.deps.DATASUSHospitais, "/v1/saude/hospitais", nil, query)
+		},
+	)
+
+	s.addTool("consultar_dengue",
+		"Consulta notificações de dengue do SINAN/DATASUS. Dados de arboviroses por município e período.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("municipio", mcpgosdk.Description("Código IBGE do município")),
+			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			var parts []string
+			if m := req.GetString("municipio", ""); m != "" {
+				parts = append(parts, "municipio="+m)
+			}
+			if l := req.GetString("limit", ""); l != "" {
+				parts = append(parts, "limit="+l)
+			}
+			query := strings.Join(parts, "&")
+			return invokeHandler(ctx, s.deps.DATASUSDengue, "/v1/saude/dengue", nil, query)
+		},
+	)
+
+	s.addTool("consultar_vacinacao",
+		"Consulta doses aplicadas do PNI/DATASUS (Programa Nacional de Imunizações) por ano.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("ano", mcpgosdk.Required(),
+				mcpgosdk.Description("Ano da vacinação (2020-2030)"),
+			),
+			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			ano := req.GetString("ano", "")
+			var parts []string
+			if l := req.GetString("limit", ""); l != "" {
+				parts = append(parts, "limit="+l)
+			}
+			query := strings.Join(parts, "&")
+			return invokeHandler(ctx, s.deps.DATASUSVacinacao, "/v1/saude/vacinacao/"+ano, map[string]string{"ano": ano}, query)
+		},
+	)
+
+	s.addTool("listar_municipios_diarios",
+		"Lista municípios com diários oficiais disponíveis no Querido Diário.",
+		[]mcpgosdk.ToolOption{},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			return invokeHandler(ctx, s.deps.DiariosMunicipios, "/v1/diarios/municipios", nil, "")
+		},
+	)
+
+	s.addTool("listar_temas_diarios",
+		"Lista temas de classificação disponíveis nos diários oficiais municipais.",
+		[]mcpgosdk.ToolOption{},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			return invokeHandler(ctx, s.deps.DiariosTemas, "/v1/diarios/temas", nil, "")
+		},
+	)
+
+	s.addTool("buscar_diarios_por_tema",
+		"Busca publicações em diários oficiais municipais filtradas por tema (ex: educacao, saude, meio-ambiente).",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("tema", mcpgosdk.Required(),
+				mcpgosdk.Description("Tema de classificação (ex: educacao, saude, meio-ambiente)"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			tema := req.GetString("tema", "")
+			return invokeHandler(ctx, s.deps.DiariosTema, "/v1/diarios/tema/"+tema, map[string]string{"tema": tema}, "")
+		},
+	)
+
+	s.addTool("descobrir_casos_uso",
+		"Lista casos de uso e exemplos práticos da API DataBR para diferentes setores (compliance, due diligence, saúde pública, etc).",
+		[]mcpgosdk.ToolOption{},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			return invokeHandler(ctx, s.deps.DiscoverCases, "/v1/discover/cases", nil, "")
 		},
 	)
 

@@ -180,6 +180,9 @@ func main() {
 		esgHandler = handlers.NewESGHandler(cnpjCollector, cguCollector, store)
 	}
 
+	// Discovery handler (created before MCP deps so it can be wired into both MCP and routes)
+	discoverHandler := handlers.NewDiscoverHandler()
+
 	// MCP server (invokes handlers directly, no HTTP loopback)
 	mcpDeps := &mcp.HandlerDeps{
 		// On-demand handlers (always available)
@@ -236,6 +239,17 @@ func main() {
 		Diarios:              douHandler.GetDiarios,
 		DATASUSEstabelecimento:  dataSUSHandler.GetEstabelecimento,
 		DATASUSEstabelecimentos: dataSUSHandler.GetEstabelecimentos,
+		// Phase 4-5 handlers
+		JudicialProcesso:   judicialHand.GetProcesso,
+		DATASUSMortalidade: dataSUSHandler.GetMortalidade,
+		DATASUSNascimentos: dataSUSHandler.GetNascimentos,
+		DATASUSHospitais:   dataSUSHandler.GetHospitais,
+		DATASUSDengue:      dataSUSHandler.GetDengue,
+		DATASUSVacinacao:   dataSUSHandler.GetVacinacao,
+		DiariosMunicipios:  douHandler.GetMunicipios,
+		DiariosTemas:       douHandler.GetTemas,
+		DiariosTema:        douHandler.GetTema,
+		DiscoverCases:      discoverHandler.GetCases,
 	}
 	// Store-backed handlers (only when DB is connected)
 	if bcbHandler != nil {
@@ -560,7 +574,6 @@ func main() {
 		))
 
 		// Discovery endpoint (free, no x402 payment required)
-		discoverHandler := handlers.NewDiscoverHandler()
 		r.Get("/discover/cases", discoverHandler.GetCases)
 
 		// $0.003 — basic lookups: company data, BCB rates, economic indicators, tesouro
