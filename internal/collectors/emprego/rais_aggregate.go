@@ -33,11 +33,21 @@ type raisAgg struct {
 //   - Columns found by substring match (not exact name) due to encoding artifacts
 //
 // Key columns:
-//   - "CNAE 2.0 Classe" (not subclasse): 4-digit CNAE code → divisao → secao
-//   - "Ind Vínculo Ativo 31/12": "1" = active bond on Dec 31
-//   - "Município Trab": IBGE municipality code, first 2 digits = UF
-//   - "Vl Rem Média Nom": average nominal remuneration (US decimal format)
+//   - "CNAE 2.0 Classe" (not subclasse): 4-digit CNAE code -> divisao -> secao
+//   - "Ind Vinculo Ativo 31/12": "1" = active bond on Dec 31
+//   - "Municipio Trab": IBGE municipality code, first 2 digits = UF
+//   - "Vl Rem Media Nom": average nominal remuneration (US decimal format)
 func aggregateRAIS(r io.Reader, ano int) ([]domain.SourceRecord, error) {
+	aggs := make(map[string]*raisAgg)
+	if err := aggregateRAISInto(r, aggs); err != nil {
+		return nil, err
+	}
+	return raisAggsToRecords(aggs, ano), nil
+}
+
+// aggregateRAISInto reads RAIS CSV from r and accumulates into the provided map.
+// This allows merging multiple region files into a single aggregation.
+func aggregateRAISInto(r io.Reader, aggs map[string]*raisAgg) error {
 	cr := csv.NewReader(r)
 	cr.LazyQuotes = true
 	cr.ReuseRecord = true
@@ -45,14 +55,30 @@ func aggregateRAIS(r io.Reader, ano int) ([]domain.SourceRecord, error) {
 
 	header, err := cr.Read()
 	if err != nil {
-		return nil, fmt.Errorf("rais_aggregate: read header: %w", err)
+		return fmt.Errorf("rais_aggregate: read header: %w", err)
 	}
 
-	colCNAE := -1
-	colAtivo := -1
-	colMunic := -1
-	colRem := -1
+	colCNAE, colAtivo, colMunic, colRem := findRAISColumns(header)
+	if colCNAE < 0 || colMunic < 0 {
+		return nil // no usable columns
+	}
 
+	for {
+		row, err := cr.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue // skip malformed rows
+		}
+		processRAISRow(row, colCNAE, colAtivo, colMunic, colRem, aggs)
+	}
+	return nil
+}
+
+// findRAISColumns locates key column indices by substring matching.
+func findRAISColumns(header []string) (colCNAE, colAtivo, colMunic, colRem int) {
+	colCNAE, colAtivo, colMunic, colRem = -1, -1, -1, -1
 	for i, name := range header {
 		lower := strings.ToLower(strings.Trim(name, "\" "))
 		switch {
@@ -66,86 +92,57 @@ func aggregateRAIS(r io.Reader, ano int) ([]domain.SourceRecord, error) {
 			colRem = i
 		}
 	}
+	return
+}
 
-	emptyResult := []domain.SourceRecord{{
-		Source:    "rais_emprego",
-		RecordKey: strconv.Itoa(ano),
-		Data:      map[string]any{"ano": ano, "items": []map[string]any{}, "total": 0},
-		FetchedAt: time.Now().UTC(),
-	}}
-
-	if colCNAE < 0 || colMunic < 0 {
-		return emptyResult, nil
+// processRAISRow processes a single RAIS CSV row into the aggregation map.
+func processRAISRow(row []string, colCNAE, colAtivo, colMunic, colRem int, aggs map[string]*raisAgg) {
+	municCode := ""
+	if colMunic < len(row) {
+		municCode = strings.TrimSpace(row[colMunic])
+	}
+	if len(municCode) < 2 {
+		return
+	}
+	ufSigla := ufCodeToSigla(municCode[:2])
+	if ufSigla == "" {
+		return
 	}
 
-	aggs := make(map[string]*raisAgg)
-
-	for {
-		row, err := cr.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			continue // skip malformed rows
-		}
-
-		// Extract UF from municipality code (first 2 digits)
-		municCode := ""
-		if colMunic < len(row) {
-			municCode = strings.TrimSpace(row[colMunic])
-		}
-		if len(municCode) < 2 {
-			continue
-		}
-		ufCode := municCode[:2]
-		ufSigla := ufCodeToSigla(ufCode)
-		if ufSigla == "" {
-			continue // unknown UF (e.g. "99")
-		}
-
-		// Extract CNAE section from CNAE 2.0 Classe code
-		cnaeRaw := ""
-		if colCNAE < len(row) {
-			cnaeRaw = strings.TrimSpace(row[colCNAE])
-		}
-		// Pad to at least 4 digits for divisao lookup
-		for len(cnaeRaw) < 4 {
-			cnaeRaw = "0" + cnaeRaw
-		}
-		secao, descricao := cnaeDivisaoToSecao(cnaeRaw)
-		if secao == "" {
-			continue
-		}
-
-		key := ufSigla + "_" + secao
-		agg, ok := aggs[key]
-		if !ok {
-			agg = &raisAgg{
-				uf:        ufSigla,
-				secao:     secao,
-				descricao: descricao,
-			}
-			aggs[key] = agg
-		}
-
-		agg.total++
-
-		// Count active bonds (Dec 31)
-		if colAtivo >= 0 && colAtivo < len(row) && strings.TrimSpace(row[colAtivo]) == "1" {
-			agg.ativos++
-		}
-
-		// Sum remuneration for average calculation
-		if colRem >= 0 && colRem < len(row) {
-			rem := parseBRDecimal(row[colRem])
-			if rem > 0 {
-				agg.somaRem += rem
-				agg.countRem++
-			}
-		}
+	cnaeRaw := ""
+	if colCNAE < len(row) {
+		cnaeRaw = strings.TrimSpace(row[colCNAE])
+	}
+	for len(cnaeRaw) < 4 {
+		cnaeRaw = "0" + cnaeRaw
+	}
+	secao, descricao := cnaeDivisaoToSecao(cnaeRaw)
+	if secao == "" {
+		return
 	}
 
-	// Convert to sorted slice
+	key := ufSigla + "_" + secao
+	agg, ok := aggs[key]
+	if !ok {
+		agg = &raisAgg{uf: ufSigla, secao: secao, descricao: descricao}
+		aggs[key] = agg
+	}
+
+	agg.total++
+	if colAtivo >= 0 && colAtivo < len(row) && strings.TrimSpace(row[colAtivo]) == "1" {
+		agg.ativos++
+	}
+	if colRem >= 0 && colRem < len(row) {
+		rem := parseBRDecimal(row[colRem])
+		if rem > 0 {
+			agg.somaRem += rem
+			agg.countRem++
+		}
+	}
+}
+
+// raisAggsToRecords converts a completed raisAgg map into SourceRecords.
+func raisAggsToRecords(aggs map[string]*raisAgg, ano int) []domain.SourceRecord {
 	items := make([]map[string]any, 0, len(aggs))
 	for _, agg := range aggs {
 		remMedia := 0.0
@@ -175,5 +172,5 @@ func aggregateRAIS(r io.Reader, ano int) ([]domain.SourceRecord, error) {
 		RecordKey: strconv.Itoa(ano),
 		Data:      map[string]any{"ano": ano, "items": items, "total": len(items)},
 		FetchedAt: time.Now().UTC(),
-	}}, nil
+	}}
 }

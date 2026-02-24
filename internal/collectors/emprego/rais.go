@@ -3,100 +3,69 @@ package emprego
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
+	"log/slog"
 	"time"
 
 	"github.com/databr/api/internal/domain"
+	"golang.org/x/text/encoding/charmap"
 )
 
-const raisDefaultBaseURL = "https://dados.gov.br"
-
-// raisRecord represents a single RAIS employment aggregate per sector.
-type raisRecord struct {
-	SectorCode string  `json:"sector_code"`
-	SectorName string  `json:"sector_name"`
-	Employees  int     `json:"employees"`
-	AvgSalary  float64 `json:"avg_salary"`
-	Admissions int     `json:"admissions"`
-	Dismissals int     `json:"dismissals"`
-	UF         string  `json:"uf"`
+var raisRegionFiles = []string{
+	"RAIS_VINC_PUB_SP",
+	"RAIS_VINC_PUB_MG_ES_RJ",
+	"RAIS_VINC_PUB_SUL",
+	"RAIS_VINC_PUB_NORDESTE",
+	"RAIS_VINC_PUB_NORTE",
+	"RAIS_VINC_PUB_CENTRO_OESTE",
+	"RAIS_VINC_PUB_NI",
 }
 
-// RAISCollector fetches annual employment aggregates by sector from the RAIS data source.
+// RAISCollector downloads annual RAIS data from MTE FTP,
+// aggregates by UF+CNAE across all region files, and returns summary records.
 type RAISCollector struct {
-	baseURL    string
-	httpClient *http.Client
+	ftpHost string
 }
 
 // NewRAISCollector creates a new RAISCollector.
-// baseURL overrides the production URL; pass "" to use the default.
-func NewRAISCollector(baseURL string) *RAISCollector {
-	if baseURL == "" {
-		baseURL = raisDefaultBaseURL
-	}
-	return &RAISCollector{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		httpClient: &http.Client{Timeout: 60 * time.Second},
-	}
+// Pass "" for ftpHost to use the default MTE FTP server.
+func NewRAISCollector(ftpHost string) *RAISCollector {
+	return &RAISCollector{ftpHost: ftpHost}
 }
 
 func (c *RAISCollector) Source() string   { return "rais_emprego" }
-func (c *RAISCollector) Schedule() string { return "0 3 1 * *" }
+func (c *RAISCollector) Schedule() string { return "0 3 1 3 *" }
 
-// Collect fetches RAIS employment data for the previous year.
+// Collect downloads RAIS region files from MTE FTP for the previous year,
+// decodes from Latin-1, and aggregates by (UF, CNAE secao).
 func (c *RAISCollector) Collect(ctx context.Context) ([]domain.SourceRecord, error) {
-	year := time.Now().Year() - 1 // RAIS is released with ~1 year lag
-	url := fmt.Sprintf("%s/api/rais?year=%d", c.baseURL, year)
+	ano := time.Now().Year() - 1
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("rais_emprego: build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
+	// We accumulate aggregates across all region files into a single raisAgg map
+	// by downloading each file sequentially and feeding rows into aggregateRAISInto.
+	merged := make(map[string]*raisAgg)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("rais_emprego: fetch: %w", err)
-	}
-	defer resp.Body.Close()
+	for _, region := range raisRegionFiles {
+		ftpPath := fmt.Sprintf("%s/RAIS/%d/%s.7z", ftpBasePath, ano, region)
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("rais_emprego: upstream returned %d", resp.StatusCode)
-	}
+		slog.Info("rais: processing region", "region", region, "year", ano)
 
-	var items []raisRecord
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
-		return nil, fmt.Errorf("rais_emprego: decode: %w", err)
-	}
-
-	now := time.Now().UTC()
-	records := make([]domain.SourceRecord, 0, len(items))
-	for _, item := range items {
-		if item.SectorCode == "" {
-			continue
+		rc, _, err := downloadAndExtract7z(ctx, c.ftpHost, ftpPath)
+		if err != nil {
+			slog.Error("rais: skip region", "region", region, "error", err)
+			continue // skip failed regions, don't abort entirely
 		}
 
-		recordKey := fmt.Sprintf("%d_%s", year, item.SectorCode)
+		// RAIS files are Latin-1 encoded -- decode to UTF-8
+		decoder := charmap.ISO8859_1.NewDecoder()
+		utf8Reader := decoder.Reader(rc)
 
-		records = append(records, domain.SourceRecord{
-			Source:    "rais_emprego",
-			RecordKey: recordKey,
-			Data: map[string]any{
-				"year":        year,
-				"sector_code": item.SectorCode,
-				"sector_name": item.SectorName,
-				"employees":   item.Employees,
-				"avg_salary":  item.AvgSalary,
-				"admissions":  item.Admissions,
-				"dismissals":  item.Dismissals,
-				"uf":          item.UF,
-			},
-			FetchedAt: now,
-		})
+		if err := aggregateRAISInto(utf8Reader, merged); err != nil {
+			slog.Error("rais: aggregate failed", "region", region, "error", err)
+		}
+
+		rc.Close()
 	}
 
-	return records, nil
+	return raisAggsToRecords(merged, ano), nil
 }

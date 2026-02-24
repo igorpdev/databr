@@ -1,8 +1,23 @@
 package emprego
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/bodgit/sevenzip"
+	"github.com/jlaffaye/ftp"
+)
+
+const (
+	ftpHost     = "ftp.mtps.gov.br:21"
+	ftpBasePath = "/pdet/microdados"
+	ftpTimeout  = 30 * time.Second
 )
 
 // ufCodes maps IBGE numeric UF codes to state abbreviations.
@@ -133,4 +148,101 @@ func parseBRDecimal(s string) float64 {
 
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+// downloadAndExtract7z connects to the MTE FTP server, downloads the file at ftpPath
+// to a temp file, extracts the first entry from the 7z archive, and returns:
+//   - An io.ReadCloser for the extracted content (MUST close to clean up temp files)
+//   - The filename inside the 7z archive (for logging)
+//   - Any error
+func downloadAndExtract7z(ctx context.Context, host, ftpPath string) (io.ReadCloser, string, error) {
+	if host == "" {
+		host = ftpHost
+	}
+
+	slog.Info("ftp: connecting", "host", host, "path", ftpPath)
+
+	conn, err := ftp.Dial(host, ftp.DialWithTimeout(ftpTimeout))
+	if err != nil {
+		return nil, "", fmt.Errorf("ftp dial %s: %w", host, err)
+	}
+
+	if err := conn.Login("anonymous", ""); err != nil {
+		conn.Quit()
+		return nil, "", fmt.Errorf("ftp login: %w", err)
+	}
+
+	resp, err := conn.Retr(ftpPath)
+	if err != nil {
+		conn.Quit()
+		return nil, "", fmt.Errorf("ftp retr %s: %w", ftpPath, err)
+	}
+
+	// Write to temp file (sevenzip needs io.ReaderAt)
+	tmpFile, err := os.CreateTemp("", "databr-*.7z")
+	if err != nil {
+		resp.Close()
+		conn.Quit()
+		return nil, "", fmt.Errorf("create temp: %w", err)
+	}
+
+	if _, err := io.Copy(tmpFile, resp); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		resp.Close()
+		conn.Quit()
+		return nil, "", fmt.Errorf("download %s: %w", ftpPath, err)
+	}
+	resp.Close()
+	conn.Quit()
+
+	slog.Info("ftp: downloaded", "path", ftpPath, "temp", tmpFile.Name())
+
+	// Open 7z archive
+	szReader, err := sevenzip.OpenReader(tmpFile.Name())
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, "", fmt.Errorf("open 7z %s: %w", ftpPath, err)
+	}
+
+	if len(szReader.File) == 0 {
+		szReader.Close()
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, "", fmt.Errorf("empty 7z archive: %s", ftpPath)
+	}
+
+	entry := szReader.File[0]
+	rc, err := entry.Open()
+	if err != nil {
+		szReader.Close()
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, "", fmt.Errorf("open 7z entry %s: %w", entry.Name, err)
+	}
+
+	slog.Info("ftp: extracting", "entry", entry.Name, "size", entry.UncompressedSize)
+
+	// Wrap in a closer that cleans up everything
+	return &cleanupReadCloser{
+		ReadCloser: rc,
+		cleanup: func() {
+			szReader.Close()
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+		},
+	}, entry.Name, nil
+}
+
+// cleanupReadCloser wraps an io.ReadCloser and runs cleanup on Close.
+type cleanupReadCloser struct {
+	io.ReadCloser
+	cleanup func()
+}
+
+func (c *cleanupReadCloser) Close() error {
+	err := c.ReadCloser.Close()
+	c.cleanup()
+	return err
 }
