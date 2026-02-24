@@ -94,7 +94,7 @@ tags:
   - name: Energia
     description: ANEEL tarifas, ONS, ANP combustíveis
   - name: Saúde
-    description: ANVISA medicamentos, ANS planos
+    description: ANVISA medicamentos, ANS planos, DATASUS estabelecimentos (CNES)
   - name: Ambiental
     description: INPE DETER/PRODES, risco ambiental, ESG
   - name: Transporte
@@ -1872,6 +1872,94 @@ paths:
                 $ref: "#/components/schemas/APIResponse"
         "402":
           $ref: "#/components/responses/PaymentRequired"
+
+  /v1/saude/estabelecimentos/{cnes}:
+    get:
+      tags: [Saúde]
+      summary: Estabelecimento de saúde por código CNES
+      description: "Fonte: DATASUS / CNES. Retorna dados completos do estabelecimento de saúde: nome, endereço, coordenadas, tipo, esfera administrativa, serviços disponíveis. Custo: $0.003 USDC"
+      parameters:
+        - name: cnes
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Código CNES do estabelecimento (7 dígitos)
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Dados do estabelecimento de saúde
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/saude/estabelecimentos:
+    get:
+      tags: [Saúde]
+      summary: Busca estabelecimentos de saúde por município ou UF
+      description: "Fonte: DATASUS / CNES. Lista estabelecimentos de saúde filtrados por código IBGE do município ou código numérico do estado. Custo: $0.003 USDC"
+      parameters:
+        - name: municipio
+          in: query
+          schema:
+            type: string
+          description: Código IBGE do município (6 dígitos). Pelo menos municipio ou uf é obrigatório.
+        - name: uf
+          in: query
+          schema:
+            type: string
+          description: Código numérico do estado (ex 33 para RJ, 35 para SP)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 500
+          description: Número máximo de resultados
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de estabelecimentos de saúde
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "400":
+          description: Faltou informar municipio ou uf
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /.well-known/mcp.json:
+    get:
+      tags: [Operacional]
+      summary: MCP Server discovery
+      description: "Documento de descoberta para agentes de IA encontrarem o servidor MCP automaticamente. Retorna URL, transporte e informações de autenticação."
+      responses:
+        "200":
+          description: MCP discovery document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: databr
+                  description:
+                    type: string
+                  url:
+                    type: string
+                    example: https://databr.api.br/mcp
+                  transport:
+                    type: string
+                    example: streamable-http
+                  version:
+                    type: string
+                  authentication:
+                    type: object
 
   # ── Ambiental ($0.002–$0.020) ────────────────────────────
   /v1/ambiental/desmatamento:
