@@ -738,11 +738,12 @@ func main() {
 			}
 		})
 
-		// $0.010 — premium: full compliance, CVM fund data, fund analysis, credit score
+		// $0.010 — premium: full compliance, CVM fund data, fund analysis, credit score, process lookup
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.010"))
 			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
+			r.Get("/judicial/processo/{numero}", judicialHand.GetProcesso)
 			if mercHandler != nil {
 				r.Get("/mercado/fundos/{cnpj}", mercHandler.GetFundos)
 			}

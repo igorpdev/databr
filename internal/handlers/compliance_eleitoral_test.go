@@ -38,6 +38,10 @@ func (s *ceJudicialSearcher) Search(ctx context.Context, doc string) ([]domain.S
 	return s.records, s.err
 }
 
+func (s *ceJudicialSearcher) SearchByNumber(ctx context.Context, numero string) ([]domain.SourceRecord, error) {
+	return nil, nil
+}
+
 // ceStore implements handlers.SourceStore for electoral compliance tests.
 type ceStore struct {
 	filteredRecords map[string][]domain.SourceRecord

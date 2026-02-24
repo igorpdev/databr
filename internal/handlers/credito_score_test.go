@@ -48,6 +48,10 @@ func (s *csJudicialSearcher) Search(ctx context.Context, doc string) ([]domain.S
 	return s.records, s.err
 }
 
+func (s *csJudicialSearcher) SearchByNumber(ctx context.Context, numero string) ([]domain.SourceRecord, error) {
+	return nil, nil
+}
+
 // csStore implements handlers.SourceStore for credit score tests.
 type csStore struct {
 	filteredRecords []domain.SourceRecord

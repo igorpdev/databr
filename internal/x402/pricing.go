@@ -119,8 +119,9 @@ var priceTable = map[string]string{
 	"/v1/ambiental/risco/{municipio}":          "0.007",
 	"/v1/eleicoes/compliance/{cpf_cnpj}":       "0.007",
 	"/v1/municipios/{codigo}/perfil":           "0.007",
-	// $0.010 — premium: full compliance, CVM funds, judicial superior courts, score, analysis
+	// $0.010 — premium: full compliance, CVM funds, judicial process lookup, score, analysis
 	"/v1/compliance/{cnpj}":                    "0.010",
+	"/v1/judicial/processo/{numero}":           "0.010",
 	"/v1/mercado/fundos/{cnpj}":                "0.010",
 	"/v1/judicial/stf":                         "0.010",
 	"/v1/judicial/stj":                         "0.010",

@@ -49,6 +49,10 @@ func (s *ddJudicialSearcher) Search(ctx context.Context, doc string) ([]domain.S
 	return s.records, s.err
 }
 
+func (s *ddJudicialSearcher) SearchByNumber(ctx context.Context, numero string) ([]domain.SourceRecord, error) {
+	return nil, nil
+}
+
 // ddStore implements handlers.SourceStore for due diligence tests.
 type ddStore struct {
 	records []domain.SourceRecord

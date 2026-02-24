@@ -3,15 +3,17 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/databr/api/internal/domain"
 	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
-// DataJudSearcher searches judicial processes by CPF/CNPJ.
+// DataJudSearcher searches judicial processes by CPF/CNPJ or process number.
 type DataJudSearcher interface {
 	Search(ctx context.Context, documento string) ([]domain.SourceRecord, error)
+	SearchByNumber(ctx context.Context, numero string) ([]domain.SourceRecord, error)
 }
 
 // JudicialHandler handles /v1/judicial/* requests.
@@ -56,5 +58,43 @@ func (h *JudicialHandler) GetProcessos(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: records[0].FetchedAt,
 		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"processos": items, "total": len(items), "documento": doc},
+	})
+}
+
+// GetProcesso handles GET /v1/judicial/processo/{numero}.
+// {numero} is a CNJ unified process number (e.g. 0000832-35.2018.4.01.3202).
+func (h *JudicialHandler) GetProcesso(w http.ResponseWriter, r *http.Request) {
+	numero := chi.URLParam(r, "numero")
+	if numero == "" {
+		jsonError(w, http.StatusBadRequest, "número do processo is required")
+		return
+	}
+	// Minimal format validation: CNJ numbers contain hyphens and dots
+	if !strings.Contains(numero, "-") || !strings.Contains(numero, ".") {
+		jsonError(w, http.StatusBadRequest, "formato inválido — use o número CNJ unificado (ex: 0000832-35.2018.4.01.3202)")
+		return
+	}
+
+	records, err := h.searcher.SearchByNumber(r.Context(), numero)
+	if err != nil {
+		// If it's a parse error (invalid number), return 400 not 502
+		if strings.Contains(err.Error(), "invalid CNJ") || strings.Contains(err.Error(), "not available") ||
+			strings.Contains(err.Error(), "unknown") || strings.Contains(err.Error(), "does not have") {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		gatewayError(w, "judicial", err)
+		return
+	}
+	if len(records) == 0 {
+		jsonError(w, http.StatusNotFound, "Processo não encontrado: "+numero)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "datajud_cnj",
+		UpdatedAt: records[0].FetchedAt,
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data:      records[0].Data,
 	})
 }
