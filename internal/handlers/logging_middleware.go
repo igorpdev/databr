@@ -31,10 +31,14 @@ func QueryLogMiddleware(next http.Handler) http.Handler {
 		reqID := middleware.GetReqID(r.Context())
 
 		endpoint := maskPath(routePattern)
-		status := fmt.Sprintf("%d", ww.Status())
 
-		metrics.RequestsTotal.WithLabelValues(endpoint, status).Inc()
-		metrics.RequestDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
+		// Only record Prometheus metrics for API routes — skip infra endpoints
+		// (health, readyz, metrics, favicon) to avoid noise from probes and scrapers.
+		if strings.HasPrefix(endpoint, "/v1/") || strings.HasPrefix(endpoint, "/mcp") {
+			status := fmt.Sprintf("%d", ww.Status())
+			metrics.RequestsTotal.WithLabelValues(endpoint, status).Inc()
+			metrics.RequestDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
+		}
 
 		slog.Info("query_log",
 			"req_id", reqID,
