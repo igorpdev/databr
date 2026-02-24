@@ -1,8 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
+	"time"
+
+	"github.com/databr/api/internal/domain"
+	x402pkg "github.com/databr/api/internal/x402"
 )
 
 // CaseStudy represents an AI agent use case for the DataBR API.
@@ -100,10 +103,14 @@ func NewDiscoverHandler() *DiscoverHandler { return &DiscoverHandler{} }
 // GetCases handles GET /v1/discover/cases.
 // Returns hardcoded case studies showing how AI agents can use the DataBR API.
 func (h *DiscoverHandler) GetCases(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"cases":       caseStudies,
-		"total":       len(caseStudies),
-		"description": "Use cases for AI agents consuming the DataBR API",
+	respond(w, r, domain.APIResponse{
+		Source:    "databr_discover",
+		UpdatedAt: time.Now().UTC(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data: map[string]any{
+			"cases":       caseStudies,
+			"total":       len(caseStudies),
+			"description": "Use cases for AI agents consuming the DataBR API",
+		},
 	})
 }

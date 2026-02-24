@@ -16,6 +16,14 @@ import (
 	"github.com/databr/api/internal/domain"
 )
 
+// ParseError indicates an invalid CNJ number or unsupported tribunal routing.
+// Handlers use errors.As to distinguish parse errors (400) from network errors (502).
+type ParseError struct {
+	Msg string
+}
+
+func (e *ParseError) Error() string { return e.Msg }
+
 const datajudBase = "https://api-publica.datajud.cnj.jus.br"
 
 // allTribunais contains all 91 DataJud Elasticsearch indices:
@@ -53,7 +61,7 @@ var allTribunais = []string{
 	"api_publica_tjmmg", "api_publica_tjmrs", "api_publica_tjmsp",
 }
 
-// trCodeToUF maps CNJ tribunal region codes (01-27) to UF abbreviations.
+// trCodeToUF maps CNJ tribunal region codes (1–27, int keys) to lowercase UF abbreviations.
 // Used for justiça estadual (J=8), eleitoral (J=6), and militar estadual (J=7).
 var trCodeToUF = map[int]string{
 	1: "ac", 2: "al", 3: "ap", 4: "am", 5: "ba", 6: "ce", 7: "dft",
@@ -66,6 +74,22 @@ var trCodeToUF = map[int]string{
 // militarEstadualUFs are the UFs that have military state tribunals (TJMMG, TJMRS, TJMSP).
 var militarEstadualUFs = map[string]bool{
 	"mg": true, "rs": true, "sp": true,
+}
+
+// searchTribunais is the high-volume subset (23 courts) used for fan-out CPF/CNPJ searches.
+// Searching all 91 tribunals sequentially is too slow (~22+ min worst case at 15s timeout each).
+// SearchByNumber still routes to any of the 91 via CNJ number parsing.
+var searchTribunais = []string{
+	// Superiores (4)
+	"api_publica_stj", "api_publica_tst", "api_publica_tse", "api_publica_stm",
+	// Federal (6)
+	"api_publica_trf1", "api_publica_trf2", "api_publica_trf3",
+	"api_publica_trf4", "api_publica_trf5", "api_publica_trf6",
+	// Top 13 estaduais by case volume
+	"api_publica_tjsp", "api_publica_tjrj", "api_publica_tjmg", "api_publica_tjrs",
+	"api_publica_tjpr", "api_publica_tjba", "api_publica_tjpe", "api_publica_tjce",
+	"api_publica_tjgo", "api_publica_tjdft", "api_publica_tjes", "api_publica_tjsc",
+	"api_publica_tjma",
 }
 
 // ParseCNJNumber parses a CNJ unified process number and returns the DataJud
@@ -82,7 +106,7 @@ func ParseCNJNumber(numero string) (index, cleanNum string, err error) {
 	}, numero)
 
 	if len(clean) != 20 {
-		return "", "", fmt.Errorf("invalid CNJ number: expected 20 digits, got %d from %q", len(clean), numero)
+		return "", "", &ParseError{Msg: fmt.Sprintf("invalid CNJ number: expected 20 digits, got %d from %q", len(clean), numero)}
 	}
 
 	// CNJ number layout (20 digits): NNNNNNNDDAAAAJTROOOO
@@ -95,24 +119,24 @@ func ParseCNJNumber(numero string) (index, cleanNum string, err error) {
 
 	j, err := strconv.Atoi(string(clean[13]))
 	if err != nil {
-		return "", "", fmt.Errorf("invalid justice branch digit: %w", err)
+		return "", "", &ParseError{Msg: fmt.Sprintf("invalid justice branch digit: %v", err)}
 	}
 	tr, err := strconv.Atoi(clean[14:16])
 	if err != nil {
-		return "", "", fmt.Errorf("invalid tribunal region: %w", err)
+		return "", "", &ParseError{Msg: fmt.Sprintf("invalid tribunal region: %v", err)}
 	}
 
 	var idx string
 	switch j {
 	case 1: // STF (Supremo Tribunal Federal) — not available in DataJud
-		return "", "", fmt.Errorf("STF (J=1) is not available in DataJud")
+		return "", "", &ParseError{Msg: "STF (J=1) is not available in DataJud"}
 	case 2: // CNJ (Conselho Nacional de Justiça) — not a tribunal with cases
-		return "", "", fmt.Errorf("CNJ (J=2) does not have public processes in DataJud")
+		return "", "", &ParseError{Msg: "CNJ (J=2) does not have public processes in DataJud"}
 	case 3: // STJ (Superior Tribunal de Justiça)
 		idx = "api_publica_stj"
 	case 4: // Justiça Federal (TRFs)
 		if tr == 0 {
-			return "", "", fmt.Errorf("invalid TR=00 for federal justice (J=4)")
+			return "", "", &ParseError{Msg: "invalid TR=00 for federal justice (J=4)"}
 		}
 		idx = fmt.Sprintf("api_publica_trf%d", tr)
 	case 5: // Justiça do Trabalho
@@ -127,7 +151,7 @@ func ParseCNJNumber(numero string) (index, cleanNum string, err error) {
 		} else {
 			uf, ok := trCodeToUF[tr]
 			if !ok {
-				return "", "", fmt.Errorf("unknown TR code %d for electoral justice", tr)
+				return "", "", &ParseError{Msg: fmt.Sprintf("unknown TR code %d for electoral justice", tr)}
 			}
 			idx = "api_publica_tre-" + uf
 		}
@@ -136,20 +160,20 @@ func ParseCNJNumber(numero string) (index, cleanNum string, err error) {
 	case 8: // Justiça Estadual
 		uf, ok := trCodeToUF[tr]
 		if !ok {
-			return "", "", fmt.Errorf("unknown TR code %d for state justice", tr)
+			return "", "", &ParseError{Msg: fmt.Sprintf("unknown TR code %d for state justice", tr)}
 		}
 		idx = "api_publica_tj" + uf
 	case 9: // Justiça Militar Estadual
 		uf, ok := trCodeToUF[tr]
 		if !ok {
-			return "", "", fmt.Errorf("unknown TR code %d for state military justice", tr)
+			return "", "", &ParseError{Msg: fmt.Sprintf("unknown TR code %d for state military justice", tr)}
 		}
 		if !militarEstadualUFs[uf] {
-			return "", "", fmt.Errorf("no military state tribunal for UF %q (TR=%d)", uf, tr)
+			return "", "", &ParseError{Msg: fmt.Sprintf("no military state tribunal for UF %q (TR=%d)", uf, tr)}
 		}
 		idx = "api_publica_tjm" + uf
 	default:
-		return "", "", fmt.Errorf("unknown justice branch J=%d", j)
+		return "", "", &ParseError{Msg: fmt.Sprintf("unknown justice branch J=%d", j)}
 	}
 
 	return idx, clean, nil
@@ -200,7 +224,7 @@ func (c *DataJudCollector) Search(ctx context.Context, documento string) ([]doma
 	}
 
 	var allRecords []domain.SourceRecord
-	for _, tribunal := range allTribunais {
+	for _, tribunal := range searchTribunais {
 		records, err := c.searchTribunal(ctx, tribunal, fieldName, normalized)
 		if err != nil {
 			// Non-fatal: one tribunal failing shouldn't block results from others

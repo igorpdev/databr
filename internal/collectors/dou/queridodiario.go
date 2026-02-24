@@ -151,8 +151,11 @@ func (c *QDCollector) ListCities(ctx context.Context) ([]domain.SourceRecord, er
 	}
 
 	records := make([]domain.SourceRecord, 0, len(raw.Cities))
-	for _, city := range raw.Cities {
+	for i, city := range raw.Cities {
 		tid, _ := city["territory_id"].(string)
+		if tid == "" {
+			tid = fmt.Sprintf("city_%d", i)
+		}
 		records = append(records, domain.SourceRecord{
 			Source:    "querido_diario",
 			RecordKey: tid,

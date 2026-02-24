@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/databr/api/internal/collectors/juridico"
 	"github.com/databr/api/internal/domain"
 	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
@@ -77,9 +79,8 @@ func (h *JudicialHandler) GetProcesso(w http.ResponseWriter, r *http.Request) {
 
 	records, err := h.searcher.SearchByNumber(r.Context(), numero)
 	if err != nil {
-		// If it's a parse error (invalid number), return 400 not 502
-		if strings.Contains(err.Error(), "invalid CNJ") || strings.Contains(err.Error(), "not available") ||
-			strings.Contains(err.Error(), "unknown") || strings.Contains(err.Error(), "does not have") {
+		var parseErr *juridico.ParseError
+		if errors.As(err, &parseErr) {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}

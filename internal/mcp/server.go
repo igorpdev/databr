@@ -1249,6 +1249,18 @@ func (s *Server) registerTools() {
 		},
 	)
 
+	// buildHealthQuery extracts common DATASUS query params (municipio, limit) with proper URL encoding.
+	buildHealthQuery := func(req mcpgosdk.CallToolRequest) string {
+		q := url.Values{}
+		if m := req.GetString("municipio", ""); m != "" {
+			q.Set("municipio", m)
+		}
+		if l := req.GetString("limit", ""); l != "" {
+			q.Set("limit", l)
+		}
+		return q.Encode()
+	}
+
 	// === Phase 4-5: Judicial, DATASUS health, Diários, Discover ===
 	s.addTool("consultar_processo_judicial",
 		"Consulta processo judicial pelo número unificado CNJ. Retorna dados do processo, partes, movimentações.",
@@ -1259,7 +1271,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			numero := req.GetString("numero", "")
-			return invokeHandler(ctx, s.deps.JudicialProcesso, "/v1/judicial/processo/"+numero, map[string]string{"numero": numero}, "")
+			return invokeHandler(ctx, s.deps.JudicialProcesso, "/v1/judicial/processo/"+url.PathEscape(numero), map[string]string{"numero": numero}, "")
 		},
 	)
 
@@ -1270,15 +1282,7 @@ func (s *Server) registerTools() {
 			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
-			var parts []string
-			if m := req.GetString("municipio", ""); m != "" {
-				parts = append(parts, "municipio="+m)
-			}
-			if l := req.GetString("limit", ""); l != "" {
-				parts = append(parts, "limit="+l)
-			}
-			query := strings.Join(parts, "&")
-			return invokeHandler(ctx, s.deps.DATASUSMortalidade, "/v1/saude/mortalidade", nil, query)
+			return invokeHandler(ctx, s.deps.DATASUSMortalidade, "/v1/saude/mortalidade", nil, buildHealthQuery(req))
 		},
 	)
 
@@ -1289,15 +1293,7 @@ func (s *Server) registerTools() {
 			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
-			var parts []string
-			if m := req.GetString("municipio", ""); m != "" {
-				parts = append(parts, "municipio="+m)
-			}
-			if l := req.GetString("limit", ""); l != "" {
-				parts = append(parts, "limit="+l)
-			}
-			query := strings.Join(parts, "&")
-			return invokeHandler(ctx, s.deps.DATASUSNascimentos, "/v1/saude/nascimentos", nil, query)
+			return invokeHandler(ctx, s.deps.DATASUSNascimentos, "/v1/saude/nascimentos", nil, buildHealthQuery(req))
 		},
 	)
 
@@ -1308,15 +1304,7 @@ func (s *Server) registerTools() {
 			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
-			var parts []string
-			if m := req.GetString("municipio", ""); m != "" {
-				parts = append(parts, "municipio="+m)
-			}
-			if l := req.GetString("limit", ""); l != "" {
-				parts = append(parts, "limit="+l)
-			}
-			query := strings.Join(parts, "&")
-			return invokeHandler(ctx, s.deps.DATASUSHospitais, "/v1/saude/hospitais", nil, query)
+			return invokeHandler(ctx, s.deps.DATASUSHospitais, "/v1/saude/hospitais", nil, buildHealthQuery(req))
 		},
 	)
 
@@ -1327,15 +1315,7 @@ func (s *Server) registerTools() {
 			mcpgosdk.WithString("limit", mcpgosdk.Description("Número máximo de registros (padrão: 50)")),
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
-			var parts []string
-			if m := req.GetString("municipio", ""); m != "" {
-				parts = append(parts, "municipio="+m)
-			}
-			if l := req.GetString("limit", ""); l != "" {
-				parts = append(parts, "limit="+l)
-			}
-			query := strings.Join(parts, "&")
-			return invokeHandler(ctx, s.deps.DATASUSDengue, "/v1/saude/dengue", nil, query)
+			return invokeHandler(ctx, s.deps.DATASUSDengue, "/v1/saude/dengue", nil, buildHealthQuery(req))
 		},
 	)
 
@@ -1354,7 +1334,7 @@ func (s *Server) registerTools() {
 				parts = append(parts, "limit="+l)
 			}
 			query := strings.Join(parts, "&")
-			return invokeHandler(ctx, s.deps.DATASUSVacinacao, "/v1/saude/vacinacao/"+ano, map[string]string{"ano": ano}, query)
+			return invokeHandler(ctx, s.deps.DATASUSVacinacao, "/v1/saude/vacinacao/"+url.PathEscape(ano), map[string]string{"ano": ano}, query)
 		},
 	)
 

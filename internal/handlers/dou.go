@@ -181,7 +181,11 @@ func (h *DOUHandler) GetTema(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(records) == 0 {
-		jsonError(w, http.StatusNotFound, "no results found for theme: "+decoded)
+		display := decoded
+		if len(display) > 100 {
+			display = display[:100] + "..."
+		}
+		jsonError(w, http.StatusNotFound, "no results found for theme: "+display)
 		return
 	}
 

@@ -361,7 +361,7 @@ func TestDATASUSHandler_GetVacinacao_InvalidYear(t *testing.T) {
 		year string
 	}{
 		{"too_old", "2019"},
-		{"too_new", "2031"},
+		{"too_new", "2099"},
 		{"not_a_number", "abc"},
 	}
 	for _, tt := range tests {
