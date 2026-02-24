@@ -307,6 +307,7 @@
     <div class="links">
       <a href="#how-it-works">Como funciona</a>
       <a href="#endpoints">Endpoints</a>
+      <a href="#sdk">SDK</a>
       <a href="#pricing">Preços</a>
       <a href="/docs" class="btn btn-primary">Documentação</a>
     </div>
@@ -493,6 +494,39 @@
     </div>
 
     <div class="ep-card">
+      <div class="header"><h3>Judicial (DataJud)</h3><span class="price-tag price-010">$0.010</span></div>
+      <ul>
+        <li>/v1/judicial/processos/{doc}</li>
+        <li>/v1/judicial/processo/{numero}</li>
+      </ul>
+      <div class="count">91 tribunais CNJ &middot; Busca por CPF/CNPJ ou número unificado</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Saúde Pública (DATASUS)</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/saude/estabelecimentos</li>
+        <li>/v1/saude/mortalidade</li>
+        <li>/v1/saude/nascimentos</li>
+        <li>/v1/saude/hospitais</li>
+        <li>/v1/saude/dengue</li>
+        <li>/v1/saude/vacinacao/{ano}</li>
+      </ul>
+      <div class="count">SIM, SINASC, CNES, SINAN, PNI</div>
+    </div>
+
+    <div class="ep-card">
+      <div class="header"><h3>Diários Oficiais</h3><span class="price-tag price-003">$0.003</span></div>
+      <ul>
+        <li>/v1/diarios/busca</li>
+        <li>/v1/diarios/municipios</li>
+        <li>/v1/diarios/temas</li>
+        <li>/v1/diarios/tema/{tema}</li>
+      </ul>
+      <div class="count">Querido Diário &middot; Diários oficiais municipais</div>
+    </div>
+
+    <div class="ep-card">
       <div class="header"><h3>Mais domínios</h3><span class="price-tag price-003">$0.003+</span></div>
       <ul>
         <li>/v1/ipea/serie/{codigo}</li>
@@ -502,7 +536,7 @@
         <li>/v1/tcu/acordaos</li>
         <li>/v1/pncp/orgaos</li>
       </ul>
-      <div class="count">IPEA, Energia, Saúde, Transporte, TCU, PNCP, Orçamento</div>
+      <div class="count">IPEA, Energia, Transporte, TCU, PNCP, Orçamento</div>
     </div>
 
   </div>
@@ -510,7 +544,7 @@
 
 <section id="quick-start">
   <h2>Quick Start</h2>
-  <p class="subtitle">Integre em minutos — o SDK x402 cuida do pagamento automaticamente.</p>
+  <p class="subtitle">Integre em minutos — o SDK DataBR cuida do pagamento x402 automaticamente.</p>
 
   <div class="code-tabs">
     <div class="code-tab active" onclick="showTab('curl')">cURL</div>
@@ -524,29 +558,37 @@ curl -s <span class="url">https://databr.api.br/v1/bcb/selic</span>
 <span class="comment"># {"x402Version":1,"accepts":[{"scheme":"exact","network":"eip155:8453",</span>
 <span class="comment">#   "maxAmountRequired":"3000","asset":"0x833589...","payTo":"0x..."}]}</span>
 
-<span class="comment"># 2. Use o x402 SDK para pagamento automático:</span>
-<span class="comment">#    npm install x402 / pip install x402 / go get github.com/coinbase/x402/go</span>
+<span class="comment"># 2. Instale o SDK:</span>
+<span class="comment">#    pip install databr          (Python — SDK oficial com namespaces tipados)</span>
+<span class="comment">#    npm install x402             (TypeScript — SDK genérico x402)</span>
+<span class="comment">#    go get github.com/coinbase/x402/go  (Go — SDK genérico x402)</span>
 
-<span class="comment"># 3. Com o SDK, a chamada é transparente:</span>
-<span class="comment">#    client.get("https://databr.api.br/v1/bcb/selic")</span>
-<span class="comment">#    → Paga automaticamente → Retorna dados JSON</span></pre>
+<span class="comment"># 3. Com o SDK Python, a chamada é transparente:</span>
+<span class="comment">#    from databr import DataBR</span>
+<span class="comment">#    client = DataBR(private_key="0x...")</span>
+<span class="comment">#    selic = client.bcb.selic()  → Paga automaticamente → Retorna dados</span></pre>
   </div>
 
   <div class="code-block" id="tab-python">
-<pre><span class="keyword">from</span> x402.client <span class="keyword">import</span> PaymentClient
+<pre><span class="comment"># pip install databr</span>
+<span class="keyword">from</span> databr <span class="keyword">import</span> DataBR
 
 <span class="comment"># Configure com sua wallet (USDC na rede Base)</span>
-client = PaymentClient(
-    private_key=<span class="string">"0xYOUR_PRIVATE_KEY"</span>,
-    network=<span class="string">"base-mainnet"</span>
-)
+client = DataBR(private_key=<span class="string">"0x..."</span>)
 
-<span class="comment"># O SDK cuida do fluxo 402 → pagamento → retry automaticamente</span>
-resp = client.get(<span class="string">"https://databr.api.br/v1/bcb/selic"</span>)
-data = resp.json()
+<span class="comment"># Namespaces tipados — autocompletion no IDE</span>
+selic = client.bcb.selic()
+print(selic.data[<span class="string">"valor"</span>])      <span class="comment"># "14.25"</span>
+print(selic.cost_usdc)           <span class="comment"># "0.003"</span>
 
-print(data[<span class="string">"data"</span>][<span class="string">"valor"</span>])   <span class="comment"># 14.25</span>
-print(data[<span class="string">"cost_usdc"</span>])        <span class="comment"># "0.003"</span></pre>
+<span class="comment"># Empresa por CNPJ</span>
+empresa = client.empresas.consultar(<span class="string">"33000167000101"</span>)
+print(empresa.data[<span class="string">"razao_social"</span>])  <span class="comment"># "PETROLEO BRASILEIRO S.A."</span>
+
+<span class="comment"># Compliance + Judicial + Ambiental — tudo com a mesma API</span>
+compliance = client.compliance.verificar(<span class="string">"33000167000101"</span>)
+processos  = client.judicial.processos(<span class="string">"33000167000101"</span>)
+dengue     = client.saude.dengue(municipio=<span class="string">"3550308"</span>)</pre>
   </div>
 
   <div class="code-block" id="tab-typescript">
@@ -565,6 +607,33 @@ print(data[<span class="string">"cost_usdc"</span>])        <span class="comment
 
 console.log(resp.data.razao_social); <span class="comment">// "PETROLEO BRASILEIRO S.A."</span>
 console.log(resp.cost_usdc);         <span class="comment">// "0.003"</span></pre>
+  </div>
+</section>
+
+<section id="sdk">
+  <h2>Python SDK</h2>
+  <p class="subtitle"><code>pip install databr</code> — namespaces tipados, pagamento automático, zero configuração.</p>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>15 namespaces</h3>
+      <p>BCB, empresas, economia, mercado, compliance, judicial, legislativo, ambiental, transparência, saúde, energia, transporte, educação, emprego, comércio</p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>Pagamento automático</h3>
+      <p>x402 transparente — basta ter USDC na rede Base. Sem callbacks, sem webhooks.</p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>Tipagem completa</h3>
+      <p>py.typed + DataBRResponse com <code>.data</code>, <code>.source</code>, <code>.cost_usdc</code>, <code>.context</code></p>
+    </div>
+    <div class="flow-step">
+      <div class="num-badge" style="background:rgba(34,197,94,0.2);color:var(--green)">&#10003;</div>
+      <h3>Error handling</h3>
+      <p><code>NotFoundError</code>, <code>PaymentError</code>, <code>RateLimitError</code> — exceções específicas por tipo de falha</p>
+    </div>
   </div>
 </section>
 
