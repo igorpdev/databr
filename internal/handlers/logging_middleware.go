@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/databr/api/internal/metrics"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -28,9 +30,15 @@ func QueryLogMiddleware(next http.Handler) http.Handler {
 		// to avoid logging PII like CNPJs and CPFs.
 		reqID := middleware.GetReqID(r.Context())
 
+		endpoint := maskPath(routePattern)
+		status := fmt.Sprintf("%d", ww.Status())
+
+		metrics.RequestsTotal.WithLabelValues(endpoint, status).Inc()
+		metrics.RequestDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
+
 		slog.Info("query_log",
 			"req_id", reqID,
-			"endpoint", maskPath(routePattern),
+			"endpoint", endpoint,
 			"status", ww.Status(),
 			"duration_ms", duration.Milliseconds(),
 		)

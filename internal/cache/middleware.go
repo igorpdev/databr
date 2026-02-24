@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/databr/api/internal/metrics"
 )
 
 // Cacher is the interface the cache middleware needs.
@@ -45,6 +47,7 @@ func NewCacheMiddleware(cacher Cacher, ttl time.Duration) func(http.Handler) htt
 			// Try cache hit
 			var cached cachedResponse
 			if err := cacher.Get(ctx, key, &cached); err == nil {
+				metrics.CacheHits.WithLabelValues(r.URL.Path, "true").Inc()
 				age := int(time.Since(cached.StoredAt).Seconds())
 				body := injectCacheFields(cached.Body, age)
 				for k, v := range cached.Headers {
@@ -58,6 +61,7 @@ func NewCacheMiddleware(cacher Cacher, ttl time.Duration) func(http.Handler) htt
 			}
 
 			// Cache miss — capture response via recorder
+			metrics.CacheHits.WithLabelValues(r.URL.Path, "false").Inc()
 			rec := httptest.NewRecorder()
 			next.ServeHTTP(rec, r)
 
