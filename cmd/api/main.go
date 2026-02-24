@@ -24,6 +24,7 @@ import (
 	"github.com/databr/api/internal/handlers"
 	"github.com/databr/api/internal/logging"
 	"github.com/databr/api/internal/mcp"
+	"github.com/databr/api/internal/metrics"
 	"github.com/databr/api/internal/repositories"
 	x402pkg "github.com/databr/api/internal/x402"
 	migpkg "github.com/databr/api/migrations"
@@ -33,6 +34,7 @@ import (
 	"github.com/go-chi/httprate"
 	"github.com/joho/godotenv"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -55,9 +57,14 @@ func main() {
 		if err := repositories.RunMigrations(ctx, p, migpkg.FS); err != nil {
 			slog.Warn("migrations failed", "error", err)
 		}
-		store = repositories.NewSourceRecordRepository(p)
+		repo := repositories.NewSourceRecordRepository(p)
+		store = repositories.NewCachedSourceRecordRepository(repo, repositories.DefaultMemCacheTTL)
 		pool = p
 		defer p.Close()
+
+		// Export DB connection pool stats as Prometheus gauges
+		prometheus.MustRegister(metrics.NewDBPoolCollector(p))
+		slog.Info("in-memory query cache enabled", "ttl", repositories.DefaultMemCacheTTL)
 	}
 
 	// Redis cache (optional — degrades gracefully when unavailable)
@@ -436,6 +443,20 @@ func main() {
 			handlers.RateLimitExceeded(w)
 		}),
 	))
+
+	// Gzip compression (level 5 = good balance of CPU vs compression ratio).
+	// Placed BEFORE ETag so the hash is computed on the uncompressed body.
+	r.Use(middleware.Compress(5))
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Vary", "Accept-Encoding")
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	// ETag: return 304 Not Modified when content hasn't changed.
+	// Inner to Compress so the hash is stable (uncompressed body).
+	r.Use(cache.ETagMiddleware)
 
 	// Query logging middleware
 	r.Use(handlers.QueryLogMiddleware)
