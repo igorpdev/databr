@@ -31,7 +31,7 @@ func (c *CAGEDCollector) Collect(ctx context.Context) ([]domain.SourceRecord, er
 	ftpPath := fmt.Sprintf("%s/NOVO CAGED/%d/%s/CAGEDMOV%s.7z",
 		ftpBasePath, prevMonth.Year(), periodo, periodo)
 
-	rc, entryName, err := downloadAndExtract7z(ctx, c.ftpHost, ftpPath)
+	rc, entryName, err := downloadWithRetry(ctx, c.ftpHost, ftpPath, 3)
 	if err != nil {
 		return nil, fmt.Errorf("caged_emprego: %w", err)
 	}

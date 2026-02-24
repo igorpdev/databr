@@ -50,7 +50,7 @@ func (c *RAISCollector) Collect(ctx context.Context) ([]domain.SourceRecord, err
 
 		slog.Info("rais: processing region", "region", region, "year", ano)
 
-		rc, _, err := downloadAndExtract7z(ctx, c.ftpHost, ftpPath)
+		rc, _, err := downloadWithRetry(ctx, c.ftpHost, ftpPath, 3)
 		if err != nil {
 			slog.Error("rais: skip region", "region", region, "error", err)
 			continue // skip failed regions, don't abort entirely

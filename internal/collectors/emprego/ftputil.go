@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	ftpHost     = "ftp.mtps.gov.br:21"
-	ftpBasePath = "/pdet/microdados"
-	ftpTimeout  = 30 * time.Second
+	ftpHost         = "ftp.mtps.gov.br:21"
+	ftpBasePath     = "/pdet/microdados"
+	ftpTimeout      = 30 * time.Second
+	maxDownloadSize = 2 * 1024 * 1024 * 1024 // 2GB safety cap
 )
 
 // ufCodes maps IBGE numeric UF codes to state abbreviations.
@@ -160,9 +161,19 @@ func downloadAndExtract7z(ctx context.Context, host, ftpPath string) (io.ReadClo
 		host = ftpHost
 	}
 
+	// Check for context cancellation before starting download
+	select {
+	case <-ctx.Done():
+		return nil, "", ctx.Err()
+	default:
+	}
+
 	slog.Info("ftp: connecting", "host", host, "path", ftpPath)
 
-	conn, err := ftp.Dial(host, ftp.DialWithTimeout(ftpTimeout))
+	conn, err := ftp.Dial(host,
+		ftp.DialWithTimeout(ftpTimeout),
+		ftp.DialWithContext(ctx),
+	)
 	if err != nil {
 		return nil, "", fmt.Errorf("ftp dial %s: %w", host, err)
 	}
@@ -186,7 +197,7 @@ func downloadAndExtract7z(ctx context.Context, host, ftpPath string) (io.ReadClo
 		return nil, "", fmt.Errorf("create temp: %w", err)
 	}
 
-	if _, err := io.Copy(tmpFile, resp); err != nil {
+	if _, err := io.Copy(tmpFile, io.LimitReader(resp, maxDownloadSize)); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())
 		resp.Close()
@@ -245,4 +256,27 @@ func (c *cleanupReadCloser) Close() error {
 	err := c.ReadCloser.Close()
 	c.cleanup()
 	return err
+}
+
+// downloadWithRetry wraps downloadAndExtract7z with retry logic using exponential backoff.
+func downloadWithRetry(ctx context.Context, host, ftpPath string, maxRetries int) (io.ReadCloser, string, error) {
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			slog.Info("ftp: retrying", "attempt", attempt+1, "backoff", backoff, "path", ftpPath)
+			select {
+			case <-ctx.Done():
+				return nil, "", ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+		rc, name, err := downloadAndExtract7z(ctx, host, ftpPath)
+		if err == nil {
+			return rc, name, nil
+		}
+		lastErr = err
+		slog.Warn("ftp: attempt failed", "attempt", attempt+1, "error", err)
+	}
+	return nil, "", fmt.Errorf("after %d retries: %w", maxRetries+1, lastErr)
 }
