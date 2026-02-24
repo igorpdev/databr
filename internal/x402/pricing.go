@@ -92,7 +92,12 @@ var priceTable = map[string]string{
 	"/v1/transporte/transportadores/{rntrc}":    "0.003",
 	"/v1/transporte/aeronaves/{prefixo}":        "0.003",
 	"/v1/mercado/fatos-relevantes/{protocolo}":  "0.003",
-	// $0.005 — standard: B3 stock quotes, CVM, INPE, transport lists, comex, educacao
+	// $0.005 — standard: B3 stock quotes, CVM, INPE, transport lists, comex, educacao, DATASUS advanced
+	"/v1/saude/mortalidade":            "0.005",
+	"/v1/saude/nascimentos":            "0.005",
+	"/v1/saude/hospitais":              "0.005",
+	"/v1/saude/dengue":                 "0.005",
+	"/v1/saude/vacinacao/{ano}":        "0.005",
 	"/v1/mercado/acoes/{ticker}":       "0.005",
 	"/v1/mercado/fatos-relevantes":     "0.005",
 	"/v1/mercado/fundos/{cnpj}/cotas":  "0.005",

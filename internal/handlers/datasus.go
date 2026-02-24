@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/databr/api/internal/domain"
@@ -90,6 +91,143 @@ func (h *DATASUSHandler) GetEstabelecimentos(w http.ResponseWriter, r *http.Requ
 		Data: map[string]any{
 			"estabelecimentos": result.Estabelecimentos,
 			"total":            len(result.Estabelecimentos),
+		},
+	})
+}
+
+// GetMortalidade handles GET /v1/saude/mortalidade?limit=N&offset=M.
+// Proxies to DATASUS SIM (Sistema de Informação sobre Mortalidade).
+func (h *DATASUSHandler) GetMortalidade(w http.ResponseWriter, r *http.Request) {
+	limit, offset := parsePagination(r)
+	url := fmt.Sprintf("%s/vigilancia-e-meio-ambiente/sistema-de-informacao-sobre-mortalidade?limit=%d&offset=%d",
+		h.baseURL, limit, offset)
+
+	var result struct {
+		SIM []map[string]any `json:"sim"`
+	}
+	if _, err := fetchJSON(r.Context(), h.client, url, nil, &result); err != nil {
+		gatewayError(w, "datasus_sim", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "datasus_sim",
+		UpdatedAt: time.Now(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data: map[string]any{
+			"items": result.SIM,
+			"total": len(result.SIM),
+		},
+	})
+}
+
+// GetNascimentos handles GET /v1/saude/nascimentos?limit=N&offset=M.
+// Proxies to DATASUS SINASC (Sistema de Informação sobre Nascidos Vivos).
+func (h *DATASUSHandler) GetNascimentos(w http.ResponseWriter, r *http.Request) {
+	limit, offset := parsePagination(r)
+	url := fmt.Sprintf("%s/vigilancia-e-meio-ambiente/sistema-de-informacao-sobre-nascidos-vivos?limit=%d&offset=%d",
+		h.baseURL, limit, offset)
+
+	var result struct {
+		SINASC []map[string]any `json:"sinasc"`
+	}
+	if _, err := fetchJSON(r.Context(), h.client, url, nil, &result); err != nil {
+		gatewayError(w, "datasus_sinasc", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "datasus_sinasc",
+		UpdatedAt: time.Now(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data: map[string]any{
+			"items": result.SINASC,
+			"total": len(result.SINASC),
+		},
+	})
+}
+
+// GetHospitais handles GET /v1/saude/hospitais?limit=N&offset=M.
+// Proxies to DATASUS hospitals and beds data (CNES).
+func (h *DATASUSHandler) GetHospitais(w http.ResponseWriter, r *http.Request) {
+	limit, offset := parsePagination(r)
+	url := fmt.Sprintf("%s/assistencia-a-saude/hospitais-e-leitos?limit=%d&offset=%d",
+		h.baseURL, limit, offset)
+
+	var result struct {
+		Hospitais []map[string]any `json:"hospitais_leitos"`
+	}
+	if _, err := fetchJSON(r.Context(), h.client, url, nil, &result); err != nil {
+		gatewayError(w, "datasus_hospitais", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "datasus_hospitais",
+		UpdatedAt: time.Now(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data: map[string]any{
+			"items": result.Hospitais,
+			"total": len(result.Hospitais),
+		},
+	})
+}
+
+// GetDengue handles GET /v1/saude/dengue?limit=N&offset=M.
+// Proxies to DATASUS dengue/arboviroses notification data (SINAN).
+func (h *DATASUSHandler) GetDengue(w http.ResponseWriter, r *http.Request) {
+	limit, offset := parsePagination(r)
+	url := fmt.Sprintf("%s/arboviroses/dengue?limit=%d&offset=%d",
+		h.baseURL, limit, offset)
+
+	var result struct {
+		Parametros []map[string]any `json:"parametros"`
+	}
+	if _, err := fetchJSON(r.Context(), h.client, url, nil, &result); err != nil {
+		gatewayError(w, "datasus_dengue", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "datasus_dengue",
+		UpdatedAt: time.Now(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data: map[string]any{
+			"items": result.Parametros,
+			"total": len(result.Parametros),
+		},
+	})
+}
+
+// GetVacinacao handles GET /v1/saude/vacinacao/{ano}?limit=N&offset=M.
+// Proxies to DATASUS PNI vaccination data for a given year (2020-2030).
+func (h *DATASUSHandler) GetVacinacao(w http.ResponseWriter, r *http.Request) {
+	anoStr := chi.URLParam(r, "ano")
+	ano, err := strconv.Atoi(anoStr)
+	if err != nil || ano < 2020 || ano > 2030 {
+		jsonError(w, http.StatusBadRequest, "ano must be a year between 2020 and 2030")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	url := fmt.Sprintf("%s/vacinacao/doses-aplicadas-pni-%d?limit=%d&offset=%d",
+		h.baseURL, ano, limit, offset)
+
+	var result struct {
+		Doses []map[string]any `json:"doses_aplicadas_pni"`
+	}
+	if _, err := fetchJSON(r.Context(), h.client, url, nil, &result); err != nil {
+		gatewayError(w, "datasus_vacinacao", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "datasus_vacinacao",
+		UpdatedAt: time.Now(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data: map[string]any{
+			"items": result.Doses,
+			"total": len(result.Doses),
 		},
 	})
 }

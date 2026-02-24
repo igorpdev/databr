@@ -102,6 +102,11 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/transparencia/transferencias":          {"Convênios e transferências voluntárias federais (Portal da Transparência CGU)", "application/json"},
 	"/v1/transparencia/pensionistas":            {"Servidores civis federais por órgão (Portal da Transparência CGU)", "application/json"},
 	"/v1/saude/planos":                          {"Operadoras de planos de saúde ativas (ANS)", "application/json"},
+	"/v1/saude/mortalidade":                     {"Dados de mortalidade do SIM/DATASUS — causas de óbito por CID-10, município, sexo, idade", "application/json"},
+	"/v1/saude/nascimentos":                     {"Dados de nascidos vivos SINASC/DATASUS — peso, APGAR, tipo de parto, idade da mãe", "application/json"},
+	"/v1/saude/hospitais":                       {"Hospitais e leitos disponíveis no Brasil (CNES/DATASUS)", "application/json"},
+	"/v1/saude/dengue":                          {"Casos notificados de dengue e arboviroses (SINAN/DATASUS)", "application/json"},
+	"/v1/saude/vacinacao/{ano}":                 {"Doses de vacinas aplicadas por ano — PNI/DATASUS (2020-2030)", "application/json"},
 	// Phase 6: new endpoints
 	"/v1/endereco/{cep}":                        {"Endereço completo por CEP (ViaCEP)", "application/json"},
 	"/v1/empresas/{cnpj}/simples":               {"Situação no Simples Nacional e MEI por CNPJ", "application/json"},

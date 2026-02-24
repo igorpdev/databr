@@ -673,6 +673,11 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
+			r.Get("/saude/mortalidade", dataSUSHandler.GetMortalidade)
+			r.Get("/saude/nascimentos", dataSUSHandler.GetNascimentos)
+			r.Get("/saude/hospitais", dataSUSHandler.GetHospitais)
+			r.Get("/saude/dengue", dataSUSHandler.GetDengue)
+			r.Get("/saude/vacinacao/{ano}", dataSUSHandler.GetVacinacao)
 			r.Get("/orcamento/documentos", orcamentoHandler.GetDocumentos)
 			r.Get("/orcamento/favorecidos", orcamentoHandler.GetFavorecidos)
 			if mercHandler != nil {
