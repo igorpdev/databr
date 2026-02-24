@@ -612,6 +612,8 @@ func main() {
 			r.Get("/transparencia/obras", transparenciaFedHandler.GetObras)
 			r.Get("/transparencia/transferencias", transparenciaFedHandler.GetTransferencias)
 			r.Get("/transparencia/pensionistas", transparenciaFedHandler.GetPensionistas)
+			r.Get("/diarios/municipios", douHandler.GetMunicipios)
+			r.Get("/diarios/temas", douHandler.GetTemas)
 			r.Get("/pncp/orgaos", pncpHandler.GetOrgaos)
 			r.Get("/bcb/ifdata", proxyBCBHandler.GetIFData)
 			r.Get("/bcb/base-monetaria", proxyBCBHandler.GetBaseMonetaria)
@@ -673,6 +675,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
+			r.Get("/diarios/tema/{tema}", douHandler.GetTema)
 			r.Get("/saude/mortalidade", dataSUSHandler.GetMortalidade)
 			r.Get("/saude/nascimentos", dataSUSHandler.GetNascimentos)
 			r.Get("/saude/hospitais", dataSUSHandler.GetHospitais)

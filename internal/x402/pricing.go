@@ -78,6 +78,8 @@ var priceTable = map[string]string{
 	"/v1/ipea/serie/{codigo}":                   "0.003",
 	"/v1/ipea/busca":                            "0.003",
 	"/v1/ipea/temas":                            "0.003",
+	"/v1/diarios/municipios":                     "0.003",
+	"/v1/diarios/temas":                          "0.003",
 	"/v1/pncp/orgaos":                           "0.003",
 	"/v1/eleicoes/candidatos":                   "0.003",
 	"/v1/eleicoes/bens":                         "0.003",
@@ -93,6 +95,7 @@ var priceTable = map[string]string{
 	"/v1/transporte/aeronaves/{prefixo}":        "0.003",
 	"/v1/mercado/fatos-relevantes/{protocolo}":  "0.003",
 	// $0.005 — standard: B3 stock quotes, CVM, INPE, transport lists, comex, educacao, DATASUS advanced
+	"/v1/diarios/tema/{tema}":          "0.005",
 	"/v1/saude/mortalidade":            "0.005",
 	"/v1/saude/nascimentos":            "0.005",
 	"/v1/saude/hospitais":              "0.005",
