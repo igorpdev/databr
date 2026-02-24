@@ -33,6 +33,7 @@ import (
 	"github.com/go-chi/httprate"
 	"github.com/joho/godotenv"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -484,6 +485,9 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})
 	})
+
+	// Prometheus metrics endpoint
+	r.Handle("/metrics", promhttp.Handler())
 
 	// Favicon — return 204 No Content to prevent 402 from x402 middleware.
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
