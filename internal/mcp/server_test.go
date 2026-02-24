@@ -32,7 +32,18 @@ func TestMCPServer_ToolsRegistered(t *testing.T) {
 	srv := mcp.NewServer(&mcp.HandlerDeps{})
 	tools := srv.Tools()
 
-	required := []string{
+	expected := 69
+	if len(tools) != expected {
+		t.Errorf("expected %d tools, got %d", expected, len(tools))
+	}
+
+	// Spot-check critical tools across all domains
+	toolSet := make(map[string]bool, len(tools))
+	for _, t := range tools {
+		toolSet[t] = true
+	}
+	critical := []string{
+		// Original 13
 		"consultar_empresa",
 		"verificar_compliance",
 		"cotacao_cambio",
@@ -46,16 +57,35 @@ func TestMCPServer_ToolsRegistered(t *testing.T) {
 		"buscar_licitacao",
 		"consultar_tarifas_energia",
 		"consultar_medicamento",
+		// New tools (representative sample)
+		"consultar_selic",
+		"consultar_pix_estatisticas",
+		"consultar_populacao",
+		"consultar_municipio",
+		"consultar_servidores_federais",
+		"consultar_senadores",
+		"consultar_candidatos",
+		"consultar_fundo_investimento",
+		"consultar_ibovespa",
+		"consultar_desmatamento",
+		"consultar_emprego",
+		"consultar_aeronave",
+		"consultar_comercio_exterior",
+		"consultar_ipea",
+		"consultar_endereco",
+		"consultar_censo_escolar",
+		// Premium
+		"due_diligence_empresa",
+		"perfil_completo_empresa",
+		"analise_esg",
+		"rede_influencia",
+		"analise_litigio",
+		"panorama_economico",
+		"perfil_municipio",
 	}
-
-	toolSet := make(map[string]bool, len(tools))
-	for _, t := range tools {
-		toolSet[t] = true
-	}
-
-	for _, name := range required {
+	for _, name := range critical {
 		if !toolSet[name] {
-			t.Errorf("MCP tool %q not registered", name)
+			t.Errorf("critical MCP tool %q not registered", name)
 		}
 	}
 }
@@ -199,10 +229,21 @@ func TestPerToolMiddleware_ToolsCall(t *testing.T) {
 		tool  string
 		price string
 	}{
+		// Original
 		{"consultar_empresa", "0.003"},
 		{"buscar_processos_judiciais", "0.015"},
 		{"verificar_compliance", "0.010"},
 		{"cotacao_acoes", "0.005"},
+		// New — one per price tier
+		{"consultar_selic", "0.003"},
+		{"consultar_desmatamento", "0.005"},
+		{"consultar_diarios_municipais", "0.007"},
+		{"consultar_fundo_investimento", "0.010"},
+		{"analise_mercado_trabalho", "0.015"},
+		{"perfil_completo_empresa", "0.020"},
+		{"analise_esg", "0.030"},
+		{"rede_influencia", "0.050"},
+		{"due_diligence_empresa", "0.075"},
 	}
 
 	for _, tc := range tests {

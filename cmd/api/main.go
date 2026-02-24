@@ -179,32 +179,168 @@ func main() {
 	// MCP server (invokes handlers directly, no HTTP loopback)
 	mcpDeps := &mcp.HandlerDeps{
 		// On-demand handlers (always available)
-		Empresas:    empHandler.GetEmpresa,
-		Compliance:  compHandler.GetCompliance,
-		Judicial:    judicialHand.GetProcessos,
-		DOU:         douHandler.GetBusca,
-		Orcamento:   orcamentoHandler.GetDespesas,
-		TCU:         tcuHandler.GetCertidao,
-		Legislativo: legislativoHandler.GetDeputados,
-		PNCP:        pncpHandler.GetOrgaos,
+		Empresas:             empHandler.GetEmpresa,
+		Compliance:           compHandler.GetCompliance,
+		Judicial:             judicialHand.GetProcessos,
+		DOU:                  douHandler.GetBusca,
+		Orcamento:            orcamentoHandler.GetDespesas,
+		TCU:                  tcuHandler.GetCertidao,
+		Legislativo:          legislativoHandler.GetDeputados,
+		PNCP:                 pncpHandler.GetOrgaos,
+		Endereco:             enderecoHandler.GetEndereco,
+		Senadores:            legislativoHandler.GetSenadores,
+		Proposicoes:          legislativoHandler.GetProposicoes,
+		Votacoes:             legislativoHandler.GetVotacoes,
+		Partidos:             legislativoHandler.GetPartidos,
+		TranspServidores:     transparenciaFedHandler.GetServidores,
+		TranspContratos:      transparenciaFedHandler.GetContratos,
+		TranspBeneficios:     transparenciaFedHandler.GetBolsaFamilia,
+		TranspCartoes:        transparenciaFedHandler.GetCartoes,
+		TranspViagens:        transparenciaFedHandler.GetViagens,
+		TranspEmendas:        transparenciaFedHandler.GetEmendas,
+		TranspObras:          transparenciaFedHandler.GetObras,
+		TranspTransferencias: transparenciaFedHandler.GetTransferencias,
+		TranspPensionistas:   transparenciaFedHandler.GetPensionistas,
+		TesouroRREO:          tesouroHand.GetRREO,
+		TesouroEntes:         tesouroHand.GetEntes,
+		TesouroRGF:           tesouroHand.GetRGF,
+		TesouroDCA:           tesouroHand.GetDCA,
+		IPEASerie:            ipeaHandler.GetSerie,
+		IPEABusca:            ipeaHandler.GetBusca,
+		IPEATemas:            ipeaHandler.GetTemas,
+		BCBIndicadores:       proxyBCBHandler.GetIndicadores,
+		BCBIFData:            proxyBCBHandler.GetIFData,
+		BCBBaseMonetaria:     proxyBCBHandler.GetBaseMonetaria,
+		IBGEMunicipio:        ibgeHandler.GetMunicipio,
+		IBGEMunicipiosUF:     ibgeHandler.GetMunicipiosPorUF,
+		IBGEEstados:          ibgeHandler.GetEstados,
+		IBGERegioes:          ibgeHandler.GetRegioes,
+		IBGECNAE:             ibgeHandler.GetCNAE,
+		IBGEPNAD:             ibgeHandler.GetPNAD,
+		IBGEINPC:             ibgeHandler.GetINPC,
+		IBGEPIM:              ibgeHandler.GetPIM,
+		IBGEIPCA15:           ibgeHandler.GetIPCA15,
+		IBGEPMC:              ibgeHandler.GetPMC,
+		IBGEPMS:              ibgeHandler.GetPMS,
+		TSEBens:              tseExtrasHandler.GetBens,
+		TSEDoacoes:           tseExtrasHandler.GetDoacoes,
+		ANSPlanos:            ansHandler.GetPlanos,
+		Combustiveis:         tseExtrasHandler.GetCombustiveis,
+		TCUAcordaos:          tcuHandler.GetAcordaos,
+		TCUInabilitados:      tcuHandler.GetInabilitados,
+		OrcamentoFuncional:   orcamentoHandler.GetFuncionalProgramatica,
+		Diarios:              douHandler.GetDiarios,
 	}
 	// Store-backed handlers (only when DB is connected)
 	if bcbHandler != nil {
 		mcpDeps.BCBSelic = bcbHandler.GetSelic
 		mcpDeps.BCBCambio = bcbHandler.GetCambio
+		mcpDeps.BCBPix = bcbHandler.GetPIX
+		mcpDeps.BCBCredito = bcbHandler.GetCredito
+		mcpDeps.BCBTaxasCredito = bcbHandler.GetTaxasCredito
+		mcpDeps.BCBReservas = bcbHandler.GetReservas
 	}
 	if ecoHandler != nil {
 		mcpDeps.EconomiaIPCA = ecoHandler.GetIPCA
 		mcpDeps.EconomiaPIB = ecoHandler.GetPIB
+		mcpDeps.EconomiaFocus = ecoHandler.GetFocus
 	}
 	if mercHandler != nil {
 		mcpDeps.MercadoAcoes = mercHandler.GetAcoes
+		mcpDeps.MercadoFundos = mercHandler.GetFundos
+		mcpDeps.MercadoCotas = mercHandler.GetCotasByCNPJ
+		mcpDeps.MercadoIbovespa = mercHandler.GetIndicesIbovespa
+		mcpDeps.MercadoFatos = mercHandler.GetFatosRelevantes
+		mcpDeps.MercadoFatosById = mercHandler.GetFatosById
 	}
 	if energiaHandler != nil {
 		mcpDeps.Energia = energiaHandler.GetTarifas
+		mcpDeps.EnergiaGeracao = energiaHandler.GetGeracao
+		mcpDeps.EnergiaCarga = energiaHandler.GetCarga
 	}
 	if saudeHandler != nil {
 		mcpDeps.Saude = saudeHandler.GetMedicamento
+	}
+	if ambientalHandler != nil {
+		mcpDeps.AmbientalDesmat = ambientalHandler.GetDesmatamento
+		mcpDeps.AmbientalProdes = ambientalHandler.GetProdes
+		mcpDeps.AmbientalUsoSolo = ambientalHandler.GetUsoSolo
+		mcpDeps.AmbientalEmbargos = ambientalHandler.GetEmbargos
+	}
+	if empregoHandler != nil {
+		mcpDeps.EmpregoRAIS = empregoHandler.GetRAIS
+		mcpDeps.EmpregoCAGED = empregoHandler.GetCAGED
+	}
+	if transporteHandler != nil {
+		mcpDeps.TranspAeronave = transporteHandler.GetAeronave
+		mcpDeps.TranspAeronaves = transporteHandler.GetAeronaves
+		mcpDeps.TranspAcidentes = transporteHandler.GetAcidentes
+	}
+	if transportadoresHandler != nil {
+		mcpDeps.Transportador = transportadoresHandler.GetTransportador
+		mcpDeps.Transportadores = transportadoresHandler.GetTransportadoresByCNPJ
+	}
+	if comercioHandler != nil {
+		mcpDeps.ComexExportacoes = comercioHandler.GetExportacoes
+		mcpDeps.ComexImportacoes = comercioHandler.GetImportacoes
+	}
+	if transHandler != nil {
+		mcpDeps.CandidatosTSE = transHandler.GetCandidatos
+	}
+	if titulosHandler != nil {
+		mcpDeps.TesouroTitulos = titulosHandler.GetTitulos
+	}
+	if educacaoHandler != nil {
+		mcpDeps.CensoEscolar = educacaoHandler.GetCensoEscolar
+	}
+	if ibgeHandler != nil {
+		mcpDeps.IBGEPopulacao = ibgeHandler.GetPopulacao
+	}
+	if fundoAnaliseHandler != nil {
+		mcpDeps.FundoAnalise = fundoAnaliseHandler.GetFundoAnalise
+	}
+	// Premium handlers
+	if dueDiligenceHandler != nil {
+		mcpDeps.DueDiligence = dueDiligenceHandler.GetDueDiligence
+	}
+	if perfilCompletoHandler != nil {
+		mcpDeps.PerfilCompleto = perfilCompletoHandler.GetPerfilCompleto
+	}
+	if creditoScoreHandler != nil {
+		mcpDeps.CreditoScore = creditoScoreHandler.GetCreditoScore
+	}
+	if panoramaHandler != nil {
+		mcpDeps.Panorama = panoramaHandler.GetPanorama
+	}
+	if setorHandler != nil {
+		mcpDeps.SetorAnalise = setorHandler.GetSetor
+	}
+	if regulacaoSetorHandler != nil {
+		mcpDeps.RegulacaoSetor = regulacaoSetorHandler.GetRegulacaoSetor
+	}
+	if competicaoHandler != nil {
+		mcpDeps.Competicao = competicaoHandler.GetCompeticao
+	}
+	if mercadoTrabalhoHandler != nil {
+		mcpDeps.MercadoTrabalho = mercadoTrabalhoHandler.GetMercadoTrabalho
+	}
+	if esgHandler != nil {
+		mcpDeps.ESG = esgHandler.GetESG
+	}
+	if riscoAmbientalHandler != nil {
+		mcpDeps.RiscoAmbiental = riscoAmbientalHandler.GetRiscoAmbiental
+	}
+	if litigioRiscoHandler != nil {
+		mcpDeps.LitigioRisco = litigioRiscoHandler.GetLitigioRisco
+	}
+	if redeInfluenciaHandler != nil {
+		mcpDeps.RedeInfluencia = redeInfluenciaHandler.GetRedeInfluencia
+	}
+	if municipioHandler != nil {
+		mcpDeps.MunicipioPerfil = municipioHandler.GetMunicipioPerfil
+	}
+	if complianceEleitoralHandler != nil {
+		mcpDeps.ComplianceEleitoral = complianceEleitoralHandler.GetComplianceEleitoral
 	}
 	mcpSrv := mcp.NewServer(mcpDeps)
 	streamableServer := mcpserver.NewStreamableHTTPServer(mcpSrv.MCPServer())
