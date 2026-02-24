@@ -559,6 +559,10 @@ func main() {
 			}),
 		))
 
+		// Discovery endpoint (free, no x402 payment required)
+		discoverHandler := handlers.NewDiscoverHandler()
+		r.Get("/discover/cases", discoverHandler.GetCases)
+
 		// $0.003 — basic lookups: company data, BCB rates, economic indicators, tesouro
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.003"))
