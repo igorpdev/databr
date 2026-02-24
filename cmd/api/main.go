@@ -448,15 +448,27 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// Rate limiting (100 req/min per IP)
-	r.Use(httprate.Limit(
+	// Rate limiting (100 req/min per real IP).
+	// Requests with a valid internal API key bypass rate limiting entirely.
+	internalKey := os.Getenv("INTERNAL_API_KEY")
+	rateLimiter := httprate.Limit(
 		100,
 		1*time.Minute,
-		httprate.WithKeyFuncs(httprate.KeyByIP),
+		httprate.WithKeyFuncs(httprate.KeyByRealIP),
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
 			handlers.RateLimitExceeded(w)
 		}),
-	))
+	)
+	r.Use(func(next http.Handler) http.Handler {
+		limited := rateLimiter(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if internalKey != "" && r.Header.Get("X-API-Key") == internalKey {
+				next.ServeHTTP(w, r)
+				return
+			}
+			limited.ServeHTTP(w, r)
+		})
+	})
 
 	// Gzip compression (level 5 = good balance of CPU vs compression ratio).
 	// Placed BEFORE ETag so the hash is computed on the uncompressed body.
