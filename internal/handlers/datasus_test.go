@@ -211,7 +211,9 @@ func TestDATASUSHandler_GetNascimentos(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if resp["source"] != "datasus_sinasc" {
 		t.Errorf("expected source datasus_sinasc, got %v", resp["source"])
 	}
@@ -252,7 +254,9 @@ func TestDATASUSHandler_GetHospitais(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if resp["source"] != "datasus_hospitais" {
 		t.Errorf("expected source datasus_hospitais, got %v", resp["source"])
 	}
@@ -292,7 +296,9 @@ func TestDATASUSHandler_GetDengue(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if resp["source"] != "datasus_dengue" {
 		t.Errorf("expected source datasus_dengue, got %v", resp["source"])
 	}
@@ -332,7 +338,9 @@ func TestDATASUSHandler_GetVacinacao(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if resp["source"] != "datasus_vacinacao" {
 		t.Errorf("expected source datasus_vacinacao, got %v", resp["source"])
 	}
