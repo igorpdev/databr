@@ -151,6 +151,10 @@ var routeMeta = map[string]routeMetaEntry{
 	// Emprego — RAIS e CAGED
 	"/v1/emprego/rais":  {"RAIS - Relação Anual de Informações Sociais — estoque de empregos formais por setor CNAE e salário médio (Ministério do Trabalho)", "application/json"},
 	"/v1/emprego/caged": {"CAGED - Cadastro Geral de Empregados e Desempregados — admissões e desligamentos mensais por setor (Ministério do Trabalho)", "application/json"},
+	// Tributário — IBPT e ICMS
+	"/v1/tributario/ncm/{codigo}": {"Carga tributária aproximada por NCM/NBS — alíquotas federal, estadual e municipal para produtos e serviços (IBPT De Olho no Imposto)", "application/json"},
+	"/v1/tributario/icms/{uf}":    {"Alíquota interna ICMS por estado — taxa modal, FCP e grupo interestadual atualizados para 2026 (CONFAZ)", "application/json"},
+	"/v1/tributario/icms":         {"Tabela ICMS completa — alíquotas internas dos 27 estados ou cálculo interestadual com DIFAL (?origem=SP&destino=MA)", "application/json"},
 	// Premium cross-referencing endpoints
 	"/v1/empresas/{cnpj}/duediligence":    {"Due diligence empresarial completa — CNPJ + CEIS/CNEP + processos judiciais + licitações + ambiental (multi-fonte)", "application/json"},
 	"/v1/economia/panorama":               {"Panorama macroeconômico consolidado — Selic, IPCA, PIB, câmbio, Focus e reservas internacionais em tempo real", "application/json"},

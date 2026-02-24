@@ -109,6 +109,8 @@ tags:
     description: Orçamento Federal (SIAFI/SIOP via Portal da Transparência)
   - name: PNCP
     description: Portal Nacional de Contratações Públicas
+  - name: Tributário
+    description: Carga tributária (IBPT) e alíquotas ICMS interestaduais
   - name: Crédito
     description: Score de crédito composit
   - name: Premium
@@ -2493,6 +2495,196 @@ paths:
           $ref: "#/components/responses/PaymentRequired"
         "400":
           description: Parâmetros obrigatórios ausentes
+
+  # ── Tributário ($0.003) ─────────────────────────────────
+  /v1/tributario/ncm/{codigo}:
+    get:
+      tags: [Tributário]
+      summary: Carga tributária aproximada por NCM/NBS
+      description: |
+        Consulta a carga tributária aproximada de um produto ou serviço pelo código NCM (mercadorias) ou NBS (serviços),
+        usando dados do IBPT (Instituto Brasileiro de Planejamento e Tributação).
+
+        Retorna alíquotas federais (nacional e importados), estadual e municipal, com totais calculados.
+
+        Custo: $0.003 USDC
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          description: Código NCM (8 dígitos, mercadorias) ou NBS (9 dígitos, serviços)
+          schema:
+            type: string
+            example: "22030000"
+        - name: uf
+          in: query
+          required: true
+          description: UF do estado (2 letras)
+          schema:
+            type: string
+            example: SP
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Carga tributária do produto/serviço
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/APIResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          codigo:
+                            type: string
+                            example: "22030000"
+                          descricao:
+                            type: string
+                            example: "Cervejas de malte"
+                          tipo:
+                            type: string
+                            enum: [ncm, servico]
+                          uf:
+                            type: string
+                            example: SP
+                          aliquotas:
+                            type: object
+                            properties:
+                              federal_nacional:
+                                type: number
+                                example: 19.56
+                              federal_importados:
+                                type: number
+                                example: 27.54
+                              estadual:
+                                type: number
+                                example: 29.43
+                              municipal:
+                                type: number
+                                example: 0
+                              total_nacional:
+                                type: number
+                                example: 48.99
+                              total_importados:
+                                type: number
+                                example: 56.97
+                          vigencia:
+                            type: object
+                            properties:
+                              inicio:
+                                type: string
+                              fim:
+                                type: string
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "400":
+          description: Parâmetros inválidos (codigo ou uf ausente/inválido)
+        "404":
+          description: NCM/NBS não encontrado
+
+  /v1/tributario/icms/{uf}:
+    get:
+      tags: [Tributário]
+      summary: Alíquota ICMS interna de um estado
+      description: |
+        Retorna a alíquota modal do ICMS interno de um estado, incluindo FCP (Fundo de Combate à Pobreza)
+        quando aplicável, e a alíquota efetiva total.
+
+        Dados baseados nas tabelas CONFAZ/SEFAZ 2026.
+
+        Custo: $0.003 USDC
+      parameters:
+        - name: uf
+          in: path
+          required: true
+          description: UF do estado (2 letras)
+          schema:
+            type: string
+            example: SP
+        - name: origem
+          in: query
+          description: UF de origem (para cálculo interestadual)
+          schema:
+            type: string
+            example: BA
+        - name: destino
+          in: query
+          description: UF de destino (para cálculo interestadual)
+          schema:
+            type: string
+            example: SP
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Alíquota ICMS
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/APIResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          uf:
+                            type: string
+                            example: SP
+                          nome:
+                            type: string
+                            example: "São Paulo"
+                          aliquota_modal:
+                            type: number
+                            example: 18.0
+                          fcp:
+                            type: number
+                            example: 0
+                          aliquota_efetiva:
+                            type: number
+                            example: 18.0
+                          regiao:
+                            type: string
+                            example: sudeste
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "400":
+          description: UF inválida
+
+  /v1/tributario/icms:
+    get:
+      tags: [Tributário]
+      summary: Tabela completa de alíquotas ICMS (27 UFs)
+      description: |
+        Retorna a tabela de alíquotas ICMS internas de todos os 27 estados brasileiros,
+        com alíquotas modais, FCP e alíquotas efetivas.
+
+        Se os query params `origem` e `destino` forem informados, retorna o cálculo interestadual
+        (alíquota interestadual + DIFAL).
+
+        Custo: $0.003 USDC
+      parameters:
+        - name: origem
+          in: query
+          description: UF de origem (para cálculo interestadual)
+          schema:
+            type: string
+        - name: destino
+          in: query
+          description: UF de destino (para cálculo interestadual)
+          schema:
+            type: string
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Tabela ICMS ou cálculo interestadual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
 
   # ── Crédito ($0.005) ────────────────────────────────────
   /v1/credito/score/{cnpj}:

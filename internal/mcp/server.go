@@ -148,6 +148,10 @@ type HandlerDeps struct {
 	RedeInfluencia      http.HandlerFunc // GET /v1/rede/{cnpj}/influencia
 	MunicipioPerfil     http.HandlerFunc // GET /v1/municipios/{codigo}/perfil
 	ComplianceEleitoral http.HandlerFunc // GET /v1/eleicoes/compliance/{cpf_cnpj}
+
+	// Tributario handlers
+	TributarioNCM  http.HandlerFunc // GET /v1/tributario/ncm/{codigo}
+	TributarioICMS http.HandlerFunc // GET /v1/tributario/icms/{uf} or /v1/tributario/icms
 }
 
 // ToolPrices maps each MCP tool name to its USDC price string.
@@ -249,6 +253,9 @@ var ToolPrices = map[string]string{
 	"listar_temas_diarios":        "0.003",
 	"buscar_diarios_por_tema":     "0.005",
 	"descobrir_casos_uso":         "0",
+	// Tributário
+	"consultar_tributos_ncm": "0.003",
+	"consultar_icms":         "0.003",
 }
 
 // Server wraps the mcp-go server with DataBR tool registrations.
@@ -1558,6 +1565,52 @@ func (s *Server) registerTools() {
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			codigo := req.GetString("codigo", "")
 			return invokeHandler(ctx, s.deps.MunicipioPerfil, "/v1/municipios/"+codigo+"/perfil", map[string]string{"codigo": codigo}, "")
+		},
+	)
+
+	// === Tributário ===
+	s.addTool("consultar_tributos_ncm",
+		"Consulta carga tributária aproximada de um produto/serviço pelo código NCM ou NBS. Retorna alíquotas federal, estadual e municipal (fonte: IBPT).",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("codigo", mcpgosdk.Required(),
+				mcpgosdk.Description("Código NCM (produtos, 8 dígitos) ou NBS/LC116 (serviços). Ex: 22030000, 0107"),
+			),
+			mcpgosdk.WithString("uf", mcpgosdk.Required(),
+				mcpgosdk.Description("UF do estado (2 letras). Ex: SP, RJ, MG"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			codigo := req.GetString("codigo", "")
+			uf := req.GetString("uf", "")
+			return invokeHandler(ctx, s.deps.TributarioNCM, "/v1/tributario/ncm/"+codigo, map[string]string{"codigo": codigo}, "uf="+uf)
+		},
+	)
+
+	s.addTool("consultar_icms",
+		"Consulta alíquotas ICMS: interna de um estado, interestadual entre dois estados, ou tabela completa com todos os 27 estados.",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("uf",
+				mcpgosdk.Description("UF para consulta de alíquota interna (2 letras). Ex: SP"),
+			),
+			mcpgosdk.WithString("origem",
+				mcpgosdk.Description("UF de origem para cálculo interestadual. Ex: SP"),
+			),
+			mcpgosdk.WithString("destino",
+				mcpgosdk.Description("UF de destino para cálculo interestadual. Ex: MA"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			uf := req.GetString("uf", "")
+			origem := req.GetString("origem", "")
+			destino := req.GetString("destino", "")
+			if uf != "" {
+				return invokeHandler(ctx, s.deps.TributarioICMS, "/v1/tributario/icms/"+uf, map[string]string{"uf": uf}, "")
+			}
+			qp := ""
+			if origem != "" && destino != "" {
+				qp = "origem=" + origem + "&destino=" + destino
+			}
+			return invokeHandler(ctx, s.deps.TributarioICMS, "/v1/tributario/icms", nil, qp)
 		},
 	)
 }

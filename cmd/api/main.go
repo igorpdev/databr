@@ -18,6 +18,7 @@ import (
 	"github.com/databr/api/internal/collectors/juridico"
 	"github.com/databr/api/internal/collectors/tesouro"
 	"github.com/databr/api/internal/collectors/transparencia"
+	"github.com/databr/api/internal/collectors/tributario"
 	"github.com/databr/api/internal/cache"
 	docfs "github.com/databr/api/docs"
 	"github.com/databr/api/internal/domain"
@@ -97,6 +98,10 @@ func main() {
 	qdCollector := dou.NewQDCollector("")
 	djCollector := juridico.NewDataJudCollector("", os.Getenv("DATAJUD_API_KEY"))
 
+	// Tributario collectors (on-demand IBPT + static ICMS)
+	ibptCollector := tributario.NewIBPTCollector("")
+	icmsProvider := tributario.NewICMSProvider()
+
 	// DATASUS handler (on-demand proxy, no DB required)
 	dataSUSHandler := handlers.NewDATASUSHandler()
 
@@ -116,6 +121,7 @@ func main() {
 	ansHandler := handlers.NewANSHandler()
 	tcuHandler := handlers.NewTCUHandler()
 	orcamentoHandler := handlers.NewOrcamentoHandler()
+	tributarioHandler := handlers.NewTributarioHandler(ibptCollector, icmsProvider)
 	// Proxy BCB handler for routes that call external APIs directly (no DB needed).
 	proxyBCBHandler := handlers.NewBCBHandler(nil)
 
@@ -258,6 +264,8 @@ func main() {
 		DiariosTemas:       douHandler.GetTemas,
 		DiariosTema:        douHandler.GetTema,
 		DiscoverCases:      discoverHandler.GetCases,
+		TributarioNCM:      tributarioHandler.GetNCMTributos,
+		TributarioICMS:     tributarioHandler.GetICMS,
 	}
 	// Store-backed handlers (only when DB is connected)
 	if bcbHandler != nil {
@@ -677,6 +685,9 @@ func main() {
 			r.Get("/orcamento/despesas", orcamentoHandler.GetDespesas)
 			r.Get("/orcamento/funcional-programatica", orcamentoHandler.GetFuncionalProgramatica)
 			r.Get("/orcamento/documento/{codigo}", orcamentoHandler.GetDocumento)
+			r.Get("/tributario/ncm/{codigo}", tributarioHandler.GetNCMTributos)
+			r.Get("/tributario/icms/{uf}", tributarioHandler.GetICMS)
+			r.Get("/tributario/icms", tributarioHandler.GetICMS)
 			if bcbHandler != nil {
 				r.Get("/bcb/selic", bcbHandler.GetSelic)
 				r.Get("/bcb/cambio/{moeda}", bcbHandler.GetCambio)

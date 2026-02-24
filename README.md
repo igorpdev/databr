@@ -81,7 +81,7 @@ Adicione ao seu MCP client:
 
 ## Endpoints
 
-113 endpoints organizados por domínio. Documentação completa em [databr.api.br/docs](https://databr.api.br/docs).
+116 endpoints organizados por domínio. Documentação completa em [databr.api.br/docs](https://databr.api.br/docs).
 
 ### Economia
 
@@ -183,6 +183,14 @@ Adicione ao seu MCP client:
 | `GET /v1/emprego/rais` | $0.005 | RAIS (emprego formal) |
 | `GET /v1/emprego/caged` | $0.005 | CAGED (admissões/demissões) |
 
+### Tributário
+
+| Endpoint | Preço | Descrição |
+|----------|-------|-----------|
+| `GET /v1/tributario/ncm/{codigo}` | $0.003 | Carga tributária por NCM/NBS (IBPT) |
+| `GET /v1/tributario/icms/{uf}` | $0.003 | Alíquota ICMS interna de um estado |
+| `GET /v1/tributario/icms` | $0.003 | Tabela ICMS completa (27 UFs) ou interestadual |
+
 ### Análises compostas
 
 | Endpoint | Preço | Descrição |
@@ -229,7 +237,7 @@ Todos os endpoints aceitam:
 
 | Faixa | Preço (USDC) | Exemplos |
 |-------|-------------|----------|
-| Consultas básicas | $0.003 | BCB, IBGE, empresas, legislativo |
+| Consultas básicas | $0.003 | BCB, IBGE, empresas, legislativo, tributário |
 | Consultas padrão | $0.005 | Ações B3, CVM, comércio exterior |
 | Consultas avançadas | $0.007 | Compliance empresa, DOU, risco ambiental |
 | Premium | $0.010 | Compliance completo, fundos, decisões STF/STJ |
@@ -265,6 +273,7 @@ pip install databr
 | `transporte` | `client.transporte.aeronaves()` | aeronaves, transportadores, acidentes |
 | `comercio` | `client.comercio.exportacoes()` | exportacoes, importacoes |
 | `emprego` | `client.emprego.rais()` | rais, caged |
+| `tributario` | `client.tributario.ncm("22030000", uf="SP")` | ncm, icms |
 
 ### Tratamento de erros
 
@@ -291,7 +300,7 @@ client = DataBR(private_key="0x...", network="testnet")  # Base Sepolia, USDC de
 
 ## Fontes de dados
 
-42 coletores automáticos + 5 on-demand, cobrindo:
+42 coletores automáticos + 7 on-demand, cobrindo:
 
 | Fonte | Órgão | Atualização |
 |-------|-------|-------------|
@@ -320,6 +329,8 @@ client = DataBR(private_key="0x...", network="testnet")  # Base Sepolia, USDC de
 | CNPJ | minhareceita.org | On-demand |
 | Compliance CEIS/CNEP | CGU | On-demand |
 | Processos judiciais | DataJud CNJ | On-demand |
+| Carga tributária NCM/NBS | IBPT | On-demand |
+| Alíquotas ICMS (27 UFs) | CONFAZ/SEFAZ | Estático (2026) |
 
 ---
 
@@ -363,8 +374,8 @@ databr/
 │   ├── api/              # Entrypoint REST API + MCP
 │   └── collector/        # Scheduler de coletores
 ├── internal/
-│   ├── handlers/         # 30+ handlers HTTP (113 endpoints)
-│   ├── collectors/       # 22 pacotes de coletores (47 fontes)
+│   ├── handlers/         # 30+ handlers HTTP (116 endpoints)
+│   ├── collectors/       # 23 pacotes de coletores (49 fontes)
 │   ├── repositories/     # PostgreSQL (pgx/v5)
 │   ├── cache/            # Redis + cache em memória
 │   ├── x402/             # Middleware de pagamento + pricing
