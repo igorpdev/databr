@@ -486,8 +486,8 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})
 	})
 
-	// Prometheus metrics endpoint
-	r.Handle("/metrics", promhttp.Handler())
+	// Prometheus metrics endpoint (protected by bearer token)
+	r.Handle("/metrics", metricsAuth(promhttp.Handler()))
 
 	// Favicon — return 204 No Content to prevent 402 from x402 middleware.
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
@@ -910,6 +910,24 @@ type headResponseWriter struct {
 }
 
 func (h *headResponseWriter) Write([]byte) (int, error) { return 0, nil }
+
+// metricsAuth wraps a handler with bearer token authentication.
+// Token is read from METRICS_TOKEN env var. If unset, /metrics returns 403.
+func metricsAuth(next http.Handler) http.Handler {
+	token := os.Getenv("METRICS_TOKEN")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token == "" {
+			http.Error(w, "metrics disabled", http.StatusForbidden)
+			return
+		}
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 // serveEmbedded reads a file from an embed.FS and writes it to the response.
 func serveEmbedded(w http.ResponseWriter, fsys embed.FS, name, contentType string) {
