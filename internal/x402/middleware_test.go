@@ -154,6 +154,57 @@ func TestWalletContextInjection(t *testing.T) {
 	}
 }
 
+func TestPricedMiddleware_InternalAPIKey_BypassesPayment(t *testing.T) {
+	fac := mockFacilitator(t, false) // facilitator would reject — proves bypass works
+	defer fac.Close()
+
+	cfg := x402.MiddlewareConfig{
+		WalletAddress:  "0xWALLET",
+		FacilitatorURL: fac.URL,
+		Network:        "eip155:84532",
+		InternalAPIKey: "test-secret-key-123",
+	}
+
+	var capturedPrice string
+	mw := x402.NewPricedMiddleware(cfg, "0.003")
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedPrice = x402.PriceFromRequest(r)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// With valid API key → 200 (bypass)
+	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
+	req.Header.Set("X-API-Key", "test-secret-key-123")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 with valid API key, got %d", rec.Code)
+	}
+	if capturedPrice != "0.003" {
+		t.Errorf("price should still be injected; got %q, want %q", capturedPrice, "0.003")
+	}
+
+	// With wrong API key → 402 (no bypass)
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
+	req2.Header.Set("X-API-Key", "wrong-key")
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusPaymentRequired {
+		t.Fatalf("expected 402 with wrong API key, got %d", rec2.Code)
+	}
+
+	// Without API key → 402
+	req3 := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
+	rec3 := httptest.NewRecorder()
+	handler.ServeHTTP(rec3, req3)
+
+	if rec3.Code != http.StatusPaymentRequired {
+		t.Fatalf("expected 402 without API key, got %d", rec3.Code)
+	}
+}
+
 func TestWalletFromRequest_NoWallet(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/bcb/selic", nil)
 	if w := x402.WalletFromRequest(req); w != "" {

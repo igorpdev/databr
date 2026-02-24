@@ -77,6 +77,10 @@ type MiddlewareConfig struct {
 	// CDPKeySecret is the base64-encoded private key from the CDP portal.
 	// Supports Ed25519 (64-byte raw), Ed25519 seed (32-byte), PKCS8, and SEC1/EC formats.
 	CDPKeySecret string
+
+	// InternalAPIKey, when set, allows requests with a matching X-API-Key header
+	// to bypass x402 payment. Used by first-party backends (e.g. own website).
+	InternalAPIKey string
 }
 
 // NewPricedMiddleware creates a Chi-compatible x402 payment middleware
@@ -123,6 +127,12 @@ func NewPricedMiddleware(cfg MiddlewareConfig, priceUSDC string) func(http.Handl
 			// Inject price into context so handlers can read it via PriceFromRequest.
 			ctx := context.WithValue(r.Context(), priceCtxKey{}, priceUSDC)
 			r = r.WithContext(ctx)
+
+			// Bypass x402 payment for requests with a valid internal API key.
+			if cfg.InternalAPIKey != "" && r.Header.Get("X-API-Key") == cfg.InternalAPIKey {
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			payloadBytes := extractPaymentHeader(r)
 			if payloadBytes == nil {

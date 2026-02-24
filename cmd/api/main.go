@@ -84,6 +84,7 @@ func main() {
 		Network:        networkName(os.Getenv("X402_NETWORK")),
 		CDPKeyID:       os.Getenv("CDP_KEY_ID"),
 		CDPKeySecret:   os.Getenv("CDP_KEY_SECRET"),
+		InternalAPIKey: os.Getenv("INTERNAL_API_KEY"),
 	}
 	if x402Cfg.FacilitatorURL == "" {
 		x402Cfg.FacilitatorURL = "https://x402.org/facilitator"
