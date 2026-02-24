@@ -384,7 +384,9 @@ func main() {
 	mcpDeps.JudicialSTJ = judicialHand.GetSTJ
 
 	mcpSrv := mcp.NewServer(mcpDeps)
-	streamableServer := mcpserver.NewStreamableHTTPServer(mcpSrv.MCPServer())
+	streamableServer := mcpserver.NewStreamableHTTPServer(mcpSrv.MCPServer(),
+		mcpserver.WithHeartbeatInterval(30*time.Second),
+	)
 
 	// Router
 	r := chi.NewRouter()
