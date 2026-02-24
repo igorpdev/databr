@@ -177,6 +177,18 @@ func main() {
 		}
 	}
 
+	// Data retention: purge old records weekly (Sunday 03:00 UTC / 00:00 BRT)
+	purgeRepo := repositories.NewPurgeRepository(pool)
+	if _, err := c.AddFunc("0 3 * * 0", func() {
+		if err := purgeRepo.RunRetention(ctx); err != nil {
+			slog.Error("retention job failed", "error", err)
+		}
+	}); err != nil {
+		slog.Warn("failed to schedule retention job", "error", err)
+	} else {
+		slog.Info("scheduled retention job", "schedule", "0 3 * * 0 (weekly Sunday 03:00 UTC)")
+	}
+
 	c.Start()
 	slog.Info("collector scheduler started")
 
