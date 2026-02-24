@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -1382,7 +1383,7 @@ func (s *Server) registerTools() {
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			tema := req.GetString("tema", "")
-			return invokeHandler(ctx, s.deps.DiariosTema, "/v1/diarios/tema/"+tema, map[string]string{"tema": tema}, "")
+			return invokeHandler(ctx, s.deps.DiariosTema, "/v1/diarios/tema/"+url.PathEscape(tema), map[string]string{"tema": tema}, "")
 		},
 	)
 
