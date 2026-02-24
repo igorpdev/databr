@@ -21,11 +21,35 @@ type DataJudSearcher interface {
 // JudicialHandler handles /v1/judicial/* requests.
 type JudicialHandler struct {
 	searcher DataJudSearcher
+	store    SourceStore
 }
 
 // NewJudicialHandler creates a judicial handler.
 func NewJudicialHandler(searcher DataJudSearcher) *JudicialHandler {
 	return &JudicialHandler{searcher: searcher}
+}
+
+// SetStore enables store-backed endpoints (STF/STJ decisions).
+func (h *JudicialHandler) SetStore(store SourceStore) {
+	h.store = store
+}
+
+// GetSTF handles GET /v1/judicial/stf — returns recent STF decisions.
+func (h *JudicialHandler) GetSTF(w http.ResponseWriter, r *http.Request) {
+	if h.store == nil {
+		jsonError(w, http.StatusServiceUnavailable, "stf_decisoes: database not available")
+		return
+	}
+	serveLatestAll(w, r, h.store, "stf_decisoes", "decisoes")
+}
+
+// GetSTJ handles GET /v1/judicial/stj — returns recent STJ decisions.
+func (h *JudicialHandler) GetSTJ(w http.ResponseWriter, r *http.Request) {
+	if h.store == nil {
+		jsonError(w, http.StatusServiceUnavailable, "stj_decisoes: database not available")
+		return
+	}
+	serveLatestAll(w, r, h.store, "stj_decisoes", "decisoes")
 }
 
 // GetProcessos handles GET /v1/judicial/processos/{doc}.

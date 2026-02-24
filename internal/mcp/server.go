@@ -121,6 +121,8 @@ type HandlerDeps struct {
 
 	// Phase 4-5 handlers
 	JudicialProcesso    http.HandlerFunc // GET /v1/judicial/processo/{numero}
+	JudicialSTF         http.HandlerFunc // GET /v1/judicial/stf
+	JudicialSTJ         http.HandlerFunc // GET /v1/judicial/stj
 	DATASUSMortalidade  http.HandlerFunc // GET /v1/saude/mortalidade
 	DATASUSNascimentos  http.HandlerFunc // GET /v1/saude/nascimentos
 	DATASUSHospitais    http.HandlerFunc // GET /v1/saude/hospitais
@@ -1521,21 +1523,28 @@ func (s *Server) registerTools() {
 	)
 
 	s.addTool("consultar_jurisprudencia",
-		"Busca decisões em tribunais superiores (STF e STJ).",
+		"Busca decisões recentes em tribunais superiores (STF e STJ). Retorna lista de decisões com classe, relator, ementa.",
 		[]mcpgosdk.ToolOption{
 			mcpgosdk.WithString("tribunal", mcpgosdk.Required(),
 				mcpgosdk.Description("Tribunal: 'stf' ou 'stj'"),
 			),
-			mcpgosdk.WithString("query", mcpgosdk.Description("Termo de busca")),
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			tribunal := req.GetString("tribunal", "stf")
-			query := req.GetString("query", "")
-			q := "tribunal=" + tribunal
-			if query != "" {
-				q += "&q=" + query
+			switch tribunal {
+			case "stf":
+				if s.deps.JudicialSTF == nil {
+					return mcpgosdk.NewToolResultText("STF decisions not available (database not connected)"), nil
+				}
+				return invokeHandler(ctx, s.deps.JudicialSTF, "/v1/judicial/stf", nil, "")
+			case "stj":
+				if s.deps.JudicialSTJ == nil {
+					return mcpgosdk.NewToolResultText("STJ decisions not available (database not connected)"), nil
+				}
+				return invokeHandler(ctx, s.deps.JudicialSTJ, "/v1/judicial/stj", nil, "")
+			default:
+				return mcpgosdk.NewToolResultText("Tribunal inválido: use 'stf' ou 'stj'"), nil
 			}
-			return invokeHandler(ctx, s.deps.Judicial, "/v1/judicial/processos/all", map[string]string{"doc": "all"}, q)
 		},
 	)
 

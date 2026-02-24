@@ -185,6 +185,7 @@ func main() {
 		mercadoTrabalhoHandler = handlers.NewMercadoTrabalhoHandler(store)
 		regulacaoSetorHandler = handlers.NewRegulacaoSetorHandler(store)
 		esgHandler = handlers.NewESGHandler(cnpjCollector, cguCollector, store)
+		judicialHand.SetStore(store)
 	}
 
 	// Discovery handler (created before MCP deps so it can be wired into both MCP and routes)
@@ -369,6 +370,10 @@ func main() {
 	if complianceEleitoralHandler != nil {
 		mcpDeps.ComplianceEleitoral = complianceEleitoralHandler.GetComplianceEleitoral
 	}
+	// Judicial STF/STJ — always wired; handlers return 503 if store is nil.
+	mcpDeps.JudicialSTF = judicialHand.GetSTF
+	mcpDeps.JudicialSTJ = judicialHand.GetSTJ
+
 	mcpSrv := mcp.NewServer(mcpDeps)
 	streamableServer := mcpserver.NewStreamableHTTPServer(mcpSrv.MCPServer())
 
@@ -790,6 +795,8 @@ func main() {
 			r.Use(cache.NewCacheMiddleware(cacher, 30*time.Minute))
 			r.Get("/compliance/{cnpj}", compHandler.GetCompliance)
 			r.Get("/judicial/processo/{numero}", judicialHand.GetProcesso)
+			r.Get("/judicial/stf", judicialHand.GetSTF)
+			r.Get("/judicial/stj", judicialHand.GetSTJ)
 			if mercHandler != nil {
 				r.Get("/mercado/fundos/{cnpj}", mercHandler.GetFundos)
 			}
