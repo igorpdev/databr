@@ -90,6 +90,9 @@ func main() {
 	qdCollector := dou.NewQDCollector("")
 	djCollector := juridico.NewDataJudCollector("", os.Getenv("DATAJUD_API_KEY"))
 
+	// DATASUS handler (on-demand proxy, no DB required)
+	dataSUSHandler := handlers.NewDATASUSHandler()
+
 	// HTTP handlers (on-demand, always available)
 	empHandler := handlers.NewEmpresasHandler(cnpjCollector)
 	compHandler := handlers.NewComplianceHandler(cguCollector)
@@ -231,6 +234,8 @@ func main() {
 		TCUInabilitados:      tcuHandler.GetInabilitados,
 		OrcamentoFuncional:   orcamentoHandler.GetFuncionalProgramatica,
 		Diarios:              douHandler.GetDiarios,
+		DATASUSEstabelecimento:  dataSUSHandler.GetEstabelecimento,
+		DATASUSEstabelecimentos: dataSUSHandler.GetEstabelecimentos,
 	}
 	// Store-backed handlers (only when DB is connected)
 	if bcbHandler != nil {
@@ -424,6 +429,9 @@ func main() {
 	// x402 discovery document — public, no payment required
 	r.Get("/.well-known/x402", x402pkg.WellKnownHandler(x402Cfg))
 
+	// MCP discovery document — allows AI agents to auto-discover MCP endpoint
+	r.Get("/.well-known/mcp.json", mcpDiscoveryHandler())
+
 	// Health check with DB + Redis verification
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		healthCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -614,6 +622,8 @@ func main() {
 			r.Get("/eleicoes/resultados", tseExtrasHandler.GetResultados)
 			r.Get("/energia/combustiveis", tseExtrasHandler.GetCombustiveis)
 			r.Get("/saude/planos", ansHandler.GetPlanos)
+			r.Get("/saude/estabelecimentos/{cnes}", dataSUSHandler.GetEstabelecimento)
+			r.Get("/saude/estabelecimentos", dataSUSHandler.GetEstabelecimentos)
 			r.Get("/tcu/acordaos", tcuHandler.GetAcordaos)
 			r.Get("/tcu/certidao/{cnpj}", tcuHandler.GetCertidao)
 			r.Get("/tcu/inabilitados", tcuHandler.GetInabilitados)
@@ -927,6 +937,37 @@ func metricsAuth(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// mcpDiscoveryHandler returns an HTTP handler for GET /.well-known/mcp.json.
+// This follows the emerging MCP discovery convention so AI agents and registries
+// can auto-detect the MCP server URL and transport without manual configuration.
+func mcpDiscoveryHandler() http.HandlerFunc {
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://databr.api.br"
+	}
+
+	doc := map[string]any{
+		"name":        "databr",
+		"description": "API de dados públicos brasileiros para agentes de IA. 113+ endpoints cobrindo empresas, finanças, legislação, saúde, meio ambiente e mais.",
+		"url":         baseURL + "/mcp",
+		"transport":   "streamable-http",
+		"version":     domain.Version,
+		"authentication": map[string]any{
+			"type":     "x402",
+			"protocol": "https://x402.org",
+			"network":  "base-mainnet",
+			"details":  "Endpoints require x402 micropayments (USDC on Base). See /.well-known/x402 for pricing.",
+		},
+	}
+	body, _ := json.Marshal(doc)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Write(body) //nolint:errcheck
+	}
 }
 
 // serveEmbedded reads a file from an embed.FS and writes it to the response.

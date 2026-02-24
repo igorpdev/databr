@@ -99,6 +99,8 @@ type HandlerDeps struct {
 	AmbientalProdes  http.HandlerFunc // GET /v1/ambiental/prodes
 	AmbientalUsoSolo http.HandlerFunc // GET /v1/ambiental/uso-solo
 	AmbientalEmbargos http.HandlerFunc // GET /v1/ambiental/embargos
+	DATASUSEstabelecimento  http.HandlerFunc // GET /v1/saude/estabelecimentos/{cnes}
+	DATASUSEstabelecimentos http.HandlerFunc // GET /v1/saude/estabelecimentos
 	EmpregoRAIS      http.HandlerFunc // GET /v1/emprego/rais
 	EmpregoCAGED     http.HandlerFunc // GET /v1/emprego/caged
 	TranspAeronave   http.HandlerFunc // GET /v1/transporte/aeronaves/{prefixo}
@@ -201,7 +203,8 @@ var ToolPrices = map[string]string{
 	"consultar_comercio_exterior": "0.005",
 	// Outros
 	"consultar_combustiveis":  "0.003",
-	"consultar_planos_saude":  "0.003",
+	"consultar_planos_saude":              "0.003",
+	"consultar_estabelecimento_saude":     "0.003",
 	"consultar_ipea":          "0.003",
 	"consultar_endereco":      "0.003",
 	"consultar_censo_escolar": "0.005",
@@ -1180,6 +1183,44 @@ func (s *Server) registerTools() {
 		[]mcpgosdk.ToolOption{},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
 			return invokeHandler(ctx, s.deps.CensoEscolar, "/v1/educacao/censo-escolar", nil, "")
+		},
+	)
+
+	// === Saúde (DATASUS) ===
+	s.addTool("consultar_estabelecimento_saude",
+		"Busca estabelecimentos de saúde no Brasil (CNES/DATASUS). Pode buscar por código CNES individual ou listar por município (código IBGE) ou UF (código numérico).",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnes",
+				mcpgosdk.Description("Código CNES do estabelecimento (7 dígitos). Quando informado, retorna um único estabelecimento."),
+			),
+			mcpgosdk.WithString("municipio",
+				mcpgosdk.Description("Código IBGE do município (6 dígitos). Para listar estabelecimentos."),
+			),
+			mcpgosdk.WithString("uf",
+				mcpgosdk.Description("Código numérico do estado (ex: 33 para RJ, 35 para SP). Para listar estabelecimentos."),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnes := req.GetString("cnes", "")
+			municipio := req.GetString("municipio", "")
+			uf := req.GetString("uf", "")
+			if cnes != "" {
+				return invokeHandler(ctx, s.deps.DATASUSEstabelecimento, "/v1/saude/estabelecimentos/"+cnes, map[string]string{"cnes": cnes}, "")
+			}
+			query := ""
+			if municipio != "" {
+				query += "municipio=" + municipio
+			}
+			if uf != "" {
+				if query != "" {
+					query += "&"
+				}
+				query += "uf=" + uf
+			}
+			if query == "" {
+				return nil, fmt.Errorf("informe 'cnes', 'municipio' ou 'uf'")
+			}
+			return invokeHandler(ctx, s.deps.DATASUSEstabelecimentos, "/v1/saude/estabelecimentos", nil, query)
 		},
 	)
 

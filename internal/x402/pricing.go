@@ -87,6 +87,8 @@ var priceTable = map[string]string{
 	"/v1/energia/tarifas":                       "0.003",
 	"/v1/saude/medicamentos/{registro}":         "0.003",
 	"/v1/saude/planos":                          "0.003",
+	"/v1/saude/estabelecimentos/{cnes}":         "0.003",
+	"/v1/saude/estabelecimentos":                "0.003",
 	"/v1/transporte/transportadores/{rntrc}":    "0.003",
 	"/v1/transporte/aeronaves/{prefixo}":        "0.003",
 	"/v1/mercado/fatos-relevantes/{protocolo}":  "0.003",
