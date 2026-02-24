@@ -49,8 +49,9 @@ func TestV2Response_KnownRoute(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected resource object, got %v", body["resource"])
 	}
-	if resource["description"] != "Taxa Selic do Banco Central" {
-		t.Errorf("resource.description: want 'Taxa Selic do Banco Central', got %v", resource["description"])
+	selicDesc := "Taxa Selic — taxa básica de juros da economia brasileira, atualizada a cada reunião do COPOM (Banco Central do Brasil)"
+	if resource["description"] != selicDesc {
+		t.Errorf("resource.description: want %q, got %v", selicDesc, resource["description"])
 	}
 	if resource["mimeType"] != "application/json" {
 		t.Errorf("resource.mimeType: want application/json, got %v", resource["mimeType"])
@@ -70,8 +71,8 @@ func TestV2Response_KnownRoute(t *testing.T) {
 	}
 
 	// Bazaar discovery fields inside accepts item (V1-style, read by indexer)
-	if item["description"] != "Taxa Selic do Banco Central" {
-		t.Errorf("accepts[0].description: want 'Taxa Selic do Banco Central', got %v", item["description"])
+	if item["description"] != selicDesc {
+		t.Errorf("accepts[0].description: want %q, got %v", selicDesc, item["description"])
 	}
 	if item["mimeType"] != "application/json" {
 		t.Errorf("accepts[0].mimeType: want application/json, got %v", item["mimeType"])
