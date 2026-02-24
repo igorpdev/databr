@@ -261,6 +261,42 @@ func TestEmpregoHandler_GetCAGED_FilterByMes(t *testing.T) {
 	}
 }
 
+func TestEmpregoHandler_GetCAGED_InvalidMes(t *testing.T) {
+	store := &empregoStore{
+		records: []domain.SourceRecord{
+			cagedRecord("202501", []map[string]any{
+				{"uf": "SP", "admissoes": float64(100)},
+			}),
+		},
+	}
+
+	h := handlers.NewEmpregoHandler(store)
+	router := newEmpregoRouter(h)
+
+	cases := []struct {
+		name string
+		mes  string
+	}{
+		{"letters", "abcdef"},
+		{"too_short", "2025"},
+		{"too_long", "2025010"},
+		{"month_zero", "202500"},
+		{"month_13", "202513"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v1/emprego/caged?mes="+tc.mes, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("mes=%q: expected 400, got %d: %s", tc.mes, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestEmpregoHandler_GetCAGED_FilterByMes_NotFound(t *testing.T) {
 	store := &empregoStore{
 		records: []domain.SourceRecord{
@@ -464,6 +500,40 @@ func TestEmpregoHandler_GetRAIS_FilterByAno(t *testing.T) {
 	periodo, _ := resp.Data["periodo"].(string)
 	if periodo != "2023" {
 		t.Errorf("expected periodo=2023, got %v", periodo)
+	}
+}
+
+func TestEmpregoHandler_GetRAIS_InvalidAno(t *testing.T) {
+	store := &empregoStore{
+		records: []domain.SourceRecord{
+			raisRecord("2024", []map[string]any{
+				{"uf": "SP", "admissoes": float64(1000000)},
+			}),
+		},
+	}
+
+	h := handlers.NewEmpregoHandler(store)
+	router := newEmpregoRouter(h)
+
+	cases := []struct {
+		name string
+		ano  string
+	}{
+		{"letters", "abcd"},
+		{"too_short", "202"},
+		{"too_long", "20240"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v1/emprego/rais?ano="+tc.ano, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("ano=%q: expected 400, got %d: %s", tc.ano, rec.Code, rec.Body.String())
+			}
+		})
 	}
 }
 

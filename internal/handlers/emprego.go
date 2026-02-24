@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/databr/api/internal/domain"
@@ -23,6 +24,13 @@ func NewEmpregoHandler(store SourceStore) *EmpregoHandler {
 func (h *EmpregoHandler) GetCAGED(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	ufFilter := strings.ToUpper(strings.TrimSpace(q.Get("uf")))
+	mes := q.Get("mes")
+
+	// Validate input before querying the database.
+	if mes != "" && !validMes(mes) {
+		jsonError(w, http.StatusBadRequest, "invalid mes format, expected YYYYMM (e.g. 202501)")
+		return
+	}
 
 	records, err := h.store.FindLatest(r.Context(), "caged_emprego")
 	if err != nil {
@@ -36,7 +44,7 @@ func (h *EmpregoHandler) GetCAGED(w http.ResponseWriter, r *http.Request) {
 
 	// Select specific period or use latest (first record).
 	rec := records[0]
-	if mes := q.Get("mes"); mes != "" {
+	if mes != "" {
 		found := false
 		for _, r := range records {
 			if r.RecordKey == mes {
@@ -66,6 +74,13 @@ func (h *EmpregoHandler) GetCAGED(w http.ResponseWriter, r *http.Request) {
 func (h *EmpregoHandler) GetRAIS(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	ufFilter := strings.ToUpper(strings.TrimSpace(q.Get("uf")))
+	ano := q.Get("ano")
+
+	// Validate input before querying the database.
+	if ano != "" && !validAno(ano) {
+		jsonError(w, http.StatusBadRequest, "invalid ano format, expected YYYY (e.g. 2024)")
+		return
+	}
 
 	records, err := h.store.FindLatest(r.Context(), "rais_emprego")
 	if err != nil {
@@ -79,7 +94,7 @@ func (h *EmpregoHandler) GetRAIS(w http.ResponseWriter, r *http.Request) {
 
 	// Select specific year or use latest (first record).
 	rec := records[0]
-	if ano := q.Get("ano"); ano != "" {
+	if ano != "" {
 		found := false
 		for _, r := range records {
 			if r.RecordKey == ano {
@@ -129,6 +144,28 @@ func filterEmpregoItems(data map[string]any, ufFilter string) map[string]any {
 	}
 
 	return data
+}
+
+// validMes checks that s is a valid YYYYMM period string (e.g. "202501").
+func validMes(s string) bool {
+	if len(s) != 6 {
+		return false
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return false
+	}
+	month := n % 100
+	return month >= 1 && month <= 12
+}
+
+// validAno checks that s is a valid 4-digit year string (e.g. "2024").
+func validAno(s string) bool {
+	if len(s) != 4 {
+		return false
+	}
+	_, err := strconv.Atoi(s)
+	return err == nil
 }
 
 // extractItems handles both in-memory ([]map[string]any) and JSONB-deserialized ([]any) types.

@@ -147,7 +147,10 @@ func parseBRDecimal(s string) float64 {
 	}
 	// else: dot is decimal or no separator -- standard parsing works
 
-	v, _ := strconv.ParseFloat(s, 64)
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		slog.Debug("parseBRDecimal: failed to parse", "input", s, "error", err)
+	}
 	return v
 }
 
