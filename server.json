@@ -1,0 +1,16 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.igorpdev/databr",
+  "version": "1.0.0",
+  "description": "Brazilian public data API for AI agents. 120+ endpoints covering BCB, IBGE, CVM, B3, compliance, judicial, transparency. x402 micropayments (USDC on Base). No signup, no API key.",
+  "repository": {
+    "url": "https://github.com/igorpdev/databr",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "url": "https://databr.api.br/mcp",
+      "type": "streamable-http"
+    }
+  ]
+}
