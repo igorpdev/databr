@@ -59,12 +59,13 @@ type WellKnownEndpoint struct {
 // WellKnownResponse is the body returned by GET /.well-known/x402.
 //
 // It satisfies two discovery formats simultaneously:
-//   - x402scan format: "version" (int 1) + "resources" (array of full URLs)
+//   - x402scan format: "version" (int 1) + "resources" (array of full URLs) + "ownershipProofs"
 //   - DataBR agent format: "x402Version" + "endpoints" with pricing metadata
 type WellKnownResponse struct {
 	// x402scan discovery format (required by Merit-Systems/x402scan)
-	Version   int      `json:"version"`   // always 1
-	Resources []string `json:"resources"` // full URLs that return 402 when probed
+	Version         int      `json:"version"`                   // always 1
+	Resources       []string `json:"resources"`                 // full URLs that return 402 when probed
+	OwnershipProofs []string `json:"ownershipProofs,omitempty"` // EIP-191 sigs of origin URL per payTo address
 
 	// DataBR extended format (for x402-aware AI agents)
 	X402Version int                 `json:"x402Version"` // always 2
@@ -114,14 +115,26 @@ func WellKnownHandler(cfg MiddlewareConfig) http.HandlerFunc {
 	})
 	sort.Strings(resources)
 
+	// Read ownership proofs from env (comma-separated hex signatures).
+	// Generate with: cast wallet sign --no-hash "https://databr.api.br" --private-key <KEY>
+	var ownershipProofs []string
+	if raw := os.Getenv("X402_OWNERSHIP_PROOF"); raw != "" {
+		for _, sig := range strings.Split(raw, ",") {
+			if sig = strings.TrimSpace(sig); sig != "" {
+				ownershipProofs = append(ownershipProofs, sig)
+			}
+		}
+	}
+
 	resp := WellKnownResponse{
-		Version:     1,
-		Resources:   resources,
-		X402Version: 2,
-		PayTo:       cfg.WalletAddress,
-		Network:     cfg.Network,
-		Asset:       asset,
-		Endpoints:   endpoints,
+		Version:         1,
+		Resources:       resources,
+		OwnershipProofs: ownershipProofs,
+		X402Version:     2,
+		PayTo:           cfg.WalletAddress,
+		Network:         cfg.Network,
+		Asset:           asset,
+		Endpoints:       endpoints,
 	}
 	body, _ := json.Marshal(resp)
 

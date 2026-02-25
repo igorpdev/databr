@@ -326,6 +326,7 @@ func write402Response(w http.ResponseWriter, r *http.Request, req x402types.Paym
 			"url":         resourceURL,
 			"description": meta.description,
 			"mimeType":    meta.mimeType,
+			"image":       "https://databr.api.br/og.png",
 		},
 		"accepts": []interface{}{acceptsItem},
 		"extensions": map[string]interface{}{

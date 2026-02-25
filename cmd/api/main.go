@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"embed"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"log/slog"
 	"net/http"
 	"os"
@@ -38,6 +42,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// faviconPNG holds a 16×16 blue PNG generated once at startup.
+var faviconPNG = func() []byte {
+	img := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	blue := color.NRGBA{R: 0, G: 82, B: 204, A: 255} // #0052CC
+	for y := range 16 {
+		for x := range 16 {
+			img.SetNRGBA(x, y, blue)
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
+}()
 
 func main() {
 	logging.Setup(nil)
@@ -560,9 +578,17 @@ func main() {
 	// Prometheus metrics endpoint (protected by bearer token)
 	r.Handle("/metrics", metricsAuth(promhttp.Handler()))
 
-	// Favicon — return 204 No Content to prevent 402 from x402 middleware.
+	// Favicon — serve a real PNG so x402scan can validate the resource listing.
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Write(faviconPNG) //nolint:errcheck
+	})
+	// OG image — referenced in the 402 response resource.image field for x402scan listing.
+	r.Get("/og.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Write(faviconPNG) //nolint:errcheck
 	})
 
 	// SEO: robots.txt and sitemap.xml
