@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/databr/api/internal/x402"
@@ -47,6 +48,25 @@ func TestWellKnownHandler(t *testing.T) {
 	}
 	if len(resp.Endpoints) == 0 {
 		t.Error("endpoints must not be empty")
+	}
+
+	// x402scan discovery format checks.
+	if resp.Version != 1 {
+		t.Errorf("expected version 1, got %d", resp.Version)
+	}
+	if len(resp.Resources) == 0 {
+		t.Error("resources must not be empty")
+	}
+	if len(resp.Resources) != len(resp.Endpoints) {
+		t.Errorf("resources len %d != endpoints len %d", len(resp.Resources), len(resp.Endpoints))
+	}
+	for _, r := range resp.Resources {
+		if !strings.HasPrefix(r, "https://") {
+			t.Errorf("resource %q is not an absolute HTTPS URL", r)
+		}
+		if strings.Contains(r, "{") {
+			t.Errorf("resource %q still contains unresolved chi parameter", r)
+		}
 	}
 
 	// Every endpoint must have a non-empty path, description, and amount.
