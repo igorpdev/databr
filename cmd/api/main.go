@@ -508,7 +508,10 @@ func main() {
 	r.Use(handlers.QueryLogMiddleware)
 
 	// x402 discovery document — public, no payment required
-	r.Get("/.well-known/x402", x402pkg.WellKnownHandler(x402Cfg))
+	// Accept GET and POST — x402scan's developer hub probes both methods.
+	wkHandler := x402pkg.WellKnownHandler(x402Cfg)
+	r.Get("/.well-known/x402", wkHandler)
+	r.Post("/.well-known/x402", wkHandler)
 
 	// MCP discovery document — allows AI agents to auto-discover MCP endpoint
 	r.Get("/.well-known/mcp.json", mcpDiscoveryHandler())
