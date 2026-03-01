@@ -62,19 +62,47 @@ func (c *CGUCollector) FetchByCNPJ(ctx context.Context, cnpjNum string) ([]domai
 		return nil, fmt.Errorf("cgu_compliance: CNEP fetch: %w", err)
 	}
 
+	// Soft-fail: PGFN e leniências enriquecem mas não bloqueiam
+	pgfn := c.fetchPGFN(ctx, cnpjNum)
+	leniencias := c.fetchLeniencias(ctx, cnpjNum)
+
 	record := domain.SourceRecord{
 		Source:    "cgu_compliance",
 		RecordKey: cnpjNum,
 		Data: map[string]any{
-			"cnpj":      cnpjNum,
-			"ceis":      ceis,
-			"cnep":      cnep,
-			"sanitized": len(ceis) == 0 && len(cnep) == 0,
+			"cnpj":       cnpjNum,
+			"ceis":       ceis,
+			"cnep":       cnep,
+			"pgfn":       pgfn,
+			"leniencias": leniencias,
+			"sanitized":  len(ceis) == 0 && len(cnep) == 0 && len(pgfn) == 0 && len(leniencias) == 0,
 		},
 		FetchedAt: time.Now().UTC(),
 	}
 
 	return []domain.SourceRecord{record}, nil
+}
+
+// fetchPGFN busca dívida ativa no PGFN por CNPJ (soft-fail: retorna [] em caso de erro).
+// Endpoint: GET /pgfn/consultaReceitaCadastro?cnpj={cnpj}&pagina=1
+func (c *CGUCollector) fetchPGFN(ctx context.Context, cnpjNum string) []any {
+	u := fmt.Sprintf("%s/pgfn/consultaReceitaCadastro?cnpj=%s&pagina=1", c.baseURL, cnpjNum)
+	items, err := c.fetchURL(ctx, u)
+	if err != nil {
+		return []any{}
+	}
+	return items
+}
+
+// fetchLeniencias busca acordos de leniência por CNPJ (soft-fail).
+// Endpoint: GET /leniencias?cnpj={cnpj}&pagina=1
+func (c *CGUCollector) fetchLeniencias(ctx context.Context, cnpjNum string) []any {
+	u := fmt.Sprintf("%s/leniencias?cnpj=%s&pagina=1", c.baseURL, cnpjNum)
+	items, err := c.fetchURL(ctx, u)
+	if err != nil {
+		return []any{}
+	}
+	return items
 }
 
 // FetchGranularByCNPJ fetches a single compliance list ("ceis", "cnep", or "cepim") for a CNPJ.
