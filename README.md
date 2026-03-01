@@ -4,7 +4,7 @@ API de dados públicos brasileiros para agentes de IA, com pagamento on-chain vi
 
 **Sem cadastro. Sem API key. Pague por consulta.**
 
-[Documentação](https://databr.api.br/docs) | [Python SDK](https://pypi.org/project/databr/) | [MCP Server](https://databr.api.br/.well-known/mcp.json)
+[Documentação](https://databr.api.br/docs) | [Python SDK](https://pypi.org/project/databr/) | [MCP Server](https://databr.api.br/.well-known/mcp.json) | [MCP Marketplace](https://mcp-marketplace.io/server/io-github-igorpdev-databr)
 
 ---
 
@@ -63,7 +63,7 @@ print(ipca.context)  # texto pronto para prompt
 
 ### MCP (Claude, Cursor, etc.)
 
-Adicione ao seu MCP client:
+Listado no [MCP Marketplace](https://mcp-marketplace.io/server/io-github-igorpdev-databr) — instale direto pelo marketplace ou adicione manualmente ao seu MCP client:
 
 ```json
 {
