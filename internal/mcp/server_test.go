@@ -32,7 +32,7 @@ func TestMCPServer_ToolsRegistered(t *testing.T) {
 	srv := mcp.NewServer(&mcp.HandlerDeps{})
 	tools := srv.Tools()
 
-	expected := 82
+	expected := 88
 	if len(tools) != expected {
 		t.Errorf("expected %d tools, got %d", expected, len(tools))
 	}

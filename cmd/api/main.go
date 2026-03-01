@@ -137,6 +137,7 @@ func main() {
 	ipeaHandler := handlers.NewIPEAHandler()
 	pncpHandler := handlers.NewPNCPHandler()
 	tseExtrasHandler := handlers.NewTSEExtrasHandler()
+	bndesHandler := handlers.NewBNDESHandler()
 	ansHandler := handlers.NewANSHandler()
 	tcuHandler := handlers.NewTCUHandler()
 	orcamentoHandler := handlers.NewOrcamentoHandler()
@@ -400,6 +401,15 @@ func main() {
 	// Judicial STF/STJ — always wired; handlers return 503 if store is nil.
 	mcpDeps.JudicialSTF = judicialHand.GetSTF
 	mcpDeps.JudicialSTJ = judicialHand.GetSTJ
+	// Transparência Federal (new endpoints) — always wired (on-demand)
+	mcpDeps.TranspPGFN = transparenciaFedHandler.GetPGFN
+	mcpDeps.TranspPEP = transparenciaFedHandler.GetPEP
+	mcpDeps.TranspLeniencias = transparenciaFedHandler.GetLeniencias
+	mcpDeps.TranspRenuncias = transparenciaFedHandler.GetRenuncias
+	// BNDES — always wired (on-demand)
+	mcpDeps.BNDESOperacoes = bndesHandler.GetOperacoes
+	// TSE Filiados — always wired (on-demand)
+	mcpDeps.TSEFiliados = tseExtrasHandler.GetFiliados
 
 	mcpSrv := mcp.NewServer(mcpDeps)
 	streamableServer := mcpserver.NewStreamableHTTPServer(mcpSrv.MCPServer(),
@@ -717,7 +727,12 @@ func main() {
 			r.Get("/eleicoes/bens", tseExtrasHandler.GetBens)
 			r.Get("/eleicoes/doacoes", tseExtrasHandler.GetDoacoes)
 			r.Get("/eleicoes/resultados", tseExtrasHandler.GetResultados)
+			r.Get("/eleicoes/filiados", tseExtrasHandler.GetFiliados)
 			r.Get("/energia/combustiveis", tseExtrasHandler.GetCombustiveis)
+			r.Get("/transparencia/pgfn", transparenciaFedHandler.GetPGFN)
+			r.Get("/transparencia/pep", transparenciaFedHandler.GetPEP)
+			r.Get("/transparencia/leniencias", transparenciaFedHandler.GetLeniencias)
+			r.Get("/transparencia/renuncias", transparenciaFedHandler.GetRenuncias)
 			r.Get("/saude/planos", ansHandler.GetPlanos)
 			r.Get("/saude/estabelecimentos/{cnes}", dataSUSHandler.GetEstabelecimento)
 			r.Get("/saude/estabelecimentos", dataSUSHandler.GetEstabelecimentos)
@@ -773,6 +788,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(optionalX402(x402Cfg, "0.005"))
 			r.Use(cache.NewCacheMiddleware(cacher, 15*time.Minute))
+			r.Get("/bndes/{cnpj}/operacoes", bndesHandler.GetOperacoes)
 			r.Get("/diarios/tema/{tema}", douHandler.GetTema)
 			r.Get("/saude/mortalidade", dataSUSHandler.GetMortalidade)
 			r.Get("/saude/nascimentos", dataSUSHandler.GetNascimentos)

@@ -152,6 +152,18 @@ type HandlerDeps struct {
 	// Tributario handlers
 	TributarioNCM  http.HandlerFunc // GET /v1/tributario/ncm/{codigo}
 	TributarioICMS http.HandlerFunc // GET /v1/tributario/icms/{uf} or /v1/tributario/icms
+
+	// Transparência Federal (new endpoints)
+	TranspPGFN      http.HandlerFunc // GET /v1/transparencia/pgfn
+	TranspPEP       http.HandlerFunc // GET /v1/transparencia/pep
+	TranspLeniencias http.HandlerFunc // GET /v1/transparencia/leniencias
+	TranspRenuncias  http.HandlerFunc // GET /v1/transparencia/renuncias
+
+	// BNDES
+	BNDESOperacoes http.HandlerFunc // GET /v1/bndes/{cnpj}/operacoes
+
+	// TSE Filiados
+	TSEFiliados http.HandlerFunc // GET /v1/eleicoes/filiados
 }
 
 // ToolPrices maps each MCP tool name to its USDC price string.
@@ -256,6 +268,15 @@ var ToolPrices = map[string]string{
 	// Tributário
 	"consultar_tributos_ncm": "0.003",
 	"consultar_icms":         "0.003",
+	// Transparência Federal (new)
+	"consultar_pgfn":              "0.003",
+	"consultar_pep":               "0.003",
+	"consultar_leniencias":        "0.003",
+	"consultar_renuncias_fiscais": "0.003",
+	// BNDES
+	"consultar_bndes": "0.005",
+	// TSE Filiados
+	"consultar_filiados_tse": "0.003",
 }
 
 // Server wraps the mcp-go server with DataBR tool registrations.
@@ -1611,6 +1632,103 @@ func (s *Server) registerTools() {
 				qp = "origem=" + origem + "&destino=" + destino
 			}
 			return invokeHandler(ctx, s.deps.TributarioICMS, "/v1/tributario/icms", nil, qp)
+		},
+	)
+
+	// === Transparência Federal (new) ===
+	s.addTool("consultar_pgfn",
+		"Consulta dívida ativa na Procuradoria-Geral da Fazenda Nacional (PGFN)",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnpj",
+				mcpgosdk.Required(),
+				mcpgosdk.Description("CNPJ do devedor (somente dígitos)"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnpj := req.GetString("cnpj", "")
+			return invokeHandler(ctx, s.deps.TranspPGFN, "/v1/transparencia/pgfn", nil, "cnpj="+cnpj)
+		},
+	)
+
+	s.addTool("consultar_pep",
+		"Consulta Pessoas Expostas Politicamente (PEP) pelo nome",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("nome",
+				mcpgosdk.Required(),
+				mcpgosdk.Description("Nome da pessoa para busca"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			nome := req.GetString("nome", "")
+			return invokeHandler(ctx, s.deps.TranspPEP, "/v1/transparencia/pep", nil, "nome="+url.QueryEscape(nome))
+		},
+	)
+
+	s.addTool("consultar_leniencias",
+		"Consulta acordos de leniência firmados pelo CNPJ",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnpj",
+				mcpgosdk.Required(),
+				mcpgosdk.Description("CNPJ da empresa"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnpj := req.GetString("cnpj", "")
+			return invokeHandler(ctx, s.deps.TranspLeniencias, "/v1/transparencia/leniencias", nil, "cnpj="+cnpj)
+		},
+	)
+
+	s.addTool("consultar_renuncias_fiscais",
+		"Consulta renúncias fiscais registradas no Portal da Transparência",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnpj",
+				mcpgosdk.Required(),
+				mcpgosdk.Description("CNPJ do beneficiário"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnpj := req.GetString("cnpj", "")
+			return invokeHandler(ctx, s.deps.TranspRenuncias, "/v1/transparencia/renuncias", nil, "cnpj="+cnpj)
+		},
+	)
+
+	// === BNDES ===
+	s.addTool("consultar_bndes",
+		"Consulta operações de crédito do BNDES para um CNPJ",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("cnpj",
+				mcpgosdk.Required(),
+				mcpgosdk.Description("CNPJ da empresa beneficiária"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			cnpj := req.GetString("cnpj", "")
+			return invokeHandler(ctx, s.deps.BNDESOperacoes, "/v1/bndes/"+cnpj+"/operacoes", map[string]string{"cnpj": cnpj}, "")
+		},
+	)
+
+	// === TSE Filiados ===
+	s.addTool("consultar_filiados_tse",
+		"Consulta filiados partidários por UF (estado) via TSE",
+		[]mcpgosdk.ToolOption{
+			mcpgosdk.WithString("uf",
+				mcpgosdk.Required(),
+				mcpgosdk.Description("Sigla do estado (ex: SP, RJ)"),
+			),
+			mcpgosdk.WithString("n",
+				mcpgosdk.Description("Número máximo de registros (padrão: 100)"),
+			),
+		},
+		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
+			uf := req.GetString("uf", "")
+			n := req.GetString("n", "100")
+			query := "uf=" + uf
+			if n != "" && n != "100" {
+				query += "&n=" + n
+			} else {
+				query += "&n=100"
+			}
+			return invokeHandler(ctx, s.deps.TSEFiliados, "/v1/eleicoes/filiados", nil, query)
 		},
 	)
 }

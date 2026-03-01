@@ -183,6 +183,15 @@ var routeMeta = map[string]routeMetaEntry{
 	"/v1/orcamento/documento/{codigo}":     {"Documento orçamentário por código — nota de empenho, ordem bancária ou documento de arrecadação (SIAFI via CGU)", "application/json"},
 	"/v1/orcamento/documentos":             {"Documentos orçamentários por período — notas de empenho e ordens bancárias federais (SIAFI via CGU)", "application/json"},
 	"/v1/orcamento/favorecidos":            {"Favorecidos do orçamento federal — CPF/CNPJ, valor recebido e programa orçamentário (SIAFI via CGU)", "application/json"},
+	// Transparência Federal (novos endpoints)
+	"/v1/transparencia/pgfn":       {"Dívida ativa PGFN — débitos inscritos na Procuradoria-Geral da Fazenda Nacional por CNPJ (Portal da Transparência)", "application/json"},
+	"/v1/transparencia/pep":        {"Pessoas Expostas Politicamente (PEP) — cargos públicos relevantes e vínculos políticos por nome (Portal da Transparência)", "application/json"},
+	"/v1/transparencia/leniencias": {"Acordos de leniência — contratos firmados com empresas colaboradoras em investigações (CGU via Portal da Transparência)", "application/json"},
+	"/v1/transparencia/renuncias":  {"Renúncias fiscais — benefícios tributários, isenções e desonerações por CNPJ (Portal da Transparência)", "application/json"},
+	// BNDES
+	"/v1/bndes/{cnpj}/operacoes": {"Operações de crédito do BNDES — financiamentos diretos e indiretos por CNPJ (BNDES Dados Abertos CKAN)", "application/json"},
+	// TSE Filiados
+	"/v1/eleicoes/filiados": {"Filiados partidários por UF — quantitativo de filiados por partido e estado (TSE Estatística Eleitoral)", "application/json"},
 }
 
 // RouteMeta returns the description and mimeType for a route pattern, with a fallback.
