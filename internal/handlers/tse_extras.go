@@ -18,18 +18,24 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
+// tseFiliadosBase is the base URL for TSE filiados ZIP files.
+// It differs from the odsele base used by bens/doacoes/resultados.
+const tseFiliadosBase = "https://cdn.tse.jus.br/estatistica/sead/eleitorado/filiados/uf"
+
 // TSEExtrasHandler handles on-demand requests for TSE election data
 // downloaded directly from the TSE CDN ZIP archives.
 type TSEExtrasHandler struct {
-	httpClient *http.Client
-	baseURL    string
+	httpClient      *http.Client
+	baseURL         string
+	filiadosBaseURL string
 }
 
 // NewTSEExtrasHandler creates a TSEExtrasHandler with default HTTP client and TSE CDN base URL.
 func NewTSEExtrasHandler() *TSEExtrasHandler {
 	return &TSEExtrasHandler{
-		httpClient: &http.Client{Timeout: 120 * time.Second}, // large ZIP files
-		baseURL:    "https://cdn.tse.jus.br/estatistica/sead/odsele",
+		httpClient:      &http.Client{Timeout: 120 * time.Second}, // large ZIP files
+		baseURL:         "https://cdn.tse.jus.br/estatistica/sead/odsele",
+		filiadosBaseURL: tseFiliadosBase,
 	}
 }
 
@@ -37,8 +43,19 @@ func NewTSEExtrasHandler() *TSEExtrasHandler {
 // Useful for testing.
 func NewTSEExtrasHandlerWithClient(client *http.Client, baseURL string) *TSEExtrasHandler {
 	return &TSEExtrasHandler{
-		httpClient: client,
-		baseURL:    strings.TrimRight(baseURL, "/"),
+		httpClient:      client,
+		baseURL:         strings.TrimRight(baseURL, "/"),
+		filiadosBaseURL: tseFiliadosBase,
+	}
+}
+
+// NewTSEExtrasHandlerWithClientAndFiliados creates a TSEExtrasHandler with explicit filiadosBaseURL.
+// Useful for testing filiados endpoints with a mock server.
+func NewTSEExtrasHandlerWithClientAndFiliados(client *http.Client, baseURL, filiadosBaseURL string) *TSEExtrasHandler {
+	return &TSEExtrasHandler{
+		httpClient:      client,
+		baseURL:         strings.TrimRight(baseURL, "/"),
+		filiadosBaseURL: strings.TrimRight(filiadosBaseURL, "/"),
 	}
 }
 
@@ -257,6 +274,50 @@ func (h *TSEExtrasHandler) GetResultados(w http.ResponseWriter, r *http.Request)
 		UpdatedAt: time.Now().UTC(),
 		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data:      map[string]any{"resultados": rows, "total": len(rows), "ano": ano},
+	})
+}
+
+// GetFiliados handles GET /v1/eleicoes/filiados?uf=SP&n=100
+// Downloads the TSE filiados ZIP for the given UF and returns the first n records.
+// Required query param: uf — 2-letter Brazilian state code.
+// Optional: n (default 100, max 500).
+func (h *TSEExtrasHandler) GetFiliados(w http.ResponseWriter, r *http.Request) {
+	uf := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("uf")))
+	if uf == "" {
+		jsonError(w, http.StatusBadRequest, "tse_filiados: parâmetro 'uf' é obrigatório")
+		return
+	}
+	if !isValidUF(uf) {
+		jsonError(w, http.StatusBadRequest, "tse_filiados: UF inválida: "+uf)
+		return
+	}
+
+	n := parseLimitN(r, 100, 500)
+	ufLower := strings.ToLower(uf)
+	zipURL := fmt.Sprintf("%s/filiados_%s.zip", h.filiadosBaseURL, ufLower)
+
+	zipData, err := h.downloadZip(r, zipURL)
+	if err != nil {
+		gatewayError(w, "tse_filiados", err)
+		return
+	}
+
+	rows, err := parseZipCSV(zipData, n)
+	if err != nil {
+		gatewayError(w, "tse_filiados", err)
+		return
+	}
+
+	if len(rows) == 0 {
+		jsonError(w, http.StatusNotFound, "tse_filiados: nenhum registro encontrado para UF "+uf)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:    "tse_filiados",
+		UpdatedAt: time.Now().UTC(),
+		CostUSDC:  x402pkg.PriceFromRequest(r),
+		Data:      map[string]any{"filiados": rows, "total": len(rows), "uf": uf},
 	})
 }
 

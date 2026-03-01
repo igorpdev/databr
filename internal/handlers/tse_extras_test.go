@@ -368,6 +368,114 @@ func TestTSEExtras_GetCombustiveis_UpstreamError(t *testing.T) {
 	}
 }
 
+// -----------------------------------------------------------------------
+// GetFiliados tests
+// -----------------------------------------------------------------------
+
+// mockTSEFiliadosHandler creates a TSEExtrasHandler whose filiados HTTP client
+// is redirected to srv. Uses NewTSEExtrasHandlerWithClientAndFiliados to set
+// both baseURL and filiadosBaseURL to the test server.
+func mockTSEFiliadosHandler(t *testing.T, srv *httptest.Server) *handlers.TSEExtrasHandler {
+	t.Helper()
+	return handlers.NewTSEExtrasHandlerWithClientAndFiliados(
+		&http.Client{Transport: &tseRedirectTransport{target: srv.URL}},
+		srv.URL,
+		srv.URL,
+	)
+}
+
+// newTSEFiliadosRouter registers filiados route on a Chi router.
+func newTSEFiliadosRouter(h *handlers.TSEExtrasHandler) http.Handler {
+	r := chi.NewRouter()
+	r.Get("/v1/eleicoes/filiados", h.GetFiliados)
+	return r
+}
+
+func TestTSEExtrasHandler_GetFiliados_OK(t *testing.T) {
+	csvContent := "NM_PARTIDO;SQ_CANDIDATO;NM_CANDIDATO\n" +
+		"PARTIDO A;11111;JOSE DA SILVA\n" +
+		"PARTIDO B;22222;MARIA SOUZA\n" +
+		"PARTIDO C;33333;PEDRO SANTOS\n"
+	zipBytes := buildTSEZip(t, "filiados_sp.csv", csvContent)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/zip")
+		w.WriteHeader(http.StatusOK)
+		w.Write(zipBytes)
+	}))
+	defer srv.Close()
+
+	h := mockTSEFiliadosHandler(t, srv)
+	router := newTSEFiliadosRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/eleicoes/filiados?uf=SP&n=3", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp domain.APIResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Source != "tse_filiados" {
+		t.Errorf("Source = %q, want tse_filiados", resp.Source)
+	}
+	filiados, ok := resp.Data["filiados"].([]any)
+	if !ok || len(filiados) == 0 {
+		t.Errorf("expected non-empty filiados slice, got %T: %v", resp.Data["filiados"], resp.Data["filiados"])
+	}
+	if len(filiados) != 3 {
+		t.Errorf("expected 3 filiados, got %d", len(filiados))
+	}
+	total, _ := resp.Data["total"].(float64)
+	if int(total) != 3 {
+		t.Errorf("expected total=3, got %v", resp.Data["total"])
+	}
+	uf, _ := resp.Data["uf"].(string)
+	if uf != "SP" {
+		t.Errorf("expected uf=SP, got %q", uf)
+	}
+}
+
+func TestTSEExtrasHandler_GetFiliados_MissingUF(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	h := mockTSEFiliadosHandler(t, srv)
+	router := newTSEFiliadosRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/eleicoes/filiados", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTSEExtrasHandler_GetFiliados_InvalidUF(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	h := mockTSEFiliadosHandler(t, srv)
+	router := newTSEFiliadosRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/eleicoes/filiados?uf=XX", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestTSEExtras_GetBens_NLimit verifies the n param limits rows returned.
 func TestTSEExtras_GetBens_NLimit(t *testing.T) {
 	// CSV with 5 rows
