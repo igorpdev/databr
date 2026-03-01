@@ -4,7 +4,7 @@ API de dados públicos brasileiros para agentes de IA, com pagamento on-chain vi
 
 **Sem cadastro. Sem API key. Pague por consulta.**
 
-[Documentação](https://databr.api.br/docs) | [Python SDK](https://pypi.org/project/databr/) | [MCP Server](https://databr.api.br/.well-known/mcp.json) | [MCP Marketplace](https://mcp-marketplace.io/server/io-github-igorpdev-databr)
+[Documentação](https://databr.api.br/docs) | [Python SDK](https://pypi.org/project/databr/) | [MCP Server](https://databr.api.br/.well-known/mcp.json) | [MCP Marketplace](https://mcp-marketplace.io/server/io-github-igorpdev-databr) | [Smithery](https://smithery.ai/servers/databr/databr)
 
 ---
 
