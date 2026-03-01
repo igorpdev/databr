@@ -18,24 +18,25 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
-// tseFiliadosBase is the base URL for TSE filiados ZIP files.
-// It differs from the odsele base used by bens/doacoes/resultados.
-const tseFiliadosBase = "https://cdn.tse.jus.br/estatistica/sead/eleitorado/filiados/uf"
+// tseFiliadosURL is the TSE national party membership (filiação partidária) ZIP.
+// TSE provides a single national file — no per-UF ZIPs are available.
+// Source: https://dadosabertos.tse.jus.br (delegados-partidarios dataset)
+const tseFiliadosURL = "https://cdn.tse.jus.br/estatistica/sead/odsele/filiacao_partidaria/perfil_filiacao_partidaria.zip"
 
 // TSEExtrasHandler handles on-demand requests for TSE election data
 // downloaded directly from the TSE CDN ZIP archives.
 type TSEExtrasHandler struct {
-	httpClient      *http.Client
-	baseURL         string
-	filiadosBaseURL string
+	httpClient  *http.Client
+	baseURL     string
+	filiadosURL string // URL for the national filiados ZIP (overridable for tests)
 }
 
 // NewTSEExtrasHandler creates a TSEExtrasHandler with default HTTP client and TSE CDN base URL.
 func NewTSEExtrasHandler() *TSEExtrasHandler {
 	return &TSEExtrasHandler{
-		httpClient:      &http.Client{Timeout: 120 * time.Second}, // large ZIP files
-		baseURL:         "https://cdn.tse.jus.br/estatistica/sead/odsele",
-		filiadosBaseURL: tseFiliadosBase,
+		httpClient:  &http.Client{Timeout: 120 * time.Second}, // large ZIP files
+		baseURL:     "https://cdn.tse.jus.br/estatistica/sead/odsele",
+		filiadosURL: tseFiliadosURL,
 	}
 }
 
@@ -43,19 +44,19 @@ func NewTSEExtrasHandler() *TSEExtrasHandler {
 // Useful for testing.
 func NewTSEExtrasHandlerWithClient(client *http.Client, baseURL string) *TSEExtrasHandler {
 	return &TSEExtrasHandler{
-		httpClient:      client,
-		baseURL:         strings.TrimRight(baseURL, "/"),
-		filiadosBaseURL: tseFiliadosBase,
+		httpClient:  client,
+		baseURL:     strings.TrimRight(baseURL, "/"),
+		filiadosURL: tseFiliadosURL,
 	}
 }
 
-// NewTSEExtrasHandlerWithClientAndFiliados creates a TSEExtrasHandler with explicit filiadosBaseURL.
-// Useful for testing filiados endpoints with a mock server.
-func NewTSEExtrasHandlerWithClientAndFiliados(client *http.Client, baseURL, filiadosBaseURL string) *TSEExtrasHandler {
+// NewTSEExtrasHandlerWithClientAndFiliados creates a TSEExtrasHandler with an explicit filiados ZIP URL.
+// Useful for testing the filiados endpoint with a mock server.
+func NewTSEExtrasHandlerWithClientAndFiliados(client *http.Client, baseURL, filiadosURL string) *TSEExtrasHandler {
 	return &TSEExtrasHandler{
-		httpClient:      client,
-		baseURL:         strings.TrimRight(baseURL, "/"),
-		filiadosBaseURL: strings.TrimRight(filiadosBaseURL, "/"),
+		httpClient:  client,
+		baseURL:     strings.TrimRight(baseURL, "/"),
+		filiadosURL: filiadosURL,
 	}
 }
 
@@ -278,7 +279,8 @@ func (h *TSEExtrasHandler) GetResultados(w http.ResponseWriter, r *http.Request)
 }
 
 // GetFiliados handles GET /v1/eleicoes/filiados?uf=SP&n=100
-// Downloads the TSE filiados ZIP for the given UF and returns the first n records.
+// Downloads the TSE national party membership ZIP and returns the first n records for the given UF.
+// NOTE: The TSE publishes a single national file (~230 MB). Results are filtered in-memory by UF.
 // Required query param: uf — 2-letter Brazilian state code.
 // Optional: n (default 100, max 500).
 func (h *TSEExtrasHandler) GetFiliados(w http.ResponseWriter, r *http.Request) {
@@ -293,19 +295,38 @@ func (h *TSEExtrasHandler) GetFiliados(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n := parseLimitN(r, 100, 500)
-	ufLower := strings.ToLower(uf)
-	zipURL := fmt.Sprintf("%s/filiados_%s.zip", h.filiadosBaseURL, ufLower)
 
-	zipData, err := h.downloadZip(r, zipURL)
+	// TSE provides a single national file. We download it and filter by UF.
+	// Parse up to 10× more rows than needed to find enough UF matches.
+	scanLimit := n * 10
+	if scanLimit < 5000 {
+		scanLimit = 5000
+	}
+	zipData, err := h.downloadZip(r, h.filiadosURL)
 	if err != nil {
 		gatewayError(w, "tse_filiados", err)
 		return
 	}
 
-	rows, err := parseZipCSV(zipData, n)
+	allRows, err := parseZipCSV(zipData, scanLimit)
 	if err != nil {
 		gatewayError(w, "tse_filiados", err)
 		return
+	}
+
+	// Filter rows by UF — the CSV column is "sg_uf" or "uf".
+	var rows []map[string]any
+	for _, row := range allRows {
+		rowUF := strings.ToUpper(fmt.Sprintf("%v", row["sg_uf"]))
+		if rowUF == "" {
+			rowUF = strings.ToUpper(fmt.Sprintf("%v", row["uf"]))
+		}
+		if rowUF == uf {
+			rows = append(rows, row)
+			if len(rows) >= n {
+				break
+			}
+		}
 	}
 
 	if len(rows) == 0 {

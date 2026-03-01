@@ -373,14 +373,13 @@ func TestTSEExtras_GetCombustiveis_UpstreamError(t *testing.T) {
 // -----------------------------------------------------------------------
 
 // mockTSEFiliadosHandler creates a TSEExtrasHandler whose filiados HTTP client
-// is redirected to srv. Uses NewTSEExtrasHandlerWithClientAndFiliados to set
-// both baseURL and filiadosBaseURL to the test server.
+// is redirected to srv. filiadosURL points to the mock server's /filiados.zip path.
 func mockTSEFiliadosHandler(t *testing.T, srv *httptest.Server) *handlers.TSEExtrasHandler {
 	t.Helper()
 	return handlers.NewTSEExtrasHandlerWithClientAndFiliados(
 		&http.Client{Transport: &tseRedirectTransport{target: srv.URL}},
 		srv.URL,
-		srv.URL,
+		srv.URL+"/filiados.zip",
 	)
 }
 
@@ -392,11 +391,13 @@ func newTSEFiliadosRouter(h *handlers.TSEExtrasHandler) http.Handler {
 }
 
 func TestTSEExtrasHandler_GetFiliados_OK(t *testing.T) {
-	csvContent := "NM_PARTIDO;SQ_CANDIDATO;NM_CANDIDATO\n" +
-		"PARTIDO A;11111;JOSE DA SILVA\n" +
-		"PARTIDO B;22222;MARIA SOUZA\n" +
-		"PARTIDO C;33333;PEDRO SANTOS\n"
-	zipBytes := buildTSEZip(t, "filiados_sp.csv", csvContent)
+	// CSV must include sg_uf column so the handler can filter by UF in-memory.
+	csvContent := "SG_UF;NM_PARTIDO;NM_CANDIDATO\n" +
+		"SP;PARTIDO A;JOSE DA SILVA\n" +
+		"SP;PARTIDO B;MARIA SOUZA\n" +
+		"SP;PARTIDO C;PEDRO SANTOS\n" +
+		"RJ;PARTIDO A;OUTRO CANDIDATO\n" // should be filtered out
+	zipBytes := buildTSEZip(t, "perfil_filiacao_partidaria.csv", csvContent)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")

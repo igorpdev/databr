@@ -629,7 +629,7 @@ func (h *TransparenciaFederalHandler) GetPEP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	upURL := fmt.Sprintf("%s/pep?nome=%s&pagina=1", h.baseURL, url.QueryEscape(nome))
+	upURL := fmt.Sprintf("%s/peps?nome=%s&pagina=1", h.baseURL, url.QueryEscape(nome))
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
 		internalError(w, "transparencia_pep", err)
@@ -676,7 +676,7 @@ func (h *TransparenciaFederalHandler) GetLeniencias(w http.ResponseWriter, r *ht
 		return
 	}
 
-	upURL := fmt.Sprintf("%s/leniencias?cnpj=%s&pagina=1", h.baseURL, cnpj)
+	upURL := fmt.Sprintf("%s/acordos-leniencia?cnpjSancionado=%s&pagina=1", h.baseURL, cnpj)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
 		internalError(w, "transparencia_leniencias", err)
@@ -728,7 +728,7 @@ func (h *TransparenciaFederalHandler) GetRenuncias(w http.ResponseWriter, r *htt
 		}
 	}
 
-	upURL := fmt.Sprintf("%s/renuncias-fiscais?exercicio=%s&pagina=1&quantidade=%d", h.baseURL, ano, n)
+	upURL := fmt.Sprintf("%s/renuncias-valor?exercicio=%s&pagina=1&quantidade=%d", h.baseURL, ano, n)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
 		internalError(w, "transparencia_renuncias", err)

@@ -95,9 +95,9 @@ func (c *CGUCollector) fetchPGFN(ctx context.Context, cnpjNum string) []any {
 }
 
 // fetchLeniencias busca acordos de leniência por CNPJ (soft-fail).
-// Endpoint: GET /leniencias?cnpj={cnpj}&pagina=1
+// Endpoint: GET /acordos-leniencia?cnpjSancionado={cnpj}&pagina=1
 func (c *CGUCollector) fetchLeniencias(ctx context.Context, cnpjNum string) []any {
-	u := fmt.Sprintf("%s/leniencias?cnpj=%s&pagina=1", c.baseURL, cnpjNum)
+	u := fmt.Sprintf("%s/acordos-leniencia?cnpjSancionado=%s&pagina=1", c.baseURL, cnpjNum)
 	items, err := c.fetchURL(ctx, u)
 	if err != nil {
 		return []any{}

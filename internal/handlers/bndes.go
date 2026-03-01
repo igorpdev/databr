@@ -12,7 +12,7 @@ import (
 )
 
 const bndesCKANBase = "https://dadosabertos.bndes.gov.br"
-const bndesPkgID = "operacoes-de-credito-direto-e-indireto"
+const bndesPkgID = "operacoes-financiamento"
 
 // BNDESHandler handles on-demand BNDES open data requests.
 type BNDESHandler struct {
@@ -71,7 +71,8 @@ func (h *BNDESHandler) GetOperacoes(w http.ResponseWriter, r *http.Request) {
 		Success bool `json:"success"`
 		Result  struct {
 			Resources []struct {
-				ID string `json:"id"`
+				ID   string `json:"id"`
+				Name string `json:"name"`
 			} `json:"resources"`
 		} `json:"result"`
 	}
@@ -79,12 +80,23 @@ func (h *BNDESHandler) GetOperacoes(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadGateway, "BNDES: não foi possível obter resource_id do dataset")
 		return
 	}
+	// Prefer "Operações não automáticas" resource which has per-beneficiary CNPJ data.
 	resourceID := pkgResult.Result.Resources[0].ID
+	for _, res := range pkgResult.Result.Resources {
+		if res.Name == "Operações não automáticas" {
+			resourceID = res.ID
+			break
+		}
+	}
 
-	// Step 2: search datastore by CNPJ
+	// BNDES stores CNPJ as formatted string (XX.XXX.XXX/XXXX-XX).
+	cnpjFormatted := fmt.Sprintf("%s.%s.%s/%s-%s",
+		cnpj[0:2], cnpj[2:5], cnpj[5:8], cnpj[8:12], cnpj[12:14])
+
+	// Step 2: search datastore by formatted CNPJ
 	searchURL := fmt.Sprintf(
 		"%s/api/3/action/datastore_search?resource_id=%s&q=%s&limit=%d",
-		h.baseURL, resourceID, cnpj, n,
+		h.baseURL, resourceID, cnpjFormatted, n,
 	)
 	searchReq, err := http.NewRequestWithContext(r.Context(), http.MethodGet, searchURL, nil)
 	if err != nil {
@@ -111,7 +123,7 @@ func (h *BNDESHandler) GetOperacoes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(searchResult.Result.Records) == 0 {
-		jsonError(w, http.StatusNotFound, "Nenhuma operação BNDES encontrada para CNPJ "+cnpj)
+		jsonError(w, http.StatusNotFound, "Nenhuma operação BNDES encontrada para CNPJ "+cnpjFormatted)
 		return
 	}
 
@@ -120,7 +132,7 @@ func (h *BNDESHandler) GetOperacoes(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: time.Now().UTC(),
 		CostUSDC:  x402pkg.PriceFromRequest(r),
 		Data: map[string]any{
-			"cnpj":      cnpj,
+			"cnpj":      cnpjFormatted,
 			"operacoes": searchResult.Result.Records,
 			"total":     searchResult.Result.Total,
 		},
