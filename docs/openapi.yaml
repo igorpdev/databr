@@ -1200,7 +1200,7 @@ paths:
         - name: ano
           in: query
           required: false
-          description: Ano de exercício (padrão: ano corrente)
+          description: "Ano de exercício (padrão: ano corrente)"
           schema:
             type: integer
             example: 2024
