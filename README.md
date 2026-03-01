@@ -81,7 +81,7 @@ Adicione ao seu MCP client:
 
 ## Endpoints
 
-116 endpoints organizados por domínio. Documentação completa em [databr.api.br/docs](https://databr.api.br/docs).
+122 endpoints organizados por domínio. Documentação completa em [databr.api.br/docs](https://databr.api.br/docs).
 
 ### Economia
 
@@ -123,6 +123,7 @@ Adicione ao seu MCP client:
 | `GET /v1/mercado/fatos-relevantes` | $0.005 | Fatos relevantes CVM |
 | `GET /v1/mercado/{cnae}/competicao` | $0.030 | Análise de competição |
 | `GET /v1/tesouro/titulos` | $0.003 | Tesouro Direto |
+| `GET /v1/bndes/{cnpj}/operacoes` | $0.005 | Operações de crédito BNDES |
 
 ### Transparência e governo
 
@@ -131,6 +132,10 @@ Adicione ao seu MCP client:
 | `GET /v1/transparencia/licitacoes` | $0.003 | Licitações PNCP |
 | `GET /v1/transparencia/contratos` | $0.003 | Contratos federais |
 | `GET /v1/transparencia/servidores` | $0.003 | Servidores públicos |
+| `GET /v1/transparencia/pgfn` | $0.003 | Dívida ativa PGFN por CNPJ |
+| `GET /v1/transparencia/pep` | $0.003 | Pessoas Expostas Politicamente (por nome) |
+| `GET /v1/transparencia/leniencias` | $0.003 | Acordos de leniência por CNPJ |
+| `GET /v1/transparencia/renuncias` | $0.003 | Renúncias fiscais por exercício |
 | `GET /v1/tcu/acordaos` | $0.003 | Acórdãos do TCU |
 | `GET /v1/tcu/certidao/{cnpj}` | $0.003 | Certidão TCU |
 | `GET /v1/orcamento/despesas` | $0.003 | Execução orçamentária |
@@ -145,6 +150,7 @@ Adicione ao seu MCP client:
 | `GET /v1/legislativo/proposicoes` | $0.003 | Projetos de lei |
 | `GET /v1/legislativo/votacoes` | $0.003 | Votações |
 | `GET /v1/eleicoes/candidatos` | $0.003 | Candidatos TSE |
+| `GET /v1/eleicoes/filiados` | $0.003 | Filiados partidários por UF |
 | `GET /v1/eleicoes/compliance/{cpf_cnpj}` | $0.007 | Compliance eleitoral |
 
 ### Jurídico
@@ -300,7 +306,7 @@ client = DataBR(private_key="0x...", network="testnet")  # Base Sepolia, USDC de
 
 ## Fontes de dados
 
-42 coletores automáticos + 7 on-demand, cobrindo:
+42 coletores automáticos + 8 on-demand, cobrindo:
 
 | Fonte | Órgão | Atualização |
 |-------|-------|-------------|
@@ -308,7 +314,7 @@ client = DataBR(private_key="0x...", network="testnet")  # Base Sepolia, USDC de
 | IPCA, PIB, população, pesquisas | IBGE | Diária/mensal |
 | Cotações, Ibovespa | B3 | Diária (dias úteis) |
 | Fundos, fatos relevantes, cotas | CVM | Diária |
-| Candidatos, bens, doações | TSE | Anual |
+| Candidatos, bens, doações, filiados | TSE | Anual / On-demand |
 | Licitações PNCP | Portal da Transparência | Diária |
 | Acórdãos, certidões, inabilitados | TCU | Semanal |
 | Deputados, senadores, proposições | Câmara/Senado | Diária |
@@ -330,6 +336,8 @@ client = DataBR(private_key="0x...", network="testnet")  # Base Sepolia, USDC de
 | Compliance CEIS/CNEP | CGU | On-demand |
 | Processos judiciais | DataJud CNJ | On-demand |
 | Carga tributária NCM/NBS | IBPT | On-demand |
+| Acordos leniência, PEP, renúncias, PGFN | CGU/Portal da Transparência | On-demand |
+| Operações de crédito | BNDES (CKAN) | On-demand |
 | Alíquotas ICMS (27 UFs) | CONFAZ/SEFAZ | Estático (2026) |
 
 ---
@@ -374,8 +382,8 @@ databr/
 │   ├── api/              # Entrypoint REST API + MCP
 │   └── collector/        # Scheduler de coletores
 ├── internal/
-│   ├── handlers/         # 30+ handlers HTTP (116 endpoints)
-│   ├── collectors/       # 23 pacotes de coletores (49 fontes)
+│   ├── handlers/         # 30+ handlers HTTP (122 endpoints)
+│   ├── collectors/       # 23 pacotes de coletores (50 fontes)
 │   ├── repositories/     # PostgreSQL (pgx/v5)
 │   ├── cache/            # Redis + cache em memória
 │   ├── x402/             # Middleware de pagamento + pricing
