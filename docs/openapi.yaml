@@ -1113,6 +1113,151 @@ paths:
         "402":
           $ref: "#/components/responses/PaymentRequired"
 
+  /v1/transparencia/pgfn:
+    get:
+      tags: [Transparência]
+      summary: Dívida ativa na PGFN por CNPJ
+      description: "Consulta dívida ativa na Procuradoria-Geral da Fazenda Nacional. Requer perfil especial de acesso no Portal da Transparência. Fonte: Portal da Transparência (CGU). Custo: $0.003 USDC"
+      parameters:
+        - name: cnpj
+          in: query
+          required: true
+          description: CNPJ do devedor (somente dígitos, 14 caracteres)
+          schema:
+            type: string
+            example: "33000167000101"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Registros de dívida ativa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/pep:
+    get:
+      tags: [Transparência]
+      summary: Pessoas Expostas Politicamente (PEP) por nome
+      description: "Consulta Pessoas Politicamente Expostas no Portal da Transparência. Fonte: Portal da Transparência (CGU) /peps. Custo: $0.003 USDC"
+      parameters:
+        - name: nome
+          in: query
+          required: true
+          description: Nome da pessoa para busca
+          schema:
+            type: string
+            example: "Fulano da Silva"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de PEPs encontrados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/leniencias:
+    get:
+      tags: [Transparência]
+      summary: Acordos de leniência por CNPJ
+      description: "Consulta acordos de leniência firmados pela empresa no Portal da Transparência. Fonte: Portal da Transparência /acordos-leniencia. Custo: $0.003 USDC"
+      parameters:
+        - name: cnpj
+          in: query
+          required: true
+          description: CNPJ da empresa sancionada (somente dígitos)
+          schema:
+            type: string
+            example: "33000167000101"
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de acordos de leniência
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/transparencia/renuncias:
+    get:
+      tags: [Transparência]
+      summary: Renúncias fiscais por exercício
+      description: "Consulta renúncias fiscais registradas no Portal da Transparência filtradas por ano. Fonte: Portal da Transparência /renuncias-valor. Custo: $0.003 USDC"
+      parameters:
+        - name: ano
+          in: query
+          required: false
+          description: Ano de exercício (padrão: ano corrente)
+          schema:
+            type: integer
+            example: 2024
+        - name: n
+          in: query
+          required: false
+          description: Número de registros (máx. 100, padrão 20)
+          schema:
+            type: integer
+            example: 20
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de renúncias fiscais
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  # ── BNDES ($0.005) ────────────────────────────────────────
+  /v1/bndes/{cnpj}/operacoes:
+    get:
+      tags: [Mercado]
+      summary: Operações de crédito do BNDES por CNPJ
+      description: "Consulta operações de financiamento direto e indireto do BNDES via CKAN open data. Fonte: dadosabertos.bndes.gov.br (operacoes-financiamento). Custo: $0.005 USDC"
+      parameters:
+        - name: cnpj
+          in: path
+          required: true
+          description: CNPJ do beneficiário (somente dígitos)
+          schema:
+            type: string
+            example: "33000167000101"
+        - name: n
+          in: query
+          required: false
+          description: Número de registros (máx. 100, padrão 20)
+          schema:
+            type: integer
+            example: 20
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Operações de crédito BNDES
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: CNPJ sem operações BNDES
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
   # ── IBGE ($0.001) ────────────────────────────────────────
   /v1/ibge/municipio/{ibge}:
     get:
@@ -1774,6 +1919,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/APIResponse"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+
+  /v1/eleicoes/filiados:
+    get:
+      tags: [Eleições]
+      summary: Filiados partidários por UF
+      description: "Consulta filiação partidária pelo estado. Faz download e filtra o arquivo nacional do TSE (~230 MB). Fonte: TSE CDN (perfil_filiacao_partidaria.zip). Custo: $0.003 USDC"
+      parameters:
+        - name: uf
+          in: query
+          required: true
+          description: Sigla do estado (ex. SP, RJ, MG)
+          schema:
+            type: string
+            example: SP
+        - name: n
+          in: query
+          required: false
+          description: Número de registros por UF (máx. 500, padrão 100)
+          schema:
+            type: integer
+            example: 100
+        - $ref: "#/components/parameters/FormatParam"
+      responses:
+        "200":
+          description: Lista de filiados partidários
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "402":
           $ref: "#/components/responses/PaymentRequired"
 
