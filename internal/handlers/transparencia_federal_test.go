@@ -827,9 +827,9 @@ func TestTransparenciaFederalHandler_GetPGFN_OK(t *testing.T) {
 
 	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
 	rtr := chi.NewRouter()
-	rtr.Get("/v1/transparencia/pgfn/{cnpj}", h.GetPGFN)
+	rtr.Get("/v1/transparencia/pgfn", h.GetPGFN)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pgfn/12345678000195", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pgfn?cnpj=12345678000195", nil)
 	req = x402pkg.InjectPrice(req, "0.003")
 	rec := httptest.NewRecorder()
 	rtr.ServeHTTP(rec, req)
@@ -850,9 +850,9 @@ func TestTransparenciaFederalHandler_GetPGFN_OK(t *testing.T) {
 func TestTransparenciaFederalHandler_GetPGFN_InvalidCNPJ(t *testing.T) {
 	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, http.DefaultClient, "key", "http://unused")
 	rtr := chi.NewRouter()
-	rtr.Get("/v1/transparencia/pgfn/{cnpj}", h.GetPGFN)
+	rtr.Get("/v1/transparencia/pgfn", h.GetPGFN)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pgfn/123", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pgfn?cnpj=123", nil)
 	rec := httptest.NewRecorder()
 	rtr.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -871,9 +871,9 @@ func TestTransparenciaFederalHandler_GetPEP_OK(t *testing.T) {
 
 	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
 	rtr := chi.NewRouter()
-	rtr.Get("/v1/transparencia/pep/{cpf}", h.GetPEP)
+	rtr.Get("/v1/transparencia/pep", h.GetPEP)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pep/12345678901", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pep?nome=FULANO+DA+SILVA", nil)
 	req = x402pkg.InjectPrice(req, "0.003")
 	rec := httptest.NewRecorder()
 	rtr.ServeHTTP(rec, req)
@@ -888,12 +888,12 @@ func TestTransparenciaFederalHandler_GetPEP_OK(t *testing.T) {
 	}
 }
 
-func TestTransparenciaFederalHandler_GetPEP_InvalidCPF(t *testing.T) {
+func TestTransparenciaFederalHandler_GetPEP_MissingNome(t *testing.T) {
 	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, http.DefaultClient, "key", "http://unused")
 	rtr := chi.NewRouter()
-	rtr.Get("/v1/transparencia/pep/{cpf}", h.GetPEP)
+	rtr.Get("/v1/transparencia/pep", h.GetPEP)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pep/123", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pep", nil)
 	rec := httptest.NewRecorder()
 	rtr.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -912,9 +912,9 @@ func TestTransparenciaFederalHandler_GetLeniencias_OK(t *testing.T) {
 
 	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
 	rtr := chi.NewRouter()
-	rtr.Get("/v1/transparencia/leniencias/{cnpj}", h.GetLeniencias)
+	rtr.Get("/v1/transparencia/leniencias", h.GetLeniencias)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/leniencias/12345678000195", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/leniencias?cnpj=12345678000195", nil)
 	req = x402pkg.InjectPrice(req, "0.003")
 	rec := httptest.NewRecorder()
 	rtr.ServeHTTP(rec, req)
@@ -932,9 +932,9 @@ func TestTransparenciaFederalHandler_GetLeniencias_OK(t *testing.T) {
 func TestTransparenciaFederalHandler_GetLeniencias_InvalidCNPJ(t *testing.T) {
 	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, http.DefaultClient, "key", "http://unused")
 	rtr := chi.NewRouter()
-	rtr.Get("/v1/transparencia/leniencias/{cnpj}", h.GetLeniencias)
+	rtr.Get("/v1/transparencia/leniencias", h.GetLeniencias)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/leniencias/invalid", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/leniencias?cnpj=invalid", nil)
 	rec := httptest.NewRecorder()
 	rtr.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {

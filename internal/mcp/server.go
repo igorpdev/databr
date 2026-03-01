@@ -1679,16 +1679,19 @@ func (s *Server) registerTools() {
 	)
 
 	s.addTool("consultar_renuncias_fiscais",
-		"Consulta renúncias fiscais registradas no Portal da Transparência",
+		"Consulta renúncias fiscais registradas no Portal da Transparência (filtra por ano)",
 		[]mcpgosdk.ToolOption{
-			mcpgosdk.WithString("cnpj",
-				mcpgosdk.Required(),
-				mcpgosdk.Description("CNPJ do beneficiário"),
+			mcpgosdk.WithString("ano",
+				mcpgosdk.Description("Ano de exercício (ex: 2024). Omita para usar o ano atual."),
 			),
 		},
 		func(ctx context.Context, req mcpgosdk.CallToolRequest) (*mcpgosdk.CallToolResult, error) {
-			cnpj := req.GetString("cnpj", "")
-			return invokeHandler(ctx, s.deps.TranspRenuncias, "/v1/transparencia/renuncias", nil, "cnpj="+cnpj)
+			ano := req.GetString("ano", "")
+			qp := ""
+			if ano != "" {
+				qp = "ano=" + ano
+			}
+			return invokeHandler(ctx, s.deps.TranspRenuncias, "/v1/transparencia/renuncias", nil, qp)
 		},
 	)
 

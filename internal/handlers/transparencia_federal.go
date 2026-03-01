@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -568,10 +569,10 @@ func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.
 	})
 }
 
-// GetPGFN handles GET /v1/transparencia/pgfn/{cnpj}
+// GetPGFN handles GET /v1/transparencia/pgfn?cnpj={cnpj}
 // Returns PGFN dívida ativa records for a given CNPJ.
 func (h *TransparenciaFederalHandler) GetPGFN(w http.ResponseWriter, r *http.Request) {
-	cnpj := normalizeCNPJdigits(chi.URLParam(r, "cnpj"))
+	cnpj := normalizeCNPJdigits(r.URL.Query().Get("cnpj"))
 	if len(cnpj) != 14 {
 		jsonError(w, http.StatusBadRequest, "CNPJ inválido — deve ter 14 dígitos")
 		return
@@ -619,16 +620,16 @@ func (h *TransparenciaFederalHandler) GetPGFN(w http.ResponseWriter, r *http.Req
 	})
 }
 
-// GetPEP handles GET /v1/transparencia/pep/{cpf}
-// Returns PEP (Pessoa Politicamente Exposta) records for a given CPF.
+// GetPEP handles GET /v1/transparencia/pep?nome={nome}
+// Returns PEP (Pessoa Politicamente Exposta) records for a given person name.
 func (h *TransparenciaFederalHandler) GetPEP(w http.ResponseWriter, r *http.Request) {
-	cpf := reDigits.ReplaceAllString(chi.URLParam(r, "cpf"), "")
-	if len(cpf) != 11 {
-		jsonError(w, http.StatusBadRequest, "CPF inválido — deve ter 11 dígitos")
+	nome := strings.TrimSpace(r.URL.Query().Get("nome"))
+	if nome == "" {
+		jsonError(w, http.StatusBadRequest, "parâmetro 'nome' é obrigatório")
 		return
 	}
 
-	upURL := fmt.Sprintf("%s/pep?cpf=%s&pagina=1", h.baseURL, cpf)
+	upURL := fmt.Sprintf("%s/pep?nome=%s&pagina=1", h.baseURL, url.QueryEscape(nome))
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
 	if err != nil {
 		internalError(w, "transparencia_pep", err)
@@ -662,14 +663,14 @@ func (h *TransparenciaFederalHandler) GetPEP(w http.ResponseWriter, r *http.Requ
 	respond(w, r, domain.APIResponse{
 		Source:   "cgu_pep",
 		CostUSDC: x402pkg.PriceFromRequest(r),
-		Data:     map[string]any{"cpf": cpf, "pep": dados},
+		Data:     map[string]any{"nome": nome, "pep": dados},
 	})
 }
 
-// GetLeniencias handles GET /v1/transparencia/leniencias/{cnpj}
+// GetLeniencias handles GET /v1/transparencia/leniencias?cnpj={cnpj}
 // Returns CGU leniency agreements for a given CNPJ.
 func (h *TransparenciaFederalHandler) GetLeniencias(w http.ResponseWriter, r *http.Request) {
-	cnpj := normalizeCNPJdigits(chi.URLParam(r, "cnpj"))
+	cnpj := normalizeCNPJdigits(r.URL.Query().Get("cnpj"))
 	if len(cnpj) != 14 {
 		jsonError(w, http.StatusBadRequest, "CNPJ inválido — deve ter 14 dígitos")
 		return
