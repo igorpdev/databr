@@ -11,6 +11,7 @@ import (
 
 	"github.com/databr/api/internal/domain"
 	"github.com/databr/api/internal/handlers"
+	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -812,5 +813,159 @@ func TestTransparenciaFederal_GetCartoes_DefaultDates(t *testing.T) {
 	// Should reach the fetcher (not 400). stub returns 1 record → 200.
 	if rec.Code == http.StatusBadRequest {
 		t.Fatalf("expected non-400 when de/ate omitted (defaults should apply), got 400: %s", rec.Body.String())
+	}
+}
+
+// ---- GetPGFN ----
+
+func TestTransparenciaFederalHandler_GetPGFN_OK(t *testing.T) {
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[{"situacao":"REGULAR","cnpj":"12345678000195"}]`))
+	}))
+	defer apiSrv.Close()
+
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/pgfn/{cnpj}", h.GetPGFN)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pgfn/12345678000195", nil)
+	req = x402pkg.InjectPrice(req, "0.003")
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp domain.APIResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Source != "cgu_pgfn" {
+		t.Errorf("Source = %q, want cgu_pgfn", resp.Source)
+	}
+	if resp.CostUSDC != "0.003" {
+		t.Errorf("CostUSDC = %q, want 0.003", resp.CostUSDC)
+	}
+}
+
+func TestTransparenciaFederalHandler_GetPGFN_InvalidCNPJ(t *testing.T) {
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, http.DefaultClient, "key", "http://unused")
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/pgfn/{cnpj}", h.GetPGFN)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pgfn/123", nil)
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+// ---- GetPEP ----
+
+func TestTransparenciaFederalHandler_GetPEP_OK(t *testing.T) {
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[{"nome":"FULANO","cpf":"12345678901"}]`))
+	}))
+	defer apiSrv.Close()
+
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/pep/{cpf}", h.GetPEP)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pep/12345678901", nil)
+	req = x402pkg.InjectPrice(req, "0.003")
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp domain.APIResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Source != "cgu_pep" {
+		t.Errorf("Source = %q, want cgu_pep", resp.Source)
+	}
+}
+
+func TestTransparenciaFederalHandler_GetPEP_InvalidCPF(t *testing.T) {
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, http.DefaultClient, "key", "http://unused")
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/pep/{cpf}", h.GetPEP)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/pep/123", nil)
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+// ---- GetLeniencias ----
+
+func TestTransparenciaFederalHandler_GetLeniencias_OK(t *testing.T) {
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[{"cnpj":"12345678000195","descricao":"Acordo de Leniencia"}]`))
+	}))
+	defer apiSrv.Close()
+
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/leniencias/{cnpj}", h.GetLeniencias)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/leniencias/12345678000195", nil)
+	req = x402pkg.InjectPrice(req, "0.003")
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp domain.APIResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Source != "cgu_leniencias" {
+		t.Errorf("Source = %q, want cgu_leniencias", resp.Source)
+	}
+}
+
+func TestTransparenciaFederalHandler_GetLeniencias_InvalidCNPJ(t *testing.T) {
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, http.DefaultClient, "key", "http://unused")
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/leniencias/{cnpj}", h.GetLeniencias)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/leniencias/invalid", nil)
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+// ---- GetRenuncias ----
+
+func TestTransparenciaFederalHandler_GetRenuncias_OK(t *testing.T) {
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[{"beneficiario":"Empresa XYZ","valor":1000000}]`))
+	}))
+	defer apiSrv.Close()
+
+	h := handlers.NewTransparenciaFederalHandlerWithBaseURL(&stubTransparenciaFetcher{}, apiSrv.Client(), "test-key", apiSrv.URL)
+	rtr := chi.NewRouter()
+	rtr.Get("/v1/transparencia/renuncias", h.GetRenuncias)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/transparencia/renuncias?ano=2024", nil)
+	req = x402pkg.InjectPrice(req, "0.003")
+	rec := httptest.NewRecorder()
+	rtr.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp domain.APIResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Source != "cgu_renuncias" {
+		t.Errorf("Source = %q, want cgu_renuncias", resp.Source)
 	}
 }

@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/databr/api/internal/domain"
 	x402pkg "github.com/databr/api/internal/x402"
 	"github.com/go-chi/chi/v5"
 )
+
+const transparenciaAPIBase = "https://api.portaldatransparencia.gov.br/api-de-dados"
 
 // TransparenciaFetcher retrieves on-demand CGU Portal da Transparência data.
 type TransparenciaFetcher interface {
@@ -31,6 +34,7 @@ type TransparenciaFederalHandler struct {
 	fetcher    TransparenciaFetcher
 	httpClient *http.Client
 	apiKey     string
+	baseURL    string
 }
 
 // NewTransparenciaFederalHandler creates a TransparenciaFederalHandler.
@@ -43,12 +47,23 @@ func NewTransparenciaFederalHandler(f TransparenciaFetcher) *TransparenciaFedera
 		fetcher:    f,
 		httpClient: &http.Client{Timeout: 15 * time.Second},
 		apiKey:     apiKey,
+		baseURL:    transparenciaAPIBase,
 	}
 }
 
 // NewTransparenciaFederalHandlerWithClient creates a TransparenciaFederalHandler with a custom HTTP client and API key.
 func NewTransparenciaFederalHandlerWithClient(f TransparenciaFetcher, client *http.Client, apiKey string) *TransparenciaFederalHandler {
-	return &TransparenciaFederalHandler{fetcher: f, httpClient: client, apiKey: apiKey}
+	return &TransparenciaFederalHandler{fetcher: f, httpClient: client, apiKey: apiKey, baseURL: transparenciaAPIBase}
+}
+
+// NewTransparenciaFederalHandlerWithBaseURL is for testing — allows custom base URL.
+func NewTransparenciaFederalHandlerWithBaseURL(f TransparenciaFetcher, client *http.Client, apiKey, baseURL string) *TransparenciaFederalHandler {
+	return &TransparenciaFederalHandler{
+		fetcher:    f,
+		httpClient: client,
+		apiKey:     apiKey,
+		baseURL:    strings.TrimRight(baseURL, "/"),
+	}
 }
 
 // reDigits is defined in helpers.go
@@ -550,5 +565,202 @@ func (h *TransparenciaFederalHandler) GetViagens(w http.ResponseWriter, r *http.
 		Source:   "cgu_viagens",
 		CostUSDC: x402pkg.PriceFromRequest(r),
 		Data:     map[string]any{"viagens": dados, "total": len(dados), "de": de, "ate": ate},
+	})
+}
+
+// GetPGFN handles GET /v1/transparencia/pgfn/{cnpj}
+// Returns PGFN dívida ativa records for a given CNPJ.
+func (h *TransparenciaFederalHandler) GetPGFN(w http.ResponseWriter, r *http.Request) {
+	cnpj := normalizeCNPJdigits(chi.URLParam(r, "cnpj"))
+	if len(cnpj) != 14 {
+		jsonError(w, http.StatusBadRequest, "CNPJ inválido — deve ter 14 dígitos")
+		return
+	}
+
+	upURL := fmt.Sprintf("%s/pgfn/consultaReceitaCadastro?cnpj=%s&pagina=1", h.baseURL, cnpj)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		internalError(w, "transparencia_pgfn", err)
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		gatewayError(w, "transparencia_pgfn", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		jsonError(w, http.StatusNotFound, "CNPJ não encontrado no PGFN: "+cnpj)
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência PGFN", resp.StatusCode, body))
+		return
+	}
+
+	var dados any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		gatewayError(w, "transparencia_pgfn", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_pgfn",
+		CostUSDC: x402pkg.PriceFromRequest(r),
+		Data:     map[string]any{"cnpj": cnpj, "pgfn": dados},
+	})
+}
+
+// GetPEP handles GET /v1/transparencia/pep/{cpf}
+// Returns PEP (Pessoa Politicamente Exposta) records for a given CPF.
+func (h *TransparenciaFederalHandler) GetPEP(w http.ResponseWriter, r *http.Request) {
+	cpf := reDigits.ReplaceAllString(chi.URLParam(r, "cpf"), "")
+	if len(cpf) != 11 {
+		jsonError(w, http.StatusBadRequest, "CPF inválido — deve ter 11 dígitos")
+		return
+	}
+
+	upURL := fmt.Sprintf("%s/pep?cpf=%s&pagina=1", h.baseURL, cpf)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		internalError(w, "transparencia_pep", err)
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		gatewayError(w, "transparencia_pep", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência PEP", resp.StatusCode, body))
+		return
+	}
+
+	var dados any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		gatewayError(w, "transparencia_pep", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_pep",
+		CostUSDC: x402pkg.PriceFromRequest(r),
+		Data:     map[string]any{"cpf": cpf, "pep": dados},
+	})
+}
+
+// GetLeniencias handles GET /v1/transparencia/leniencias/{cnpj}
+// Returns CGU leniency agreements for a given CNPJ.
+func (h *TransparenciaFederalHandler) GetLeniencias(w http.ResponseWriter, r *http.Request) {
+	cnpj := normalizeCNPJdigits(chi.URLParam(r, "cnpj"))
+	if len(cnpj) != 14 {
+		jsonError(w, http.StatusBadRequest, "CNPJ inválido — deve ter 14 dígitos")
+		return
+	}
+
+	upURL := fmt.Sprintf("%s/leniencias?cnpj=%s&pagina=1", h.baseURL, cnpj)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		internalError(w, "transparencia_leniencias", err)
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		gatewayError(w, "transparencia_leniencias", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Leniências", resp.StatusCode, body))
+		return
+	}
+
+	var dados any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		gatewayError(w, "transparencia_leniencias", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_leniencias",
+		CostUSDC: x402pkg.PriceFromRequest(r),
+		Data:     map[string]any{"cnpj": cnpj, "leniencias": dados},
+	})
+}
+
+// GetRenuncias handles GET /v1/transparencia/renuncias?ano=2024&n=20
+// Returns fiscal tax waivers for a given year.
+func (h *TransparenciaFederalHandler) GetRenuncias(w http.ResponseWriter, r *http.Request) {
+	ano := r.URL.Query().Get("ano")
+	if ano == "" {
+		ano = strconv.Itoa(time.Now().UTC().Year())
+	}
+	n := 20
+	if raw := r.URL.Query().Get("n"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 100 {
+			n = v
+		}
+	}
+
+	upURL := fmt.Sprintf("%s/renuncias-fiscais?exercicio=%s&pagina=1&quantidade=%d", h.baseURL, ano, n)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upURL, nil)
+	if err != nil {
+		internalError(w, "transparencia_renuncias", err)
+		return
+	}
+	req.Header.Set("chave-api-dados", h.apiKey)
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		gatewayError(w, "transparencia_renuncias", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		jsonError(w, http.StatusServiceUnavailable, "TRANSPARENCIA_API_KEY não configurada ou inválida")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := limitedReadAll(resp.Body)
+		jsonError(w, http.StatusBadGateway, logUpstreamError("Portal Transparência Renúncias", resp.StatusCode, body))
+		return
+	}
+
+	var dados []any
+	if err := json.NewDecoder(resp.Body).Decode(&dados); err != nil {
+		gatewayError(w, "transparencia_renuncias", err)
+		return
+	}
+
+	respond(w, r, domain.APIResponse{
+		Source:   "cgu_renuncias",
+		CostUSDC: x402pkg.PriceFromRequest(r),
+		Data:     map[string]any{"renuncias": dados, "total": len(dados), "ano": ano},
 	})
 }
