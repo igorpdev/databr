@@ -630,12 +630,12 @@ func main() {
 
 	// API Documentation (Scalar UI)
 	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
-		// Relax CSP for docs page so Scalar CDN scripts/styles load correctly.
+		// Relax CSP for docs page so Scalar CDN scripts/styles/workers load correctly.
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
 				"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
 				"font-src 'self' https://cdn.jsdelivr.net; "+
-				"img-src 'self' data: https:; connect-src 'self'")
+				"img-src 'self' data: https:; connect-src 'self' https://cdn.jsdelivr.net")
 		serveEmbedded(w, docfs.Static, "scalar.html", "text/html; charset=utf-8")
 	})
 	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
